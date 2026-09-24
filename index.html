@@ -22,7 +22,91 @@ const $=s=>document.querySelector(s); let clients=[],products=[],assets=[];
 const modules=['Dashboard','Clientes','Orçamentos','Contratos','Eventos','Estoque','Ativos / Equipamentos','Colaboradores','Manutenção','Financeiro / DRE','Agenda','Relatórios','Configurações'];
 $('#nav').innerHTML=modules.map((m,i)=>`<button data-i="${i}" class="${i===0?'active':''}">${m}</button>`).join('');
 $('#nav').onclick=e=>{const b=e.target.closest('button');if(!b)return;document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');renderModule(+b.dataset.i)};
-async function boot(){const {data:{session}}=await db.auth.getSession();session?showApp(session.user):showLogin()}
+let modoRecuperacao = false;
+
+db.auth.onAuthStateChange((event, session) => {
+  if (event === 'PASSWORD_RECOVERY') {
+    modoRecuperacao = true;
+    setTimeout(() => mostrarNovaSenha(), 100);
+  }
+});
+
+async function boot(){
+  const {data:{session}} = await db.auth.getSession();
+
+  if (modoRecuperacao) return;
+
+  if (session) {
+    showApp(session.user);
+  } else {
+    showLogin();
+  }
+}
+
+function mostrarNovaSenha(){
+  $('#app').classList.add('hidden');
+  $('#login').classList.remove('hidden');
+
+  $('.loginbox').innerHTML = `
+    <div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div>
+    <h3>Redefinir senha</h3>
+
+    <div class="field">
+      <label>Nova senha</label>
+      <input id="novaSenha" type="password">
+    </div>
+
+    <div class="field">
+      <label>Confirmar nova senha</label>
+      <input id="confirmarSenha" type="password">
+    </div>
+
+    <button type="button" class="btn primary full"
+      style="margin-top:18px"
+      onclick="salvarNovaSenha()">
+      SALVAR NOVA SENHA
+    </button>
+
+    <div id="novaSenhaMsg" class="msg"></div>
+  `;
+}
+
+async function salvarNovaSenha(){
+  const senha = $('#novaSenha').value;
+  const confirmar = $('#confirmarSenha').value;
+  const msg = $('#novaSenhaMsg');
+
+  if (!senha || !confirmar) {
+    msg.textContent = 'Preencha os dois campos.';
+    return;
+  }
+
+  if (senha.length < 6) {
+    msg.textContent = 'A senha precisa ter pelo menos 6 caracteres.';
+    return;
+  }
+
+  if (senha !== confirmar) {
+    msg.textContent = 'As senhas não são iguais.';
+    return;
+  }
+
+  msg.textContent = 'Salvando nova senha...';
+
+  const {error} = await db.auth.updateUser({
+    password: senha
+  });
+
+  if (error) {
+    msg.textContent = 'Erro: ' + error.message;
+    return;
+  }
+
+  await db.auth.signOut();
+
+  alert('Senha alterada com sucesso! Entre com sua nova senha.');
+  window.location.href = 'https://cz-efeitos-especiais.vercel.app';
+}
 function showLogin(){$('#login').classList.remove('hidden');$('#app').classList.add('hidden')}
 async function showApp(user){$('#login').classList.add('hidden');$('#app').classList.remove('hidden');$('#userName').textContent=user.email||'';renderModule(0)}
 $('#loginBtn').onclick=async()=>{const email=$('#email').value.trim(),password=$('#password').value;$('#loginMsg').textContent='Entrando...';const {data,error}=await db.auth.signInWithPassword({email,password});if(error){$('#loginMsg').textContent='Não foi possível entrar: '+error.message;return}$('#loginMsg').textContent='';showApp(data.user)};
