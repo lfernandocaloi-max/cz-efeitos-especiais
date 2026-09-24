@@ -450,7 +450,7 @@ async function renderOrcamentos(){
  const atualizarEquipe = () => {
   let totalEquipe = 0;
 
-  document.querySelectorAll('.linhaEquipe').forEach(linha => {
+  document.querySelectorAll('.orc-equipe-linha, .linhaEquipe').forEach(linha => {
     const diaria = Number(linha.querySelector('.equipeValorDiaria')?.value || 0);
     const dias = Number(linha.querySelector('.equipeDiarias')?.value || 0);
     const estadia = Number(linha.querySelector('.equipeEstadia')?.value || 0);
