@@ -126,7 +126,106 @@ $('#logoutBtn').onclick=async()=>{await db.auth.signOut();showLogin()};
 }
 async function renderModule(i){$('#pageTitle').textContent=modules[i];if(i===0)return renderDashboard();if(i===1)return renderClients();if(i===5)return renderProducts();if(i===6)return renderAssets();$('#content').innerHTML=`<div class="sectionhead"><h2>${modules[i]}</h2></div><div class="placeholder">Módulo já previsto no banco de dados. A tela operacional será ativada nas próximas versões sem precisar recriar sua estrutura.</div>`}
 async function count(table){const {count,error}=await db.from(table).select('*',{count:'exact',head:true});return error?'—':count}
-async function renderDashboard(){const c=await Promise.all([count('clientes'),count('eventos'),count('ativos'),count('produtos')]);$('#content').innerHTML=`<div class="sectionhead"><div><h2>Visão geral</h2><div class="muted">Resumo da operação</div></div></div><div class="cards"><div class="card"><div class="muted">Clientes</div><div class="n">${c[0]}</div></div><div class="card"><div class="muted">Eventos</div><div class="n">${c[1]}</div></div><div class="card"><div class="muted">Ativos</div><div class="n">${c[2]}</div></div><div class="card"><div class="muted">Produtos</div><div class="n">${c[3]}</div></div></div><div class="card" style="margin-top:14px"><b>Próximos passos</b><p class="muted">Cadastre seus clientes. Nas próximas telas, o cadastro será ligado diretamente a orçamentos, eventos, estoque, ativos e financeiro.</p></div>`}
+async function renderDashboard(){
+  const c = await Promise.all([
+    count('clientes'),
+    count('eventos'),
+    count('ativos'),
+    count('produtos')
+  ]);
+
+  $('#content').innerHTML = `
+    <div style="margin-bottom:24px">
+      <div style="font-size:13px;color:#ff641f;font-weight:800;letter-spacing:1px">
+        CZ EFEITOS ESPECIAIS
+      </div>
+      <h2 style="margin:5px 0 4px;font-size:30px">Painel de Controle</h2>
+      <div class="muted">Gestão rápida da sua operação</div>
+    </div>
+
+    <div style="
+      background:linear-gradient(135deg,#ff641f,#d94700);
+      border-radius:18px;
+      padding:22px;
+      margin-bottom:24px;
+      box-shadow:0 8px 25px rgba(0,0,0,.25);
+    ">
+      <div style="font-size:14px;font-weight:700;opacity:.9">
+        ACESSO RÁPIDO
+      </div>
+
+      <div style="
+        display:grid;
+        grid-template-columns:repeat(2,1fr);
+        gap:12px;
+        margin-top:16px;
+      ">
+        <button class="btn"
+          onclick="renderModule(2)"
+          style="background:#fff;color:#111;padding:18px 8px;border-radius:14px;font-weight:800">
+          <div style="font-size:27px;margin-bottom:6px">📝</div>
+          Novo Orçamento
+        </button>
+
+        <button class="btn"
+          onclick="renderModule(1)"
+          style="background:#fff;color:#111;padding:18px 8px;border-radius:14px;font-weight:800">
+          <div style="font-size:27px;margin-bottom:6px">👥</div>
+          Clientes
+        </button>
+
+        <button class="btn"
+          onclick="renderModule(4)"
+          style="background:#fff;color:#111;padding:18px 8px;border-radius:14px;font-weight:800">
+          <div style="font-size:27px;margin-bottom:6px">📅</div>
+          Eventos
+        </button>
+
+        <button class="btn"
+          onclick="renderModule(6)"
+          style="background:#fff;color:#111;padding:18px 8px;border-radius:14px;font-weight:800">
+          <div style="font-size:27px;margin-bottom:6px">🏷️</div>
+          Equipamentos
+        </button>
+      </div>
+    </div>
+
+    <div style="margin-bottom:12px">
+      <h3 style="margin:0">Visão geral</h3>
+      <div class="muted">Resumo da operação</div>
+    </div>
+
+    <div style="
+      display:grid;
+      grid-template-columns:repeat(2,1fr);
+      gap:12px;
+    ">
+      <div class="card" style="margin:0;padding:18px">
+        <div style="font-size:25px">👥</div>
+        <div class="muted">Clientes</div>
+        <div style="font-size:28px;font-weight:800">${c[0]}</div>
+      </div>
+
+      <div class="card" style="margin:0;padding:18px">
+        <div style="font-size:25px">📅</div>
+        <div class="muted">Eventos</div>
+        <div style="font-size:28px;font-weight:800">${c[1]}</div>
+      </div>
+
+      <div class="card" style="margin:0;padding:18px">
+        <div style="font-size:25px">⚙️</div>
+        <div class="muted">Equipamentos</div>
+        <div style="font-size:28px;font-weight:800">${c[2]}</div>
+      </div>
+
+      <div class="card" style="margin:0;padding:18px">
+        <div style="font-size:25px">📦</div>
+        <div class="muted">Produtos</div>
+        <div style="font-size:28px;font-weight:800">${c[3]}</div>
+      </div>
+    </div>
+  `;
+}
 async function renderClients(){const {data,error}=await db.from('clientes').select('*').order('criado_em',{ascending:false});if(error){$('#content').innerHTML=`<div class="msg">Erro ao carregar clientes: ${error.message}</div>`;return}clients=data||[];$('#content').innerHTML=`<div class="sectionhead"><div><h2>Clientes</h2><div class="muted">${clients.length} cliente(s) cadastrado(s)</div></div><button class="btn primary" onclick="openClient()">+ Novo cliente</button></div><div class="tablewrap">${clients.length?`<table><thead><tr><th>Nome</th><th>Telefone</th><th>Origem</th><th>Endereço</th><th>Ações</th></tr></thead><tbody>${clients.map(c=>`<tr><td>${esc(c.nome)}</td><td>${esc(c.telefone||'')}</td><td>${esc(c.origem||'')}</td><td>${esc(c.endereco||'')}</td><td><button class="btn secondary" onclick="editClient('${c.id}')">Editar</button> <button class="btn danger" onclick="deleteClient('${c.id}')">Excluir</button></td></tr>`).join('')}</tbody></table>`:`<div class="empty">Nenhum cliente cadastrado.</div>`}</div>`}
 function esc(v){return String(v).replace(/[&<>'"]/g,a=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[a]))}
 function openClient(c=null){$('#clientModal').classList.remove('hidden');$('#modalTitle').textContent=c?'Editar cliente':'Novo cliente';$('#clientId').value=c?.id||'';$('#clientName').value=c?.nome||'';$('#clientPhone').value=c?.telefone||'';$('#clientAddress').value=c?.endereco||'';$('#clientOrigin').value=c?.origem||'manual';$('#clientNotes').value=c?.observacoes||'';$('#clientMsg').textContent=''}
