@@ -242,54 +242,44 @@ async function renderOrcamentos(){
 
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px">
 
-        <div class="field">
-          <label>Cliente</label>
-          <input id="orcCliente" placeholder="Buscar cliente cadastrado">
-        </div>
+       <!-- EVENTO -->
+<div style="grid-column:1/-1;margin-top:4px">
+  <h3 style="margin:0 0 10px">📋 Evento</h3>
+</div>
 
-        <div class="field">
-          <label>Telefone</label>
-          <input id="orcTelefone" placeholder="Telefone">
-        </div>
+<div class="field">
+  <label>Cliente</label>
+  <input id="orcCliente" placeholder="Buscar cliente cadastrado">
+</div>
 
-        <div class="field">
-          <label>Projeto / Evento</label>
-          <input id="orcEvento" placeholder="Nome do evento">
-        </div>
+<div class="field">
+  <label>Telefone</label>
+  <input id="orcTelefone" placeholder="Telefone">
+</div>
 
-        <div class="field">
-          <label>Cidade</label>
-          <input id="orcCidade" placeholder="Cidade do evento">
-        </div>
+<div class="field">
+  <label>Projeto / Evento</label>
+  <input id="orcEvento" placeholder="Nome do evento">
+</div>
 
-        <div class="field">
-          <label>Data</label>
-          <input id="orcData" type="date">
-        </div>
-
-        <div class="field">
-          <label>Horário</label>
-          <input id="orcHorario" type="time">
-        </div>
-
-        <div class="field">
-          <label>Técnico responsável</label>
-          <input id="orcTecnico" placeholder="Técnico">
-        </div>
-
-        <div class="field">
-          <label>Veículo</label>
-          <input id="orcVeiculo" placeholder="Veículo">
-        </div>
-
-       <div class="field">
-  <label>Horário de montagem</label>
-  <input id="orcHorarioMontagem" type="time">
+<div class="field">
+  <label>Data</label>
+  <input id="orcData" type="date">
 </div>
 
 <div class="field">
   <label>Local do evento</label>
   <input id="orcLocalEvento" placeholder="Local do evento">
+</div>
+
+<div class="field">
+  <label>Horário inicial</label>
+  <input id="orcHorario" type="time">
+</div>
+
+<div class="field">
+  <label>Horário de montagem</label>
+  <input id="orcHorarioMontagem" type="time">
 </div>
 
 <div class="field">
@@ -302,18 +292,28 @@ async function renderOrcamentos(){
   <input id="orcTelefoneResponsavel" placeholder="Telefone">
 </div>
 
-        <div class="field">
-          <label>Km rodado</label>
-          <input id="orcKm" type="number" min="0" placeholder="0">
-        </div>
+<!-- DESLOCAMENTO -->
+<div style="grid-column:1/-1;margin-top:12px">
+  <h3 style="margin:0 0 10px">🚚 Deslocamento</h3>
+</div>
 
-        <div class="field">
-          <label>Pedágio</label>
-          <input id="orcPedagio" type="number" min="0" step="0.01" placeholder="R$ 0,00">
-        </div>
+<div class="field">
+  <label>Veículo</label>
+  <input id="orcVeiculo" placeholder="Veículo">
+</div>
 
-      </div>
-    </div>
+<div class="field">
+  <label>Km rodado</label>
+  <input id="orcKm" type="number" min="0" placeholder="0">
+</div>
+
+<div class="field">
+  <label>Pedágio</label>
+  <input id="orcPedagio" type="number" min="0" step="0.01" placeholder="R$ 0,00">
+</div>
+
+</div>
+</div>
 
     <!-- MÃO DE OBRA -->
     <div class="card" style="margin-bottom:18px">
