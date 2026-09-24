@@ -242,11 +242,7 @@ async function renderOrcamentos(){
 
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px">
 
-       <!-- EVENTO -->
-<div style="grid-column:1/-1;margin-top:4px">
-  <h3 style="margin:0 0 10px">📋 Evento</h3>
-</div>
-
+      
 <div class="field">
   <label>Cliente</label>
   <input id="orcCliente" placeholder="Buscar cliente cadastrado">
@@ -291,7 +287,10 @@ async function renderOrcamentos(){
   <label>Telefone do responsável</label>
   <input id="orcTelefoneResponsavel" placeholder="Telefone">
 </div>
-
+<div class="field">
+  <label>Téc. responsável</label>
+  <input id="orcTecnicoResponsavel" placeholder="Nome do técnico responsável">
+</div>
 
 
 </div>
@@ -316,6 +315,13 @@ async function renderOrcamentos(){
       <label>Km rodado</label>
       <input id="orcKm" type="number" min="0" value="0">
     </div>
+</div>
+
+<div class="field">
+  <label>Valor do km</label>
+  <input id="orcValorKm" type="number" min="0" step="0.01" value="0" readonly>
+</div>
+
 
     <div class="field">
       <label>Pedágio</label>
@@ -330,8 +336,7 @@ async function renderOrcamentos(){
 <div id="orcEquipeLista">
 
   <div class="orc-equipe-linha"
-       style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr;gap:12px;align-items:end;margin-bottom:10px">
-
+       grid-template-columns:2fr 1fr 1fr 1fr 1fr 1fr;
     <div class="field">
       <label>Nome do colaborador</label>
       <input class="equipeNome" placeholder="Nome">
@@ -346,7 +351,10 @@ async function renderOrcamentos(){
       <label>Qtd. diárias</label>
       <input class="equipeDiarias" type="number" min="0" value="0">
     </div>
-
+<div class="field">
+  <label>Valor alimentação</label>
+  <input class="equipeAlimentacao" type="number" min="0" step="0.01" value="0">
+</div>
     <div class="field">
       <label>Estadia</label>
       <input class="equipeEstadia" type="number" min="0" step="0.01" value="0">
@@ -446,8 +454,8 @@ async function renderOrcamentos(){
     const diaria = Number(linha.querySelector('.equipeValorDiaria')?.value || 0);
     const dias = Number(linha.querySelector('.equipeDiarias')?.value || 0);
     const estadia = Number(linha.querySelector('.equipeEstadia')?.value || 0);
-
-    const total = (diaria * dias) + estadia;
+const alimentacao = Number(linha.querySelector('.equipeAlimentacao')?.value || 0);
+   const total = (diaria * dias) + (alimentacao * dias) + estadia;
     totalEquipe += total;
 
     const campoTotal = linha.querySelector('.equipeTotal');
@@ -491,7 +499,10 @@ $('#btnAdicionarColaborador').onclick = () => {
       <label>Qtd. diárias</label>
       <input class="equipeDiarias" type="number" min="0" value="0">
     </div>
-
+<div class="field">
+  <label>Valor alimentação</label>
+  <input class="equipeAlimentacao" type="number" min="0" step="0.01" value="0">
+</div>
     <div class="field">
       <label>Estadia</label>
       <input class="equipeEstadia" type="number" min="0" step="0.01" value="0">
