@@ -336,7 +336,7 @@ async function renderOrcamentos(){
 <div id="orcEquipeLista">
 
   <div class="orc-equipe-linha"
-       grid-template-columns:2fr 1fr 1fr 1fr 1fr 1fr;
+     style="display:grid;grid-template-columns:1.5fr .8fr .8fr .8fr .8fr;gap:12px;align-items:end;">
     <div class="field">
       <label>Nome do colaborador</label>
       <input class="equipeNome" placeholder="Nome">
@@ -482,8 +482,7 @@ $('#btnAdicionarColaborador').onclick = () => {
 
   const novaLinha = document.createElement('div');
   novaLinha.className = 'linhaEquipe';
-  novaLinha.style = 'display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr auto;gap:12px;margin-top:10px;align-items:end';
-
+novaLinha.style = 'display:grid;grid-template-columns:1.5fr .8fr .8fr .8fr .8fr auto;gap:12px;margin-top:10px;align-items:end';
   novaLinha.innerHTML = `
     <div class="field">
       <label>Nome do colaborador</label>
