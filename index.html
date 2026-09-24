@@ -455,7 +455,7 @@ async function renderOrcamentos(){
     const dias = Number(linha.querySelector('.equipeDiarias')?.value || 0);
     const estadia = Number(linha.querySelector('.equipeEstadia')?.value || 0);
 const alimentacao = Number(linha.querySelector('.equipeAlimentacao')?.value || 0);
-   const total = (diaria * dias) + (alimentacao * dias) + estadia;
+   const total = (diaria * dias) + (alimentacao * dias) + (estadia * dias);
     totalEquipe += total;
 
     const campoTotal = linha.querySelector('.equipeTotal');
