@@ -292,58 +292,82 @@ async function renderOrcamentos(){
   <input id="orcTelefoneResponsavel" placeholder="Telefone">
 </div>
 
-<!-- DESLOCAMENTO -->
-<div style="grid-column:1/-1;margin-top:12px">
-  <h3 style="margin:0 0 10px">🚚 Deslocamento</h3>
-</div>
 
-<div class="field">
-  <label>Veículo</label>
-  <input id="orcVeiculo" placeholder="Veículo">
-</div>
-
-<div class="field">
-  <label>Km rodado</label>
-  <input id="orcKm" type="number" min="0" placeholder="0">
-</div>
-
-<div class="field">
-  <label>Pedágio</label>
-  <input id="orcPedagio" type="number" min="0" step="0.01" placeholder="R$ 0,00">
-</div>
 
 </div>
 </div>
 
-    <!-- MÃO DE OBRA -->
-    <div class="card" style="margin-bottom:18px">
-      <h3 style="margin-top:0">👷 Mão de obra</h3>
+   <!-- CUSTO INICIAL DO EVENTO -->
+<div class="card" style="margin-bottom:18px">
 
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px">
+  <h3 style="margin-top:0">💰 Custo inicial do evento</h3>
 
-        <div class="field">
-          <label>Quantidade</label>
-          <input id="orcMaoQtd" type="number" min="0" value="0">
-        </div>
+  <!-- DESLOCAMENTO -->
+  <h4 style="margin:18px 0 10px">🚗 Deslocamento</h4>
 
-        <div class="field">
-          <label>Diárias</label>
-          <input id="orcDiarias" type="number" min="0" value="0">
-        </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
 
-        <div class="field">
-          <label>Valor da diária</label>
-          <input id="orcValorDiaria" type="number" min="0" step="0.01" placeholder="R$ 0,00">
-        </div>
-
-        <div class="field">
-          <label>Total mão de obra</label>
-          <input id="orcTotalMao" value="R$ 0,00" readonly>
-        </div>
-
-      </div>
+    <div class="field">
+      <label>Veículo</label>
+      <input id="orcVeiculo" placeholder="Veículo">
     </div>
 
+    <div class="field">
+      <label>Km rodado</label>
+      <input id="orcKm" type="number" min="0" value="0">
+    </div>
+
+    <div class="field">
+      <label>Pedágio</label>
+      <input id="orcPedagio" type="number" min="0" step="0.01" value="0">
+    </div>
+
+  </div>
+
+  <!-- EQUIPE -->
+<h4 style="margin:22px 0 10px">👷 Equipe</h4>
+
+<div id="orcEquipeLista">
+
+  <div class="orc-equipe-linha"
+       style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr;gap:12px;align-items:end;margin-bottom:10px">
+
+    <div class="field">
+      <label>Nome do colaborador</label>
+      <input class="equipeNome" placeholder="Nome">
+    </div>
+
+    <div class="field">
+      <label>Valor da diária</label>
+      <input class="equipeValor" type="number" min="0" step="0.01" value="0">
+    </div>
+
+    <div class="field">
+      <label>Qtd. diárias</label>
+      <input class="equipeDiarias" type="number" min="0" value="0">
+    </div>
+
+    <div class="field">
+      <label>Estadia</label>
+      <input class="equipeEstadia" type="number" min="0" step="0.01" value="0">
+    </div>
+
+    <div class="field">
+      <label>Total</label>
+      <input class="equipeTotal" value="R$ 0,00" readonly>
+    </div>
+
+  </div>
+
+</div>
+
+<button type="button"
+        id="btnAdicionarColaborador"
+        class="btn secondary"
+        style="padding:6px 10px;font-size:12px;margin-top:4px">
+  + Adicionar colaborador
+</button>
+</div>
     <!-- 2 PRODUTOS -->
     <div class="card" style="margin-bottom:18px">
       <div class="sectionhead">
@@ -415,27 +439,88 @@ async function renderOrcamentos(){
     </div>
   `;
 
-  const atualizarMaoObra = () => {
-    const qtd = Number($('#orcMaoQtd').value || 0);
-    const diarias = Number($('#orcDiarias').value || 0);
-    const valor = Number($('#orcValorDiaria').value || 0);
+ const atualizarEquipe = () => {
+  let totalEquipe = 0;
 
-    const total = qtd * diarias * valor;
+  document.querySelectorAll('.linhaEquipe').forEach(linha => {
+    const diaria = Number(linha.querySelector('.equipeValorDiaria')?.value || 0);
+    const dias = Number(linha.querySelector('.equipeDiarias')?.value || 0);
+    const estadia = Number(linha.querySelector('.equipeEstadia')?.value || 0);
 
-    $('#orcTotalMao').value = total.toLocaleString('pt-BR',{
-      style:'currency',
-      currency:'BRL'
-    });
+    const total = (diaria * dias) + estadia;
+    totalEquipe += total;
 
-    $('#orcInvestimento').textContent = total.toLocaleString('pt-BR',{
-      style:'currency',
-      currency:'BRL'
-    });
+    const campoTotal = linha.querySelector('.equipeTotal');
+    if (campoTotal) {
+      campoTotal.value = total.toLocaleString('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+      });
+    }
+  });
+
+  $('#orcInvestimento').textContent = totalEquipe.toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL'
+  });
+};
+
+document.querySelectorAll('.linhaEquipe input').forEach(input => {
+  input.addEventListener('input', atualizarEquipe);
+});
+
+$('#btnAdicionarColaborador').onclick = () => {
+  const container = $('#orcEquipeLista');
+
+  const novaLinha = document.createElement('div');
+  novaLinha.className = 'linhaEquipe';
+  novaLinha.style = 'display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr auto;gap:12px;margin-top:10px;align-items:end';
+
+  novaLinha.innerHTML = `
+    <div class="field">
+      <label>Nome do colaborador</label>
+      <input class="equipeNome" placeholder="Nome">
+    </div>
+
+    <div class="field">
+      <label>Valor da diária</label>
+      <input class="equipeValorDiaria" type="number" min="0" step="0.01" value="0">
+    </div>
+
+    <div class="field">
+      <label>Qtd. diárias</label>
+      <input class="equipeDiarias" type="number" min="0" value="0">
+    </div>
+
+    <div class="field">
+      <label>Estadia</label>
+      <input class="equipeEstadia" type="number" min="0" step="0.01" value="0">
+    </div>
+
+    <div class="field">
+      <label>Total</label>
+      <input class="equipeTotal" value="R$ 0,00" readonly>
+    </div>
+
+    <button type="button" class="btn secondary removerColaborador"
+      style="padding:6px 10px;font-size:12px;margin-bottom:2px">
+      ✕
+    </button>
+  `;
+
+  container.appendChild(novaLinha);
+
+  novaLinha.querySelectorAll('input').forEach(input => {
+    input.addEventListener('input', atualizarEquipe);
+  });
+
+  novaLinha.querySelector('.removerColaborador').onclick = () => {
+    novaLinha.remove();
+    atualizarEquipe();
   };
+};
 
-  $('#orcMaoQtd').oninput = atualizarMaoObra;
-  $('#orcDiarias').oninput = atualizarMaoObra;
-  $('#orcValorDiaria').oninput = atualizarMaoObra;
+atualizarEquipe();
 }
   
   async function renderClients(){const {data,error}=await db.from('clientes').select('*').order('criado_em',{ascending:false});if(error){$('#content').innerHTML=`<div class="msg">Erro ao carregar clientes: ${error.message}</div>`;return}clients=data||[];$('#content').innerHTML=`<div class="sectionhead"><div><h2>Clientes</h2><div class="muted">${clients.length} cliente(s) cadastrado(s)</div></div><button class="btn primary" onclick="openClient()">+ Novo cliente</button></div><div class="tablewrap">${clients.length?`<table><thead><tr><th>Nome</th><th>Telefone</th><th>Origem</th><th>Endereço</th><th>Ações</th></tr></thead><tbody>${clients.map(c=>`<tr><td>${esc(c.nome)}</td><td>${esc(c.telefone||'')}</td><td>${esc(c.origem||'')}</td><td>${esc(c.endereco||'')}</td><td><button class="btn secondary" onclick="editClient('${c.id}')">Editar</button> <button class="btn danger" onclick="deleteClient('${c.id}')">Excluir</button></td></tr>`).join('')}</tbody></table>`:`<div class="empty">Nenhum cliente cadastrado.</div>`}</div>`}
