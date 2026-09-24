@@ -124,7 +124,7 @@ $('#logoutBtn').onclick=async()=>{await db.auth.signOut();showLogin()};
     ? 'Erro: '+error.message
     : 'Link de recuperação enviado para seu e-mail.';
 }
-async function renderModule(i){$('#pageTitle').textContent=modules[i];if(i===0)return renderDashboard();if(i===1)return renderClients();if(i===5)return renderProducts();if(i===6)return renderAssets();$('#content').innerHTML=`<div class="sectionhead"><h2>${modules[i]}</h2></div><div class="placeholder">Módulo já previsto no banco de dados. A tela operacional será ativada nas próximas versões sem precisar recriar sua estrutura.</div>`}
+async function renderModule(i){$('#pageTitle').textContent=modules[i];if(i===0)return renderDashboard();if(i===1)return renderClients();if(i===2)return renderOrcamentos();if(i===5)return renderProducts();if(i===6)return renderAssets();$('#content').innerHTML=`<div class="sectionhead"><h2>${modules[i]}</h2></div><div class="placeholder">Módulo já previsto no banco de dados. A tela operacional será ativada nas próximas versões sem precisar recriar sua estrutura.</div>`}
 async function count(table){const {count,error}=await db.from(table).select('*',{count:'exact',head:true});return error?'—':count}
 async function renderDashboard(){
   const c = await Promise.all([
@@ -226,7 +226,204 @@ async function renderDashboard(){
     </div>
   `;
 }
-async function renderClients(){const {data,error}=await db.from('clientes').select('*').order('criado_em',{ascending:false});if(error){$('#content').innerHTML=`<div class="msg">Erro ao carregar clientes: ${error.message}</div>`;return}clients=data||[];$('#content').innerHTML=`<div class="sectionhead"><div><h2>Clientes</h2><div class="muted">${clients.length} cliente(s) cadastrado(s)</div></div><button class="btn primary" onclick="openClient()">+ Novo cliente</button></div><div class="tablewrap">${clients.length?`<table><thead><tr><th>Nome</th><th>Telefone</th><th>Origem</th><th>Endereço</th><th>Ações</th></tr></thead><tbody>${clients.map(c=>`<tr><td>${esc(c.nome)}</td><td>${esc(c.telefone||'')}</td><td>${esc(c.origem||'')}</td><td>${esc(c.endereco||'')}</td><td><button class="btn secondary" onclick="editClient('${c.id}')">Editar</button> <button class="btn danger" onclick="deleteClient('${c.id}')">Excluir</button></td></tr>`).join('')}</tbody></table>`:`<div class="empty">Nenhum cliente cadastrado.</div>`}</div>`}
+async function renderOrcamentos(){
+  $('#content').innerHTML = `
+    <div style="margin-bottom:22px">
+      <div style="font-size:13px;color:#ff641f;font-weight:800;letter-spacing:1px">
+        CZ EFEITOS ESPECIAIS
+      </div>
+      <h2 style="margin:5px 0">Novo Orçamento</h2>
+      <div class="muted">Elaboração do projeto e composição do investimento</div>
+    </div>
+
+    <!-- 1 PROJETO / EVENTO -->
+    <div class="card" style="margin-bottom:18px">
+      <h3 style="margin-top:0">📋 1. Projeto / Evento</h3>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px">
+
+        <div class="field">
+          <label>Cliente</label>
+          <input id="orcCliente" placeholder="Buscar cliente cadastrado">
+        </div>
+
+        <div class="field">
+          <label>Telefone</label>
+          <input id="orcTelefone" placeholder="Telefone">
+        </div>
+
+        <div class="field">
+          <label>Projeto / Evento</label>
+          <input id="orcEvento" placeholder="Nome do evento">
+        </div>
+
+        <div class="field">
+          <label>Cidade</label>
+          <input id="orcCidade" placeholder="Cidade do evento">
+        </div>
+
+        <div class="field">
+          <label>Data</label>
+          <input id="orcData" type="date">
+        </div>
+
+        <div class="field">
+          <label>Horário</label>
+          <input id="orcHorario" type="time">
+        </div>
+
+        <div class="field">
+          <label>Técnico responsável</label>
+          <input id="orcTecnico" placeholder="Técnico">
+        </div>
+
+        <div class="field">
+          <label>Veículo</label>
+          <input id="orcVeiculo" placeholder="Veículo">
+        </div>
+
+        <div class="field">
+          <label>Deslocamento</label>
+          <input id="orcDeslocamento" placeholder="Origem / destino">
+        </div>
+
+        <div class="field">
+          <label>Km rodado</label>
+          <input id="orcKm" type="number" min="0" placeholder="0">
+        </div>
+
+        <div class="field">
+          <label>Pedágio</label>
+          <input id="orcPedagio" type="number" min="0" step="0.01" placeholder="R$ 0,00">
+        </div>
+
+      </div>
+    </div>
+
+    <!-- MÃO DE OBRA -->
+    <div class="card" style="margin-bottom:18px">
+      <h3 style="margin-top:0">👷 Mão de obra</h3>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px">
+
+        <div class="field">
+          <label>Quantidade</label>
+          <input id="orcMaoQtd" type="number" min="0" value="0">
+        </div>
+
+        <div class="field">
+          <label>Diárias</label>
+          <input id="orcDiarias" type="number" min="0" value="0">
+        </div>
+
+        <div class="field">
+          <label>Valor da diária</label>
+          <input id="orcValorDiaria" type="number" min="0" step="0.01" placeholder="R$ 0,00">
+        </div>
+
+        <div class="field">
+          <label>Total mão de obra</label>
+          <input id="orcTotalMao" value="R$ 0,00" readonly>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- 2 PRODUTOS -->
+    <div class="card" style="margin-bottom:18px">
+      <div class="sectionhead">
+        <div>
+          <h3 style="margin:0">📦 2. Produtos de Consumo</h3>
+          <div class="muted">Tabela 1 aplicada automaticamente</div>
+        </div>
+
+        <button class="btn primary" type="button">
+          + Adicionar Produto
+        </button>
+      </div>
+
+      <div style="margin-top:16px" class="muted">
+        Nenhum produto adicionado.
+      </div>
+    </div>
+
+    <!-- 3 EQUIPAMENTOS -->
+    <div class="card" style="margin-bottom:18px">
+      <div class="sectionhead">
+        <div>
+          <h3 style="margin:0">⚙️ 3. Equipamentos</h3>
+          <div class="muted">Tabela 1 aplicada automaticamente</div>
+        </div>
+
+        <button class="btn primary" type="button">
+          + Adicionar Equipamento
+        </button>
+      </div>
+
+      <div style="margin-top:16px" class="muted">
+        Nenhum equipamento adicionado.
+      </div>
+    </div>
+
+    <!-- RESUMO -->
+    <div style="
+      background:linear-gradient(135deg,#ff641f,#d94700);
+      border-radius:18px;
+      padding:22px;
+      margin-bottom:20px
+    ">
+      <div style="font-size:13px;font-weight:800;letter-spacing:1px">
+        RESUMO DO PROJETO
+      </div>
+
+      <div style="margin-top:16px;font-size:14px">
+        Composição interna do orçamento
+      </div>
+
+      <div style="margin-top:18px;font-size:14px">
+        INVESTIMENTO DO CLIENTE
+      </div>
+
+      <div id="orcInvestimento" style="font-size:34px;font-weight:900;margin-top:4px">
+        R$ 0,00
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn secondary" type="button">
+        Salvar Rascunho
+      </button>
+
+      <button class="btn primary" type="button">
+        Gerar Proposta
+      </button>
+    </div>
+  `;
+
+  const atualizarMaoObra = () => {
+    const qtd = Number($('#orcMaoQtd').value || 0);
+    const diarias = Number($('#orcDiarias').value || 0);
+    const valor = Number($('#orcValorDiaria').value || 0);
+
+    const total = qtd * diarias * valor;
+
+    $('#orcTotalMao').value = total.toLocaleString('pt-BR',{
+      style:'currency',
+      currency:'BRL'
+    });
+
+    $('#orcInvestimento').textContent = total.toLocaleString('pt-BR',{
+      style:'currency',
+      currency:'BRL'
+    });
+  };
+
+  $('#orcMaoQtd').oninput = atualizarMaoObra;
+  $('#orcDiarias').oninput = atualizarMaoObra;
+  $('#orcValorDiaria').oninput = atualizarMaoObra;
+}
+  
+  async function renderClients(){const {data,error}=await db.from('clientes').select('*').order('criado_em',{ascending:false});if(error){$('#content').innerHTML=`<div class="msg">Erro ao carregar clientes: ${error.message}</div>`;return}clients=data||[];$('#content').innerHTML=`<div class="sectionhead"><div><h2>Clientes</h2><div class="muted">${clients.length} cliente(s) cadastrado(s)</div></div><button class="btn primary" onclick="openClient()">+ Novo cliente</button></div><div class="tablewrap">${clients.length?`<table><thead><tr><th>Nome</th><th>Telefone</th><th>Origem</th><th>Endereço</th><th>Ações</th></tr></thead><tbody>${clients.map(c=>`<tr><td>${esc(c.nome)}</td><td>${esc(c.telefone||'')}</td><td>${esc(c.origem||'')}</td><td>${esc(c.endereco||'')}</td><td><button class="btn secondary" onclick="editClient('${c.id}')">Editar</button> <button class="btn danger" onclick="deleteClient('${c.id}')">Excluir</button></td></tr>`).join('')}</tbody></table>`:`<div class="empty">Nenhum cliente cadastrado.</div>`}</div>`}
 function esc(v){return String(v).replace(/[&<>'"]/g,a=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[a]))}
 function openClient(c=null){$('#clientModal').classList.remove('hidden');$('#modalTitle').textContent=c?'Editar cliente':'Novo cliente';$('#clientId').value=c?.id||'';$('#clientName').value=c?.nome||'';$('#clientPhone').value=c?.telefone||'';$('#clientAddress').value=c?.endereco||'';$('#clientOrigin').value=c?.origem||'manual';$('#clientNotes').value=c?.observacoes||'';$('#clientMsg').textContent=''}
 function closeClient(){$('#clientModal').classList.add('hidden')}
