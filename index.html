@@ -6,10 +6,11 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{--bg:#090d12;--panel:#111821;--panel2:#161f2a;--line:#273342;--text:#f5f7f8;--muted:#94a0ae;--accent:#ff641f;--ok:#38b86b;--danger:#ef5350}*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:var(--text)}button,input,textarea{font:inherit}.hidden{display:none!important}.login{min-height:100vh;display:grid;place-items:center;padding:24px}.loginbox{width:min(420px,100%);background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:28px}.brand{font-size:34px;font-weight:900;color:var(--accent);line-height:.9}.brand small{display:block;font-size:11px;letter-spacing:2px;color:#fff;margin-top:8px}.field{margin-top:16px}.field label{display:block;font-size:13px;color:var(--muted);margin-bottom:7px}.field input,.field textarea,.field select{width:100%;background:#0b1118;color:#fff;border:1px solid var(--line);border-radius:9px;padding:12px;outline:none}.field textarea{min-height:90px}.thumb{width:64px;height:64px;object-fit:cover;border-radius:9px;border:1px solid var(--line);background:#0b1118}.preview{width:140px;height:140px;object-fit:cover;border-radius:12px;border:1px solid var(--line);background:#0b1118;margin-top:10px}.btn{border:0;border-radius:9px;padding:11px 15px;cursor:pointer;font-weight:700}.primary{background:var(--accent);color:#fff}.secondary{background:#22303d;color:#fff}.danger{background:#3a1e21;color:#ffb0b0}.full{width:100%}.msg{margin-top:12px;color:#ffb0b0;font-size:13px}.app{display:grid;grid-template-columns:245px 1fr;min-height:100vh}.side{background:#070d11;border-right:1px solid var(--line);padding:22px 14px}.side .brand{margin:4px 8px 26px}.nav button{display:block;width:100%;text-align:left;padding:11px 12px;margin:4px 0;border:0;border-radius:8px;background:transparent;color:#cbd4dc;cursor:pointer}.nav button:hover,.nav button.active{background:#1c2833;color:#fff}.nav button.active{border-left:3px solid var(--accent)}.main{min-width:0}.top{height:68px;background:#10171f;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 24px}.content{padding:24px}.cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}.card .n{font-size:28px;font-weight:800;margin-top:8px}.muted{color:var(--muted)}.sectionhead{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}.sectionhead h2{margin:0}.tablewrap{overflow:auto;border:1px solid var(--line);border-radius:12px}table{width:100%;border-collapse:collapse;background:var(--panel)}th,td{padding:12px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}th{font-size:12px;color:var(--muted);background:#0e151d}.empty{padding:30px;text-align:center;color:var(--muted)}.modal{position:fixed;inset:0;background:#000a;display:grid;place-items:center;padding:20px;z-index:10}.modalbox{width:min(620px,100%);max-height:90vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}.placeholder{padding:36px;background:var(--panel);border:1px dashed var(--line);border-radius:14px;color:var(--muted)}@media(max-width:900px){.app{grid-template-columns:1fr}.side{display:none}.cards{grid-template-columns:1fr 1fr}}@media(max-width:560px){.cards,.row{grid-template-columns:1fr}.content{padding:16px}.top{padding:0 16px}}
+@media(max-width:900px){#menuBtn{display:inline-block!important}.side.mobile-open{display:block;position:fixed;inset:0 auto 0 0;width:min(290px,85vw);z-index:20;overflow:auto;box-shadow:0 0 0 100vw #000a}.top{height:auto;min-height:68px;gap:8px}.top #userName{display:none}.orc-equipe-linha,.linhaEquipe{grid-template-columns:repeat(2,minmax(0,1fr))!important}.sectionhead{flex-wrap:wrap}}
 </style>
 </head><body>
 <section id="login" class="login"><div class="loginbox"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><h3>Acesso ao sistema</h3><div class="field"><label>E-mail</label><input id="email" type="email"></div><div class="field"><label>Senha</label><input id="password" type="password"></div><button id="loginBtn" class="btn primary full" style="margin-top:18px">ENTRAR</button><button type="button" class="btn secondary full" style="margin-top:8px" onclick="recuperarSenha()">Esqueci minha senha</button><div id="loginMsg" class="msg"></div></div></section>
-<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><b id="pageTitle">Dashboard</b><div class="muted" style="font-size:12px">Sistema de gestão CZ</div></div><div><span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
+<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><div class="muted" style="font-size:12px">Sistema de gestão CZ</div></div><div><span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
 <div id="clientModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="modalTitle">Novo cliente</h2><button class="btn secondary" onclick="closeClient()">Fechar</button></div><input id="clientId" type="hidden"><div class="row"><div class="field"><label>Nome *</label><input id="clientName"></div><div class="field"><label>Telefone</label><input id="clientPhone"></div></div><div class="field"><label>Endereço completo</label><input id="clientAddress"></div><div class="row"><div class="field"><label>Origem</label><input id="clientOrigin" value="manual"></div><div></div></div><div class="field"><label>Observações</label><textarea id="clientNotes"></textarea></div><div class="actions"><button class="btn secondary" onclick="closeClient()">Cancelar</button><button id="saveClientBtn" class="btn primary">Salvar cliente</button></div><div id="clientMsg" class="msg"></div></div></div>
 
 <div id="productModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="productModalTitle">Novo produto</h2><button class="btn secondary" onclick="closeProduct()">Fechar</button></div><input id="productId" type="hidden"><div class="row"><div class="field"><label>Nome *</label><input id="productName"></div><div class="field"><label>Unidade *</label><select id="productUnit"><option value="">Selecione</option><option value="un">UN</option><option value="monotiro">Monotiro</option><option value="torta">Torta</option><option value="placa">Placa</option><option value="kg">Kg</option><option value="litro">Litro</option><option value="caixa">Caixa</option></select></div></div><div class="row"><div class="field"><label>Estoque atual</label><input id="productStock" type="number" step="0.01"></div><div class="field"><label>Estoque mínimo</label><input id="productMin" type="number" step="0.01"></div></div><div class="row"><div class="field"><label>Valor de custo</label><input id="productCost" type="number" step="0.01"></div><div class="field"><label>Lucro varejo %</label><input id="productRetailPercent" type="number" step="0.01" value="0"></div><div class="field"><label>Lucro varejo R$</label><input id="productRetailProfit" type="number" step="0.01" value="0" readonly></div><div class="field"><label>Valor varejo</label><input id="productRetail" type="number" step="0.01"></div></div><div class="field"><label>Lucro atacado %</label><input id="productWholesalePercent" type="number" step="0.01" value="0"></div><div class="field"><label>Lucro atacado R$</label><input id="productWholesaleProfit" type="number" step="0.01" value="0" readonly></div><div class="field"><label>Valor atacado</label><input id="productWholesale" type="number" step="0.01"></div><div class="field"><label>Fornecedor</label><input id="productSupplier" type="text"></div><div class="field"><label>Tempo</label><input id="productTime" type="text"></div><div class="field"><label>Efeito</label><input id="productEffect" type="text"></div><div class="field"><label>Cor</label><input id="productColor" type="text"></div><div class="field"><label>Ruído</label><select id="productNoise"><option value="">Selecione</option><option value="baixo">Baixo ruído</option><option value="alto">Alto ruído</option></select></div><div class="field"><label>Foto do produto (máx. 5 MB)</label><input id="productPhoto" type="file" accept="image/*"><img id="productPreview" class="preview hidden"></div><div class="actions"><button class="btn secondary" onclick="closeProduct()">Cancelar</button><button id="saveProductBtn" class="btn primary">Salvar produto</button></div><div id="productMsg" class="msg"></div></div></div>
@@ -21,7 +22,8 @@ const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const $=s=>document.querySelector(s); let clients=[],products=[],assets=[];
 const modules=['Dashboard','Clientes','Orçamentos','Contratos','Eventos','Estoque','Ativos / Equipamentos','Colaboradores','Manutenção','Financeiro / DRE','Agenda','Relatórios','Configurações'];
 $('#nav').innerHTML=modules.map((m,i)=>`<button data-i="${i}" class="${i===0?'active':''}">${m}</button>`).join('');
-$('#nav').onclick=e=>{const b=e.target.closest('button');if(!b)return;document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');renderModule(+b.dataset.i)};
+$('#nav').onclick=e=>{const b=e.target.closest('button');if(!b)return;document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');$('.side').classList.remove('mobile-open');renderModule(+b.dataset.i)};
+$('#menuBtn').onclick=()=>$('.side').classList.toggle('mobile-open');
 let modoRecuperacao = false;
 
 db.auth.onAuthStateChange((event, session) => {
@@ -227,6 +229,8 @@ async function renderDashboard(){
   `;
 }
 async function renderOrcamentos(){
+  const itensProduto = [];
+  const itensAtivo = [];
   $('#content').innerHTML = `
     <div style="margin-bottom:22px">
       <div style="font-size:13px;color:#ff641f;font-weight:800;letter-spacing:1px">
@@ -385,14 +389,12 @@ async function renderOrcamentos(){
           <div class="muted">Tabela 1 aplicada automaticamente</div>
         </div>
 
-        <button class="btn primary" type="button">
+        <button id="orcAddProduct" class="btn primary" type="button">
           + Adicionar Produto
         </button>
       </div>
 
-      <div style="margin-top:16px" class="muted">
-        Nenhum produto adicionado.
-      </div>
+      <div id="orcProdutosLista" style="margin-top:16px" class="muted">Nenhum produto adicionado.</div>
     </div>
 
     <!-- 3 EQUIPAMENTOS -->
@@ -403,14 +405,12 @@ async function renderOrcamentos(){
           <div class="muted">Tabela 1 aplicada automaticamente</div>
         </div>
 
-        <button class="btn primary" type="button">
+        <button id="orcAddAsset" class="btn primary" type="button">
           + Adicionar Equipamento
         </button>
       </div>
 
-      <div style="margin-top:16px" class="muted">
-        Nenhum equipamento adicionado.
-      </div>
+      <div id="orcAtivosLista" style="margin-top:16px" class="muted">Nenhum equipamento adicionado.</div>
     </div>
 
     <!-- RESUMO -->
@@ -438,14 +438,15 @@ async function renderOrcamentos(){
     </div>
 
     <div style="display:flex;gap:10px;flex-wrap:wrap">
-      <button class="btn secondary" type="button">
+      <button id="orcSave" class="btn secondary" type="button">
         Salvar Rascunho
       </button>
 
-      <button class="btn primary" type="button">
+      <button id="orcPrint" class="btn primary" type="button">
         Gerar Proposta
       </button>
     </div>
+    <div id="orcMsg" class="msg" role="status"></div>
   `;
 
  const atualizarEquipe = () => {
@@ -474,15 +475,15 @@ if (campoTotalEquipe) {
     currency: 'BRL'
   });
 }
-  $('#orcInvestimento').textContent = totalEquipe.toLocaleString('pt-BR', {
-    style: 'currency',
-    currency: 'BRL'
-  });
+  const deslocamento = (Number($('#orcKm').value||0) * Number($('#orcValorKm').value||0)) + Number($('#orcPedagio').value||0);
+  const itens = [...itensProduto,...itensAtivo].reduce((s,item)=>s+item.quantidade*item.preco,0);
+  $('#orcInvestimento').textContent = money(totalEquipe+deslocamento+itens);
 };
 
 document.querySelectorAll('.orc-equipe-linha input, .linhaEquipe input').forEach(input => {
   input.addEventListener('input', atualizarEquipe);
 });
+['orcKm','orcValorKm','orcPedagio'].forEach(id=>$('#'+id).addEventListener('input',atualizarEquipe));
 
 $('#btnAdicionarColaborador').onclick = () => {
   const container = $('#orcEquipeLista');
@@ -537,6 +538,36 @@ novaLinha.style = 'display:grid;grid-template-columns:1.5fr .7fr .8fr .9fr .8fr 
 };
 
 atualizarEquipe();
+  function mostrarItens(tipo){
+    const lista=tipo==='produto'?itensProduto:itensAtivo;
+    const destino=$(tipo==='produto'?'#orcProdutosLista':'#orcAtivosLista');
+    destino.innerHTML=lista.length?`<div class="tablewrap"><table><thead><tr><th>Item</th><th>Qtd.</th><th>Tabela</th><th>Valor</th><th>Ação</th></tr></thead><tbody>${lista.map((item,i)=>`<tr><td>${esc(item.nome)}</td><td>${item.quantidade}</td><td>${item.tabela}</td><td>${money(item.quantidade*item.preco)}</td><td><button type="button" class="btn danger" data-remover="${i}">Remover</button></td></tr>`).join('')}</tbody></table></div>`:'Nenhum item adicionado.';
+    destino.querySelectorAll('[data-remover]').forEach(btn=>btn.onclick=()=>{lista.splice(Number(btn.dataset.remover),1);mostrarItens(tipo);atualizarEquipe()});
+  }
+  async function adicionarItem(tipo){
+    const destino=$(tipo==='produto'?'#orcProdutosLista':'#orcAtivosLista');
+    const tabela=tipo==='produto'?'produtos':'ativos';
+    destino.innerHTML='<div class="muted">Carregando itens cadastrados...</div>';
+    const {data,error}=await db.from(tabela).select('*').order('nome');
+    if(error){destino.textContent='Erro ao carregar '+tabela+': '+error.message;return}
+    if(!data?.length){destino.innerHTML=`<p>Nenhum ${tipo==='produto'?'produto':'equipamento'} cadastrado.</p><button type="button" class="btn secondary" id="irCadastro">Abrir cadastro</button>`;$('#irCadastro').onclick=()=>renderModule(tipo==='produto'?5:6);return}
+    destino.innerHTML=`<div class="row"><div class="field"><label>${tipo==='produto'?'Produto':'Equipamento'}</label><select id="orcItemSelect">${data.map((item,i)=>`<option value="${i}">${esc(item.nome)}</option>`).join('')}</select></div><div class="field"><label>Quantidade</label><input id="orcItemQtd" type="number" min="1" step="1" value="1"></div><div class="field"><label>Tabela de preço</label><select id="orcItemTabela"><option value="1">Tabela 1</option><option value="2">Tabela 2</option></select></div></div><div class="actions"><button type="button" id="orcCancelarItem" class="btn secondary">Cancelar</button><button type="button" id="orcConfirmarItem" class="btn primary">Adicionar ao orçamento</button></div><div id="orcItemMsg" class="msg"></div>`;
+    $('#orcCancelarItem').onclick=()=>mostrarItens(tipo);
+    $('#orcConfirmarItem').onclick=()=>{
+      const item=data[Number($('#orcItemSelect').value)];
+      const quantidade=Number($('#orcItemQtd').value);
+      if(!Number.isInteger(quantidade)||quantidade<1){$('#orcItemMsg').textContent='Informe uma quantidade inteira maior que zero.';return}
+      const tab=Number($('#orcItemTabela').value);
+      const preco=Number(tipo==='produto'?(tab===1?item.valor_varejo:item.valor_atacado):(tab===1?item.valor_locacao_tabela1:item.valor_locacao_tabela2));
+      if(!Number.isFinite(preco)||preco<0){$('#orcItemMsg').textContent='Cadastre o valor desta tabela antes de adicionar.';return}
+      (tipo==='produto'?itensProduto:itensAtivo).push({id:item.id,nome:item.nome,quantidade,preco,tabela:tab});
+      mostrarItens(tipo);atualizarEquipe();
+    };
+  }
+  $('#orcAddProduct').onclick=()=>adicionarItem('produto');
+  $('#orcAddAsset').onclick=()=>adicionarItem('ativo');
+  $('#orcSave').onclick=()=>{$('#orcMsg').textContent='O salvamento de rascunhos ainda não está disponível nesta versão.'};
+  $('#orcPrint').onclick=()=>{$('#orcMsg').textContent='A proposta para impressão ainda não está disponível nesta versão.'};
 }
   
   async function renderClients(){const {data,error}=await db.from('clientes').select('*').order('criado_em',{ascending:false});if(error){$('#content').innerHTML=`<div class="msg">Erro ao carregar clientes: ${error.message}</div>`;return}clients=data||[];$('#content').innerHTML=`<div class="sectionhead"><div><h2>Clientes</h2><div class="muted">${clients.length} cliente(s) cadastrado(s)</div></div><button class="btn primary" onclick="openClient()">+ Novo cliente</button></div><div class="tablewrap">${clients.length?`<table><thead><tr><th>Nome</th><th>Telefone</th><th>Origem</th><th>Endereço</th><th>Ações</th></tr></thead><tbody>${clients.map(c=>`<tr><td>${esc(c.nome)}</td><td>${esc(c.telefone||'')}</td><td>${esc(c.origem||'')}</td><td>${esc(c.endereco||'')}</td><td><button class="btn secondary" onclick="editClient('${c.id}')">Editar</button> <button class="btn danger" onclick="deleteClient('${c.id}')">Excluir</button></td></tr>`).join('')}</tbody></table>`:`<div class="empty">Nenhum cliente cadastrado.</div>`}</div>`}
@@ -566,8 +597,8 @@ function money(v){return Number(v||0).toLocaleString('pt-BR',{style:'currency',c
   document.getElementById(id)?.addEventListener('input', calcularPrecosProduto);
 });
 async function uploadPhoto(file,folder){if(!file)return null;if(file.size>5*1024*1024)throw new Error('A foto deve ter no máximo 5 MB.');const ext=(file.name.split('.').pop()||'jpg').toLowerCase();const path=`${folder}/${crypto.randomUUID()}.${ext}`;const {error}=await db.storage.from('fotos').upload(path,file,{cacheControl:'3600',upsert:false});if(error)throw error;return db.storage.from('fotos').getPublicUrl(path).data.publicUrl}
-async function renderProducts(){const {data,error}=await db.from('produtos').select('*').order('nome');if(error){$('#content').innerHTML=`<div class="msg">Erro ao carregar produtos: ${error.message}</div>`;return}products=data||[];$('#content').innerHTML=`<div class="sectionhead"><div><h2>Estoque / Produtos</h2><div class="muted">${products.length} produto(s)</div></div><button class="btn primary" onclick="openProduct()">+ Novo produto</button></div><div class="tablewrap">${products.length?`<table><thead><tr><th>Foto</th><th>Produto</th><th>Unidade</th><th>Estoque</th><th>Mínimo</th><th>Custo</th><th>Varejo</th><th>Atacado</th><th>Ações</th></tr></thead><tbody>${products.map(p=>`<tr><td>${p.foto_url?`<img class="thumb" src="${esc(p.foto_url)}">`:'—'}</td><td>${esc(p.nome)}</td><td>${esc(p.unidade||'')}</td><td>${p.estoque_atual??0}</td><td>${p.estoque_minimo??0}</td><td>${money(p.valor_custo)}</td><td>${money(p.valor_varejo)}</td><td>${money(p.valor_atacado)}</td><td><button<button class="btn secondary" onclick="editProduct('${p.id}')">Editar</button></td></tr>`).join('')}</tbody></table>`:`<div class="empty">Nenhum produto cadastrado.</div>`}</div>`}
-function openProduct(p=null){$('#productModal').classList.remove('hidden');$('#productModalTitle').textContent=p?'Editar produto':'Novo produto';$('#productId').value=p?.id||'';$('#productName').value=p?.nome||'';$('#productUnit').value=p?.unidade||'unidade';$('#productStock').value=p?.estoque_atual??0;$('#productMin').value=p?.estoque_minimo??0;$('#productCost').value=p?.valor_custo??0;$('#productRetail').value=p?.valor_varejo??0;$('#productWholesale').value=p?.valor_atacado??0;$('#productTime').value=p?.tempo||'';$('#productEffect').value=p?.efeito||'';$('#productSupplier').value=p?.fornecedor||'';$('#productColor').value=p?.cor||'';$('#productNoise').value=p?.ruido||'';$('#productPhoto').value='';const im=$('#productPreview');if(p?.foto_url){im.src=p.foto_url;im.classList.remove('hidden')}else im.classList.add('hidden');$('#productMsg').textContent=''}
+async function renderProducts(){const {data,error}=await db.from('produtos').select('*').order('nome');if(error){$('#content').innerHTML=`<div class="msg">Erro ao carregar produtos: ${error.message}</div>`;return}products=data||[];$('#content').innerHTML=`<div class="sectionhead"><div><h2>Estoque / Produtos</h2><div class="muted">${products.length} produto(s)</div></div><button class="btn primary" onclick="openProduct()">+ Novo produto</button></div><div class="tablewrap">${products.length?`<table><thead><tr><th>Foto</th><th>Produto</th><th>Unidade</th><th>Estoque</th><th>Mínimo</th><th>Custo</th><th>Varejo</th><th>Atacado</th><th>Ações</th></tr></thead><tbody>${products.map(p=>`<tr><td>${p.foto_url?`<img class="thumb" src="${esc(p.foto_url)}">`:'—'}</td><td>${esc(p.nome)}</td><td>${esc(p.unidade||'')}</td><td>${p.estoque_atual??0}</td><td>${p.estoque_minimo??0}</td><td>${money(p.valor_custo)}</td><td>${money(p.valor_varejo)}</td><td>${money(p.valor_atacado)}</td><td><button class="btn secondary" onclick="editProduct('${p.id}')">Editar</button></td></tr>`).join('')}</tbody></table>`:`<div class="empty">Nenhum produto cadastrado.</div>`}</div>`}
+function openProduct(p=null){$('#productModal').classList.remove('hidden');$('#productModalTitle').textContent=p?'Editar produto':'Novo produto';$('#productId').value=p?.id||'';$('#productName').value=p?.nome||'';$('#productUnit').value=p?.unidade||'un';$('#productStock').value=p?.estoque_atual??0;$('#productMin').value=p?.estoque_minimo??0;$('#productCost').value=p?.valor_custo??0;$('#productRetail').value=p?.valor_varejo??0;$('#productWholesale').value=p?.valor_atacado??0;$('#productTime').value=p?.tempo||'';$('#productEffect').value=p?.efeito||'';$('#productSupplier').value=p?.fornecedor||'';$('#productColor').value=p?.cor||'';$('#productNoise').value=p?.ruido||'';$('#productPhoto').value='';const im=$('#productPreview');if(p?.foto_url){im.src=p.foto_url;im.classList.remove('hidden')}else im.classList.add('hidden');$('#productMsg').textContent=''}
 function closeProduct(){$('#productModal').classList.add('hidden')}
 function editProduct(id){openProduct(products.find(p=>p.id===id))}
 $('#productPhoto').onchange=e=>{const f=e.target.files[0];if(f){$('#productPreview').src=URL.createObjectURL(f);$('#productPreview').classList.remove('hidden')}};
