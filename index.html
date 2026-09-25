@@ -30,7 +30,7 @@ const SUPABASE_URL='https://locvpksjntwnlqrytqqx.supabase.co';
 const SUPABASE_KEY='sb_publishable_UN34ALY6Oxc1_V863pgq3Q_hNj7tuIQ';
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const $=s=>document.querySelector(s); let clients=[],products=[],assets=[],purchaseIds=new Set();
-const modules=['Dashboard','Clientes','Orçamentos','Contratos','Eventos','Estoque','Ativos / Equipamentos','Colaboradores','Manutenção','Financeiro / DRE','Agenda','Relatórios','Configurações','Lista de compra'];
+const modules=['Dashboard','Clientes','Orçamentos','Contratos','Eventos','Estoque','Ativos / Equipamentos','Colaboradores','Manutenção','Financeiro / DRE','Agenda','Relatórios','Configurações','Lista de compra','Atendimentos / WhatsApp'];
 $('#nav').innerHTML=modules.map((m,i)=>`<button data-i="${i}" class="${i===0?'active':''}">${m}</button>`).join('');
 $('#nav').onclick=e=>{const b=e.target.closest('button');if(!b)return;document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');$('.side').classList.remove('mobile-open');renderModule(+b.dataset.i)};
 $('#menuBtn').onclick=()=>$('.side').classList.toggle('mobile-open');
@@ -136,7 +136,7 @@ $('#logoutBtn').onclick=async()=>{await db.auth.signOut();showLogin()};
     ? 'Erro: '+error.message
     : 'Link de recuperação enviado para seu e-mail.';
 }
-async function renderModule(i){$('#pageTitle').textContent=modules[i];if(i===0)return renderDashboard();if(i===1)return renderClients();if(i===2)return renderOrcamentos();if(i===5)return renderProducts();if(i===6)return renderAssets();if(i===13)return renderShoppingList();$('#content').innerHTML=`<div class="sectionhead"><h2>${modules[i]}</h2></div><div class="placeholder">Módulo já previsto no banco de dados. A tela operacional será ativada nas próximas versões sem precisar recriar sua estrutura.</div>`}
+async function renderModule(i){$('#pageTitle').textContent=modules[i];if(i===0)return renderDashboard();if(i===1)return renderClients();if(i===2)return renderOrcamentos();if(i===5)return renderProducts();if(i===6)return renderAssets();if(i===13)return renderShoppingList();if(i===14)return renderAtendimentos();$('#content').innerHTML=`<div class="sectionhead"><h2>${modules[i]}</h2></div><div class="placeholder">Módulo já previsto no banco de dados. A tela operacional será ativada nas próximas versões sem precisar recriar sua estrutura.</div>`}
 async function count(table){const {count,error}=await db.from(table).select('*',{count:'exact',head:true});return error?'—':count}
 async function renderDashboard(){
   const c = await Promise.all([
@@ -805,6 +805,95 @@ function closeAsset(){$('#assetModal').classList.add('hidden')}
 function editAsset(id){openAsset(assets.find(a=>a.id===id))}
 $('#assetPhoto').onchange=e=>{const f=e.target.files[0];if(f){$('#assetPreview').src=URL.createObjectURL(f);$('#assetPreview').classList.remove('hidden')}};
 $('#saveAssetBtn').onclick=async()=>{const id=$('#assetId').value;$('#assetMsg').textContent='Salvando...';try{let foto_url=id?assets.find(a=>a.id===id)?.foto_url:null;const f=$('#assetPhoto').files[0];if(f)foto_url=await uploadPhoto(f,'ativos');const payload={nome:$('#assetName').value.trim(),codigo_interno:$('#assetCode').value.trim()||null,codigo_barras:$('#assetBarcode').value.trim()||null,fornecedor:$('#assetSupplier').value.trim()||null,data_compra:$('#assetPurchaseDate').value||null,valor_compra:+$('#assetPurchaseValue').value||0,valor_locacao_tabela1:+$('#assetRent1').value||0,valor_locacao_tabela2:+$('#assetRent2').value||0,peso:$('#assetWeight').value?+$('#assetWeight').value:null,possui_case:$('#assetCase').value==='true',observacoes:$('#assetNotes').value.trim()||null,foto_url,atualizado_em:new Date().toISOString()};if(!payload.nome)throw new Error('Informe o nome do equipamento.');const {error}=await(id?db.from('ativos').update(payload).eq('id',id):db.from('ativos').insert(payload));if(error)throw error;closeAsset();renderAssets()}catch(e){$('#assetMsg').textContent='Erro: '+e.message}};
+
+
+// ===== ATENDIMENTOS / WHATSAPP / LINHA DO TEMPO =====
+async function renderAtendimentos(){
+  const [atRes,clRes]=await Promise.all([
+    db.from('atendimentos').select('*').order('ultima_interacao_em',{ascending:false}),
+    db.from('clientes').select('id,nome,telefone,origem')
+  ]);
+  if(atRes.error){
+    $('#content').innerHTML=`<div class="sectionhead"><h2>Atendimentos / WhatsApp</h2></div><div class="msg">A estrutura de Atendimentos ainda precisa ser criada no Supabase: ${esc(atRes.error.message)}</div>`;
+    return;
+  }
+  const mapaClientes=new Map((clRes.data||[]).map(c=>[String(c.id),c]));
+  const lista=atRes.data||[];
+  const statusLabel={aguardando:'Aguardando atendimento',em_atendimento:'Em atendimento',orcamento_enviado:'Orçamento enviado',proposta_aceita:'Proposta aceita',finalizado:'Finalizado'};
+  $('#content').innerHTML=`
+    <div class="sectionhead">
+      <div><h2>Atendimentos / WhatsApp</h2><div class="muted">${lista.length} atendimento(s)</div></div>
+      <button id="novoAtendimentoManual" class="btn primary" type="button">+ Novo atendimento</button>
+    </div>
+    <div class="card" style="margin-bottom:16px">
+      <b>Fluxo CZ</b>
+      <div class="muted" style="margin-top:6px">WhatsApp → pré-cadastro → linha do tempo → orçamento → aceite → contrato</div>
+    </div>
+    <div id="atendimentoMsg" class="msg"></div>
+    <div class="tablewrap">${lista.length?`<table><thead><tr><th>Cliente</th><th>Telefone</th><th>Status</th><th>Última interação</th><th>Ações</th></tr></thead><tbody>${lista.map(a=>{const c=mapaClientes.get(String(a.cliente_id))||{};return `<tr><td>${esc(c.nome||a.nome_whatsapp||'Contato WhatsApp')}</td><td>${esc(c.telefone||a.telefone||'')}</td><td>${esc(statusLabel[a.status]||a.status||'Aguardando atendimento')}</td><td>${a.ultima_interacao_em?new Date(a.ultima_interacao_em).toLocaleString('pt-BR'):'—'}</td><td><button class="btn secondary" data-open-atendimento="${esc(a.id)}">Abrir</button></td></tr>`}).join('')}</tbody></table>`:'<div class="empty">Nenhum atendimento recebido ainda.</div>'}</div>`;
+  $('#content').onclick=e=>{const b=e.target.closest('[data-open-atendimento]');if(b)abrirAtendimento(b.dataset.openAtendimento)};
+  $('#novoAtendimentoManual').onclick=()=>novoAtendimentoManual();
+}
+
+async function novoAtendimentoManual(){
+  const nome=prompt('Nome do contato:'); if(!nome)return;
+  const telefone=prompt('Telefone/WhatsApp com DDD:'); if(!telefone)return;
+  const tel=telefone.replace(/\D/g,'');
+  const {data:existente}=await db.from('clientes').select('*').eq('telefone',tel).maybeSingle();
+  let cliente=existente;
+  if(!cliente){
+    const {data,error}=await db.from('clientes').insert({nome:nome.trim(),telefone:tel,origem:'whatsapp',atualizado_em:new Date().toISOString()}).select().single();
+    if(error){alert('Erro ao criar cliente: '+error.message);return} cliente=data;
+  }
+  const agora=new Date().toISOString();
+  const {data:at,error}=await db.from('atendimentos').insert({cliente_id:cliente.id,nome_whatsapp:nome.trim(),telefone:tel,status:'aguardando',canal:'whatsapp',ultima_interacao_em:agora}).select().single();
+  if(error){alert('Erro ao criar atendimento: '+error.message);return}
+  await db.from('linha_tempo_cliente').insert([
+    {cliente_id:cliente.id,atendimento_id:at.id,tipo:'primeiro_contato',titulo:'Primeiro contato pelo WhatsApp',descricao:'Contato recebido e pré-cadastro criado.'},
+    {cliente_id:cliente.id,atendimento_id:at.id,tipo:'mensagem_automatica',titulo:'Mensagem automática enviada',descricao:'CZ Efeitos Especiais agradece o contato. Em breve um de nossos atendentes dará continuidade ao atendimento.'}
+  ]);
+  renderAtendimentos();
+}
+
+async function abrirAtendimento(id){
+  const {data:a,error}=await db.from('atendimentos').select('*').eq('id',id).single();
+  if(error){alert(error.message);return}
+  const [{data:c},{data:timeline}]=await Promise.all([
+    db.from('clientes').select('*').eq('id',a.cliente_id).single(),
+    db.from('linha_tempo_cliente').select('*').eq('atendimento_id',id).order('criado_em',{ascending:false})
+  ]);
+  const statusLabel={aguardando:'Aguardando atendimento',em_atendimento:'Em atendimento',orcamento_enviado:'Orçamento enviado',proposta_aceita:'Proposta aceita',finalizado:'Finalizado'};
+  $('#content').innerHTML=`
+    <div class="sectionhead"><div><h2>${esc(c?.nome||a.nome_whatsapp||'Atendimento')}</h2><div class="muted">WhatsApp: ${esc(c?.telefone||a.telefone||'')}</div></div><button class="btn secondary" onclick="renderAtendimentos()">← Voltar</button></div>
+    <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));margin-bottom:16px">
+      <div class="card"><div class="muted">Status</div><div style="font-size:18px;font-weight:800;margin-top:6px">${esc(statusLabel[a.status]||a.status)}</div></div>
+      <div class="card"><div class="muted">Origem</div><div style="font-size:18px;font-weight:800;margin-top:6px">WhatsApp</div></div>
+    </div>
+    <div class="card" style="margin-bottom:16px">
+      <h3 style="margin-top:0">Ações</h3>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn primary" onclick="mudarStatusAtendimento('${esc(id)}','em_atendimento','Atendimento iniciado')">Iniciar atendimento</button>
+        <button class="btn secondary" onclick="criarOrcamentoDoAtendimento('${esc(c?.id||'')}')">Criar orçamento</button>
+        <button class="btn secondary" onclick="mudarStatusAtendimento('${esc(id)}','orcamento_enviado','Orçamento enviado ao cliente')">Marcar orçamento enviado</button>
+        <button class="btn secondary" onclick="mudarStatusAtendimento('${esc(id)}','proposta_aceita','Proposta aceita pelo cliente')">Marcar proposta aceita</button>
+      </div>
+    </div>
+    <div class="card"><h3 style="margin-top:0">Linha do tempo</h3>${(timeline||[]).length?(timeline||[]).map(t=>`<div style="padding:12px 0;border-bottom:1px solid var(--line)"><b>${esc(t.titulo||t.tipo)}</b><div class="muted" style="font-size:12px;margin-top:3px">${new Date(t.criado_em).toLocaleString('pt-BR')}</div>${t.descricao?`<div style="margin-top:5px">${esc(t.descricao)}</div>`:''}</div>`).join(''):'<div class="muted">Nenhum registro.</div>'}</div>`;
+}
+
+async function mudarStatusAtendimento(id,status,titulo){
+  const agora=new Date().toISOString();
+  const {data:a,error}=await db.from('atendimentos').update({status,ultima_interacao_em:agora}).eq('id',id).select().single();
+  if(error){alert('Erro: '+error.message);return}
+  await db.from('linha_tempo_cliente').insert({cliente_id:a.cliente_id,atendimento_id:id,tipo:status,titulo,descricao:null});
+  abrirAtendimento(id);
+}
+
+async function criarOrcamentoDoAtendimento(clienteId){
+  const {data:c}=await db.from('clientes').select('*').eq('id',clienteId).single();
+  await renderOrcamentos();
+  if(c){$('#orcCliente').value=c.nome||'';$('#orcTelefone').value=c.telefone||''}
+}
 
 boot();
 </script></body></html>
