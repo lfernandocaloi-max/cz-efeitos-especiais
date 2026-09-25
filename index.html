@@ -4,6 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>CZ Efeitos Especiais — Gestão</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@4.2.1/dist/jspdf.umd.min.js"></script>
 <style>
 :root{--bg:#090d12;--panel:#111821;--panel2:#161f2a;--line:#273342;--text:#f5f7f8;--muted:#94a0ae;--accent:#ff641f;--ok:#38b86b;--danger:#ef5350}*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:var(--text)}button,input,textarea{font:inherit}.hidden{display:none!important}.login{min-height:100vh;display:grid;place-items:center;padding:24px}.loginbox{width:min(420px,100%);background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:28px}.brand{font-size:34px;font-weight:900;color:var(--accent);line-height:.9}.brand small{display:block;font-size:11px;letter-spacing:2px;color:#fff;margin-top:8px}.field{margin-top:16px}.field label{display:block;font-size:13px;color:var(--muted);margin-bottom:7px}.field input,.field textarea,.field select{width:100%;background:#0b1118;color:#fff;border:1px solid var(--line);border-radius:9px;padding:12px;outline:none}.field textarea{min-height:90px}.thumb{width:64px;height:64px;object-fit:cover;border-radius:9px;border:1px solid var(--line);background:#0b1118}.preview{width:140px;height:140px;object-fit:cover;border-radius:12px;border:1px solid var(--line);background:#0b1118;margin-top:10px}.btn{border:0;border-radius:9px;padding:11px 15px;cursor:pointer;font-weight:700}.primary{background:var(--accent);color:#fff}.secondary{background:#22303d;color:#fff}.danger{background:#3a1e21;color:#ffb0b0}.full{width:100%}.msg{margin-top:12px;color:#ffb0b0;font-size:13px}.app{display:grid;grid-template-columns:245px 1fr;min-height:100vh}.side{background:#070d11;border-right:1px solid var(--line);padding:22px 14px}.side .brand{margin:4px 8px 26px}.nav button{display:block;width:100%;text-align:left;padding:11px 12px;margin:4px 0;border:0;border-radius:8px;background:transparent;color:#cbd4dc;cursor:pointer}.nav button:hover,.nav button.active{background:#1c2833;color:#fff}.nav button.active{border-left:3px solid var(--accent)}.main{min-width:0}.top{height:68px;background:#10171f;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 24px}.content{padding:24px}.cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}.card .n{font-size:28px;font-weight:800;margin-top:8px}.muted{color:var(--muted)}.sectionhead{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}.sectionhead h2{margin:0}.tablewrap{overflow:auto;border:1px solid var(--line);border-radius:12px}table{width:100%;border-collapse:collapse;background:var(--panel)}th,td{padding:12px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}th{font-size:12px;color:var(--muted);background:#0e151d}.empty{padding:30px;text-align:center;color:var(--muted)}.modal{position:fixed;inset:0;background:#000a;display:grid;place-items:center;padding:20px;z-index:10}.modalbox{width:min(620px,100%);max-height:90vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}.placeholder{padding:36px;background:var(--panel);border:1px dashed var(--line);border-radius:14px;color:var(--muted)}@media(max-width:900px){.app{grid-template-columns:1fr}.side{display:none}.cards{grid-template-columns:1fr 1fr}}@media(max-width:560px){.cards,.row{grid-template-columns:1fr}.content{padding:16px}.top{padding:0 16px}}
 @media(max-width:900px){#menuBtn{display:inline-block!important}.side.mobile-open{display:block;position:fixed;inset:0 auto 0 0;width:min(290px,85vw);z-index:20;overflow:auto;box-shadow:0 0 0 100vw #000a}.top{height:auto;min-height:68px;gap:8px}.top #userName{display:none}.orc-equipe-linha,.linhaEquipe{grid-template-columns:repeat(2,minmax(0,1fr))!important}.sectionhead{flex-wrap:wrap}}
@@ -697,12 +698,85 @@ async function addPurchaseItem(id,btn){
 async function renderShoppingList(){
   const [compras,cadastro]=await Promise.all([
     db.from('lista_compras').select('*').order('criado_em',{ascending:false}),
-    db.from('produtos').select('id,nome,estoque_atual,estoque_minimo,codigo_barras')
+    db.from('produtos').select('id,nome,marca,fornecedor,valor_custo,estoque_atual,estoque_minimo,codigo_barras')
   ]);
   if(compras.error||cadastro.error){$('#content').innerHTML=`<div class="msg">Erro ao carregar Lista de compra: ${esc((compras.error||cadastro.error).message)}</div>`;return}
   const porId=new Map((cadastro.data||[]).map(p=>[String(p.id),p]));
-  $('#content').innerHTML=`<div class="sectionhead"><div><h2>Lista de compra</h2><div class="muted">${compras.data.length} produto(s)</div></div><button class="btn secondary" onclick="renderModule(5)">Ver Estoque</button></div><div id="purchaseMsg" class="msg" role="status"></div><div class="tablewrap">${compras.data.length?`<table><thead><tr><th>Produto</th><th>Estoque atual</th><th>Estoque mínimo</th><th>Cód. barras</th><th>Adicionado em</th><th>Ações</th></tr></thead><tbody>${compras.data.map(item=>{const p=porId.get(String(item.produto_id));return `<tr><td>${esc(p?.nome||'Produto removido do cadastro')}</td><td>${p?.estoque_atual??'—'}</td><td>${p?.estoque_minimo??'—'}</td><td>${esc(p?.codigo_barras||'—')}</td><td>${new Date(item.criado_em).toLocaleDateString('pt-BR')}</td><td><button type="button" class="btn danger" data-remove-purchase="${esc(item.produto_id)}">Remover da lista</button></td></tr>`}).join('')}</tbody></table>`:'<div class="empty">A lista está vazia. Adicione produtos pelo Estoque.</div>'}</div>`;
+  const linhas=(compras.data||[]).map(item=>({...item,produto:porId.get(String(item.produto_id))}));
+  $('#content').innerHTML=`<div class="sectionhead"><div><h2>Lista de compra</h2><div class="muted">${linhas.length} produto(s)</div></div><div class="actions"><button id="purchasePdf" type="button" class="btn primary" ${linhas.length?'':'disabled'}>Gerar PDF</button><button class="btn secondary" onclick="renderModule(5)">Ver Estoque</button></div></div><div id="purchaseMsg" class="msg" role="status"></div><div class="tablewrap">${linhas.length?`<table><thead><tr><th>Produto</th><th>Marca</th><th>Fornecedor</th><th>Qtd. para comprar</th><th>Última compra (un.)</th><th>Total último custo</th><th>Novo valor (un.)</th><th>Total compra atual</th><th>Ações</th></tr></thead><tbody>${linhas.map((item,i)=>{const p=item.produto;return `<tr data-purchase-row="${i}"><td>${esc(p?.nome||'Produto removido do cadastro')}</td><td>${esc(p?.marca||'—')}</td><td>${esc(p?.fornecedor||'—')}</td><td><input class="purchase-input" data-purchase-qty="${i}" type="number" min="0.01" step="0.01" value="${Number(item.quantidade??1)}" aria-label="Quantidade para comprar de ${esc(p?.nome||'produto')}"></td><td>${money(p?.valor_custo)}</td><td data-last-total="${i}"></td><td><input class="purchase-input" data-purchase-current="${i}" type="number" min="0" step="0.01" value="${item.valor_compra_atual??''}" placeholder="Preencher" aria-label="Novo valor unitário de ${esc(p?.nome||'produto')}"></td><td data-current-total="${i}"></td><td><button type="button" class="btn danger" data-remove-purchase="${esc(item.produto_id)}">Remover</button></td></tr>`}).join('')}</tbody></table>`:'<div class="empty">A lista está vazia. Adicione produtos pelo Estoque.</div>'}</div><div class="card" style="margin-top:16px"><div>Total pelo último custo: <strong id="purchaseGrandLast">R$ 0,00</strong></div><div style="margin-top:8px">Total da compra atual: <strong id="purchaseGrandCurrent">R$ 0,00</strong> <span id="purchasePending" class="muted"></span></div></div>`;
+  const pendentes=new Set();
+  const atualizarTotais=()=>{
+    let ultimo=0,atual=0,faltando=0;
+    linhas.forEach((item,i)=>{
+      const q=Number($(`[data-purchase-qty="${i}"]`).value);
+      const raw=$(`[data-purchase-current="${i}"]`).value;
+      const novo=raw===''?null:Number(raw);
+      const anterior=Number(item.produto?.valor_custo||0);
+      const quantidade=Number.isFinite(q)&&q>0?q:0;
+      ultimo+=quantidade*anterior;
+      $(`[data-last-total="${i}"]`).textContent=money(quantidade*anterior);
+      if(novo===null||!Number.isFinite(novo)||novo<0){faltando++;$(`[data-current-total="${i}"]`).textContent='Pendente'}
+      else {atual+=quantidade*novo;$(`[data-current-total="${i}"]`).textContent=money(quantidade*novo)}
+    });
+    $('#purchaseGrandLast').textContent=money(ultimo);
+    $('#purchaseGrandCurrent').textContent=money(atual);
+    $('#purchasePending').textContent=faltando?`(${faltando} preço(s) pendente(s))`:'';
+  };
   $('#content').onclick=e=>{const btn=e.target.closest('[data-remove-purchase]');if(btn)removePurchaseItem(btn.dataset.removePurchase,btn)};
+  $('#content').oninput=e=>{if(e.target.matches('[data-purchase-qty],[data-purchase-current]'))atualizarTotais()};
+  $('#content').onchange=e=>{
+    const input=e.target;
+    const tipo=input.dataset.purchaseQty!==undefined?'quantidade':input.dataset.purchaseCurrent!==undefined?'valor_compra_atual':null;
+    if(!tipo)return;
+    const i=Number(tipo==='quantidade'?input.dataset.purchaseQty:input.dataset.purchaseCurrent);
+    const item=linhas[i],raw=input.value;
+    const valor=raw===''&&tipo==='valor_compra_atual'?null:Number(raw);
+    if((tipo==='quantidade'&&(!Number.isFinite(valor)||valor<=0))||(valor!==null&&(!Number.isFinite(valor)||valor<0))){
+      $('#purchaseMsg').textContent=tipo==='quantidade'?'Informe uma quantidade maior que zero.':'Informe um valor de compra válido.';
+      input.value=item[tipo]??'';atualizarTotais();return;
+    }
+    input.disabled=true;
+    const salvar=(async()=>{
+      const {error}=await db.from('lista_compras').update({[tipo]:valor}).eq('produto_id',item.produto_id);
+      input.disabled=false;
+      if(error){$('#purchaseMsg').textContent='Erro ao salvar: '+error.message;input.value=item[tipo]??''}
+      else {item[tipo]=valor;$('#purchaseMsg').textContent='Lista de compra atualizada.'}
+      atualizarTotais();
+    })();
+    pendentes.add(salvar);salvar.finally(()=>pendentes.delete(salvar));
+  };
+  $('#purchasePdf').onclick=async()=>{await Promise.all([...pendentes]);gerarPdfCompras(linhas)};
+  atualizarTotais();
+}
+function gerarPdfCompras(linhas){
+  if(!window.jspdf?.jsPDF){$('#purchaseMsg').textContent='Não foi possível carregar o gerador de PDF. Atualize a página e tente novamente.';return}
+  const pdf=new window.jspdf.jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const xs=[12,62,90,132,149,183,217,253],larguras=[48,26,40,15,32,32,34,32];
+  const cabecalhos=['Produto','Marca','Fornecedor','Qtd.','Último un.','Novo un.','Total último','Total atual'];
+  let y=0;
+  function cabecalho(){
+    pdf.setFillColor(22,31,42);pdf.rect(0,0,297,30,'F');pdf.setTextColor(255,255,255);pdf.setFontSize(16);pdf.text('CZ Efeitos Especiais | Lista de compra',12,15);
+    pdf.setFontSize(9);pdf.text(new Date().toLocaleString('pt-BR'),285,15,{align:'right'});
+    pdf.setTextColor(30,35,40);pdf.setFontSize(8);pdf.setFont('helvetica','bold');
+    cabecalhos.forEach((h,i)=>pdf.text(h,xs[i],36));pdf.setDrawColor(180);pdf.line(12,39,285,39);pdf.setFont('helvetica','normal');y=42;
+  }
+  cabecalho();let totalAnterior=0,totalAtual=0,faltando=0;
+  linhas.forEach(item=>{
+    if(y>181){pdf.addPage();cabecalho()}
+    const quantidade=Number(item.quantidade||1),anterior=Number(item.produto?.valor_custo||0);
+    const novo=item.valor_compra_atual===null||item.valor_compra_atual===undefined?null:Number(item.valor_compra_atual);
+    totalAnterior+=quantidade*anterior;if(novo===null)faltando++;else totalAtual+=quantidade*novo;
+    const p=item.produto||{};
+    const valores=[p.nome||'Produto removido',p.marca||'—',p.fornecedor||'—',String(quantidade),money(anterior),novo===null?'Pendente':money(novo),money(quantidade*anterior),novo===null?'Pendente':money(quantidade*novo)];
+    pdf.setFontSize(8);
+    valores.forEach((v,i)=>{const texto=pdf.splitTextToSize(String(v),larguras[i]).slice(0,2);pdf.text(texto,xs[i],y+4)});
+    pdf.setDrawColor(225);pdf.line(12,y+11,285,y+11);y+=13;
+  });
+  if(y>177){pdf.addPage();cabecalho()}
+  pdf.setFont('helvetica','bold');pdf.setFontSize(10);
+  pdf.text('Total pelo último custo: '+money(totalAnterior),12,y+9);
+  pdf.text('Total da compra atual: '+money(totalAtual)+(faltando?` (${faltando} preço(s) pendente(s))`:''),12,y+16);
+  pdf.save('lista-de-compra-cz-'+new Date().toISOString().slice(0,10)+'.pdf');
 }
 async function removePurchaseItem(id,btn){
   btn.disabled=true;
