@@ -389,11 +389,9 @@ async function renderOrcamentos(){
           <div class="muted">Tabela 1 aplicada automaticamente</div>
         </div>
 
-        <button id="orcAddProduct" class="btn primary" type="button">
-          + Adicionar Produto
-        </button>
       </div>
 
+      <div id="orcProdutoPicker" style="margin-top:16px" class="muted">Carregando produtos cadastrados...</div>
       <div id="orcProdutosLista" style="margin-top:16px" class="muted">Nenhum produto adicionado.</div>
     </div>
 
@@ -541,8 +539,46 @@ atualizarEquipe();
   function mostrarItens(tipo){
     const lista=tipo==='produto'?itensProduto:itensAtivo;
     const destino=$(tipo==='produto'?'#orcProdutosLista':'#orcAtivosLista');
-    destino.innerHTML=lista.length?`<div class="tablewrap"><table><thead><tr><th>Item</th><th>Qtd.</th><th>Tabela</th><th>Valor</th><th>Ação</th></tr></thead><tbody>${lista.map((item,i)=>`<tr><td>${esc(item.nome)}</td><td>${item.quantidade}</td><td>${item.tabela}</td><td>${money(item.quantidade*item.preco)}</td><td><button type="button" class="btn danger" data-remover="${i}">Remover</button></td></tr>`).join('')}</tbody></table></div>`:'Nenhum item adicionado.';
+    destino.innerHTML=lista.length?`<div class="tablewrap"><table><thead><tr><th>${tipo==='produto'?'Produto':'Equipamento'}</th><th>Quantidade</th><th>Valor unitário</th><th>Tabela de preço</th><th>Valor total</th><th>Ação</th></tr></thead><tbody>${lista.map((item,i)=>`<tr><td>${esc(item.nome)}</td><td>${item.quantidade}</td><td>${money(item.preco)}</td><td>Tabela ${item.tabela}</td><td>${money(item.quantidade*item.preco)}</td><td><button type="button" class="btn danger" data-remover="${i}">Remover</button></td></tr>`).join('')}</tbody></table></div><div style="text-align:right;margin-top:12px;font-weight:700;color:var(--text)">Total ${tipo==='produto'?'dos produtos':'dos equipamentos'}: ${money(lista.reduce((total,item)=>total+item.quantidade*item.preco,0))}</div>`:'Nenhum item adicionado.';
     destino.querySelectorAll('[data-remover]').forEach(btn=>btn.onclick=()=>{lista.splice(Number(btn.dataset.remover),1);mostrarItens(tipo);atualizarEquipe()});
+  }
+  async function prepararProdutos(){
+    const destino=$('#orcProdutoPicker');
+    const {data,error}=await db.from('produtos').select('*').order('nome');
+    if(!destino || !destino.isConnected)return;
+    if(error){destino.textContent='Erro ao carregar produtos: '+error.message;return}
+    if(!data?.length){destino.innerHTML='<p>Nenhum produto cadastrado. Cadastre um produto no menu Estoque antes de adicioná-lo ao orçamento.</p>';return}
+    destino.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;align-items:start">
+      <div class="field"><label>Produto</label><select id="orcProdutoSelect"><option value="">Selecione o produto</option>${data.map((item,i)=>`<option value="${i}">${esc(item.nome)}</option>`).join('')}</select><button id="orcConfirmarProduto" type="button" class="btn primary" style="margin-top:10px">+ Adicionar Produto</button></div>
+      <div class="field"><label>Quantidade</label><input id="orcProdutoQtd" type="number" min="1" step="1" value="1"></div>
+      <div class="field"><label>Valor unitário</label><input id="orcProdutoUnitario" readonly></div>
+      <div class="field"><label>Tabela de preço</label><select id="orcProdutoTabela"><option value="1">Tabela 1 (varejo)</option><option value="2">Tabela 2 (atacado)</option></select></div>
+      <div class="field"><label>Valor total da linha</label><input id="orcProdutoTotal" readonly></div>
+    </div><div id="orcProdutoMsg" class="msg" role="status"></div>`;
+    const precoSelecionado=()=>{
+      const item=data[Number($('#orcProdutoSelect').value)];
+      if($('#orcProdutoSelect').value===''||!item)return null;
+      const valor=$('#orcProdutoTabela').value==='1'?item.valor_varejo:item.valor_atacado;
+      return valor===null||valor===undefined||valor===''?null:Number(valor);
+    };
+    const atualizarPreview=()=>{
+      const preco=precoSelecionado(),quantidade=Number($('#orcProdutoQtd').value);
+      $('#orcProdutoUnitario').value=preco===null||!Number.isFinite(preco)?'Preço não cadastrado':money(preco);
+      $('#orcProdutoTotal').value=preco===null||!Number.isFinite(preco)||!Number.isInteger(quantidade)||quantidade<1?'—':money(preco*quantidade);
+    };
+    ['orcProdutoSelect','orcProdutoTabela','orcProdutoQtd'].forEach(id=>$('#'+id).addEventListener('input',atualizarPreview));
+    $('#orcConfirmarProduto').onclick=()=>{
+      const indice=$('#orcProdutoSelect').value,quantidade=Number($('#orcProdutoQtd').value),preco=precoSelecionado();
+      if(indice===''){$('#orcProdutoMsg').textContent='Selecione um produto.';return}
+      if(!Number.isInteger(quantidade)||quantidade<1){$('#orcProdutoMsg').textContent='Informe uma quantidade inteira maior que zero.';return}
+      if(preco===null||!Number.isFinite(preco)||preco<0){$('#orcProdutoMsg').textContent='Cadastre o preço desta tabela no produto antes de adicioná-lo.';return}
+      const item=data[Number(indice)];
+      itensProduto.push({id:item.id,nome:item.nome,quantidade,preco,tabela:Number($('#orcProdutoTabela').value)});
+      $('#orcProdutoMsg').textContent='Produto adicionado.';
+      $('#orcProdutoSelect').value='';$('#orcProdutoQtd').value='1';atualizarPreview();
+      mostrarItens('produto');atualizarEquipe();
+    };
+    atualizarPreview();
   }
   async function adicionarItem(tipo){
     const destino=$(tipo==='produto'?'#orcProdutosLista':'#orcAtivosLista');
@@ -564,7 +600,7 @@ atualizarEquipe();
       mostrarItens(tipo);atualizarEquipe();
     };
   }
-  $('#orcAddProduct').onclick=()=>adicionarItem('produto');
+  prepararProdutos();
   $('#orcAddAsset').onclick=()=>adicionarItem('ativo');
   $('#orcSave').onclick=()=>{$('#orcMsg').textContent='O salvamento de rascunhos ainda não está disponível nesta versão.'};
   $('#orcPrint').onclick=()=>{$('#orcMsg').textContent='A proposta para impressão ainda não está disponível nesta versão.'};
