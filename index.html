@@ -7,7 +7,7 @@
 <style>
 :root{--bg:#090d12;--panel:#111821;--panel2:#161f2a;--line:#273342;--text:#f5f7f8;--muted:#94a0ae;--accent:#ff641f;--ok:#38b86b;--danger:#ef5350}*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:var(--text)}button,input,textarea{font:inherit}.hidden{display:none!important}.login{min-height:100vh;display:grid;place-items:center;padding:24px}.loginbox{width:min(420px,100%);background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:28px}.brand{font-size:34px;font-weight:900;color:var(--accent);line-height:.9}.brand small{display:block;font-size:11px;letter-spacing:2px;color:#fff;margin-top:8px}.field{margin-top:16px}.field label{display:block;font-size:13px;color:var(--muted);margin-bottom:7px}.field input,.field textarea,.field select{width:100%;background:#0b1118;color:#fff;border:1px solid var(--line);border-radius:9px;padding:12px;outline:none}.field textarea{min-height:90px}.thumb{width:64px;height:64px;object-fit:cover;border-radius:9px;border:1px solid var(--line);background:#0b1118}.preview{width:140px;height:140px;object-fit:cover;border-radius:12px;border:1px solid var(--line);background:#0b1118;margin-top:10px}.btn{border:0;border-radius:9px;padding:11px 15px;cursor:pointer;font-weight:700}.primary{background:var(--accent);color:#fff}.secondary{background:#22303d;color:#fff}.danger{background:#3a1e21;color:#ffb0b0}.full{width:100%}.msg{margin-top:12px;color:#ffb0b0;font-size:13px}.app{display:grid;grid-template-columns:245px 1fr;min-height:100vh}.side{background:#070d11;border-right:1px solid var(--line);padding:22px 14px}.side .brand{margin:4px 8px 26px}.nav button{display:block;width:100%;text-align:left;padding:11px 12px;margin:4px 0;border:0;border-radius:8px;background:transparent;color:#cbd4dc;cursor:pointer}.nav button:hover,.nav button.active{background:#1c2833;color:#fff}.nav button.active{border-left:3px solid var(--accent)}.main{min-width:0}.top{height:68px;background:#10171f;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 24px}.content{padding:24px}.cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}.card .n{font-size:28px;font-weight:800;margin-top:8px}.muted{color:var(--muted)}.sectionhead{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}.sectionhead h2{margin:0}.tablewrap{overflow:auto;border:1px solid var(--line);border-radius:12px}table{width:100%;border-collapse:collapse;background:var(--panel)}th,td{padding:12px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}th{font-size:12px;color:var(--muted);background:#0e151d}.empty{padding:30px;text-align:center;color:var(--muted)}.modal{position:fixed;inset:0;background:#000a;display:grid;place-items:center;padding:20px;z-index:10}.modalbox{width:min(620px,100%);max-height:90vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}.placeholder{padding:36px;background:var(--panel);border:1px dashed var(--line);border-radius:14px;color:var(--muted)}@media(max-width:900px){.app{grid-template-columns:1fr}.side{display:none}.cards{grid-template-columns:1fr 1fr}}@media(max-width:560px){.cards,.row{grid-template-columns:1fr}.content{padding:16px}.top{padding:0 16px}}
 @media(max-width:900px){#menuBtn{display:inline-block!important}.side.mobile-open{display:block;position:fixed;inset:0 auto 0 0;width:min(290px,85vw);z-index:20;overflow:auto;box-shadow:0 0 0 100vw #000a}.top{height:auto;min-height:68px;gap:8px}.top #userName{display:none}.orc-equipe-linha,.linhaEquipe{grid-template-columns:repeat(2,minmax(0,1fr))!important}.sectionhead{flex-wrap:wrap}}
-.filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:0 0 16px;padding:14px;background:var(--panel);border:1px solid var(--line);border-radius:12px}.filters .field{margin:0}
+.filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:0 0 16px;padding:14px;background:var(--panel);border:1px solid var(--line);border-radius:12px}.filters .field{margin:0}.btn:disabled{opacity:.55;cursor:not-allowed}
 </style>
 </head><body>
 <section id="login" class="login"><div class="loginbox"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><h3>Acesso ao sistema</h3><div class="field"><label>E-mail</label><input id="email" type="email"></div><div class="field"><label>Senha</label><input id="password" type="password"></div><button id="loginBtn" class="btn primary full" style="margin-top:18px">ENTRAR</button><button type="button" class="btn secondary full" style="margin-top:8px" onclick="recuperarSenha()">Esqueci minha senha</button><div id="loginMsg" class="msg"></div></div></section>
@@ -28,8 +28,8 @@
 const SUPABASE_URL='https://locvpksjntwnlqrytqqx.supabase.co';
 const SUPABASE_KEY='sb_publishable_UN34ALY6Oxc1_V863pgq3Q_hNj7tuIQ';
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
-const $=s=>document.querySelector(s); let clients=[],products=[],assets=[];
-const modules=['Dashboard','Clientes','Orçamentos','Contratos','Eventos','Estoque','Ativos / Equipamentos','Colaboradores','Manutenção','Financeiro / DRE','Agenda','Relatórios','Configurações'];
+const $=s=>document.querySelector(s); let clients=[],products=[],assets=[],purchaseIds=new Set();
+const modules=['Dashboard','Clientes','Orçamentos','Contratos','Eventos','Estoque','Ativos / Equipamentos','Colaboradores','Manutenção','Financeiro / DRE','Agenda','Relatórios','Configurações','Lista de compra'];
 $('#nav').innerHTML=modules.map((m,i)=>`<button data-i="${i}" class="${i===0?'active':''}">${m}</button>`).join('');
 $('#nav').onclick=e=>{const b=e.target.closest('button');if(!b)return;document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');$('.side').classList.remove('mobile-open');renderModule(+b.dataset.i)};
 $('#menuBtn').onclick=()=>$('.side').classList.toggle('mobile-open');
@@ -135,7 +135,7 @@ $('#logoutBtn').onclick=async()=>{await db.auth.signOut();showLogin()};
     ? 'Erro: '+error.message
     : 'Link de recuperação enviado para seu e-mail.';
 }
-async function renderModule(i){$('#pageTitle').textContent=modules[i];if(i===0)return renderDashboard();if(i===1)return renderClients();if(i===2)return renderOrcamentos();if(i===5)return renderProducts();if(i===6)return renderAssets();$('#content').innerHTML=`<div class="sectionhead"><h2>${modules[i]}</h2></div><div class="placeholder">Módulo já previsto no banco de dados. A tela operacional será ativada nas próximas versões sem precisar recriar sua estrutura.</div>`}
+async function renderModule(i){$('#pageTitle').textContent=modules[i];if(i===0)return renderDashboard();if(i===1)return renderClients();if(i===2)return renderOrcamentos();if(i===5)return renderProducts();if(i===6)return renderAssets();if(i===13)return renderShoppingList();$('#content').innerHTML=`<div class="sectionhead"><h2>${modules[i]}</h2></div><div class="placeholder">Módulo já previsto no banco de dados. A tela operacional será ativada nas próximas versões sem precisar recriar sua estrutura.</div>`}
 async function count(table){const {count,error}=await db.from(table).select('*',{count:'exact',head:true});return error?'—':count}
 async function renderDashboard(){
   const c = await Promise.all([
@@ -656,11 +656,19 @@ $('#productWholesale').addEventListener('input',()=>atualizarLucroPeloValor('ata
 async function uploadPhoto(file,folder){if(!file)return null;if(file.size>5*1024*1024)throw new Error('A foto deve ter no máximo 5 MB.');const ext=(file.name.split('.').pop()||'jpg').toLowerCase();const path=`${folder}/${crypto.randomUUID()}.${ext}`;const {error}=await db.storage.from('fotos').upload(path,file,{cacheControl:'3600',upsert:false});if(error)throw error;return db.storage.from('fotos').getPublicUrl(path).data.publicUrl}
 function textoFiltro(v){return String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim()}
 async function renderProducts(){
-  const {data,error}=await db.from('produtos').select('*').order('nome');
+  const [{data,error},compra]=await Promise.all([
+    db.from('produtos').select('*').order('nome'),
+    db.from('lista_compras').select('produto_id')
+  ]);
   if(error){$('#content').innerHTML=`<div class="msg">Erro ao carregar produtos: ${esc(error.message)}</div>`;return}
   products=data||[];
+  purchaseIds=new Set((compra.data||[]).map(item=>item.produto_id));
+  const estoqueMinimo=products.filter(p=>Number(p.estoque_atual||0)<=Number(p.estoque_minimo||0));
   $('#content').innerHTML=`
     <div class="sectionhead"><div><h2>Estoque / Produtos</h2><div id="productCount" class="muted">${products.length} produto(s)</div></div><button class="btn primary" onclick="openProduct()">+ Novo produto</button></div>
+    <div class="card" style="margin-bottom:16px"><h3 style="margin:0 0 10px">Produtos no estoque mínimo (${estoqueMinimo.length})</h3>${estoqueMinimo.length?`<div class="tablewrap"><table><thead><tr><th>Produto</th><th>Estoque atual</th><th>Estoque mínimo</th></tr></thead><tbody>${estoqueMinimo.map(p=>`<tr><td>${esc(p.nome)}</td><td>${p.estoque_atual??0}</td><td>${p.estoque_minimo??0}</td></tr>`).join('')}</tbody></table></div>`:'<div class="muted">Nenhum produto no estoque mínimo.</div>'}</div>
+    ${compra.error?`<div class="msg">A Lista de compra precisa ser criada no Supabase: ${esc(compra.error.message)}</div>`:''}
+    <div id="productActionMsg" class="msg" role="status"></div>
     <div class="filters" aria-label="Filtrar produtos">
       <div class="field"><label>Filtrar pelo nome</label><input id="filterName" placeholder="Nome do produto"></div>
       <div class="field"><label>Filtrar pelo tempo</label><input id="filterTime" placeholder="Tempo"></div>
@@ -674,10 +682,33 @@ async function renderProducts(){
   function filtrarProdutos(){
     const encontrados=products.filter(p=>filtros.every(([id,campo])=>textoFiltro(p[campo]).includes(textoFiltro($('#'+id).value))));
     $('#productCount').textContent=`${encontrados.length} de ${products.length} produto(s)`;
-    $('#productResults').innerHTML=encontrados.length?`<table><thead><tr><th>Produto</th><th>Varejo</th><th>Atacado</th><th>Cor</th><th>Tempo</th><th>Unidade</th><th>Foto</th><th>Ver vídeo</th><th>Estoque</th><th>Custo</th><th>Cód. barras</th><th>Ações</th></tr></thead><tbody>${encontrados.map(p=>`<tr><td>${esc(p.nome)}</td><td>${money(p.valor_varejo)}</td><td>${money(p.valor_atacado)}</td><td>${esc(p.cor||'—')}</td><td>${esc(p.tempo||'—')}</td><td>${esc(p.unidade||'—')}</td><td>${p.foto_url?`<img class="thumb" src="${esc(p.foto_url)}" alt="">`:'—'}</td><td>${safeHttpUrl(p.video_url)?`<a href="${esc(safeHttpUrl(p.video_url))}" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">Ver vídeo</a>`:'—'}</td><td>${p.estoque_atual??0}</td><td>${money(p.valor_custo)}</td><td>${esc(p.codigo_barras||'—')}</td><td><button class="btn secondary" onclick="editProduct('${p.id}')">Editar</button></td></tr>`).join('')}</tbody></table>`:`<div class="empty">${products.length?'Nenhum produto corresponde aos filtros.':'Nenhum produto cadastrado.'}</div>`;
+    $('#productResults').innerHTML=encontrados.length?`<table><thead><tr><th>Produto</th><th>Varejo</th><th>Atacado</th><th>Cor</th><th>Tempo</th><th>Unidade</th><th>Foto</th><th>Ver vídeo</th><th>Estoque</th><th>Custo</th><th>Cód. barras</th><th>Ações</th></tr></thead><tbody>${encontrados.map(p=>`<tr><td>${esc(p.nome)}</td><td>${money(p.valor_varejo)}</td><td>${money(p.valor_atacado)}</td><td>${esc(p.cor||'—')}</td><td>${esc(p.tempo||'—')}</td><td>${esc(p.unidade||'—')}</td><td>${p.foto_url?`<img class="thumb" src="${esc(p.foto_url)}" alt="">`:'—'}</td><td>${safeHttpUrl(p.video_url)?`<a href="${esc(safeHttpUrl(p.video_url))}" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">Ver vídeo</a>`:'—'}</td><td>${p.estoque_atual??0}</td><td>${money(p.valor_custo)}</td><td>${esc(p.codigo_barras||'—')}</td><td><button class="btn secondary" onclick="editProduct('${p.id}')">Editar</button> <button type="button" class="btn primary" data-add-purchase="${esc(p.id)}" ${purchaseIds.has(String(p.id))?'disabled':''}>${purchaseIds.has(String(p.id))?'Na lista':'+ Lista de compra'}</button></td></tr>`).join('')}</tbody></table>`:`<div class="empty">${products.length?'Nenhum produto corresponde aos filtros.':'Nenhum produto cadastrado.'}</div>`;
   }
   filtros.forEach(([id])=>$('#'+id).addEventListener('input',filtrarProdutos));
+  $('#productResults').onclick=e=>{const btn=e.target.closest('[data-add-purchase]');if(btn)addPurchaseItem(btn.dataset.addPurchase,btn)};
   filtrarProdutos();
+}
+async function addPurchaseItem(id,btn){
+  btn.disabled=true;
+  const {error}=await db.from('lista_compras').insert({produto_id:id});
+  if(error){btn.disabled=false;$('#productActionMsg').textContent=error.code==='23505'?'Este produto já está na Lista de compra.':'Erro ao adicionar à Lista de compra: '+error.message;return}
+  purchaseIds.add(id);btn.textContent='Na lista';$('#productActionMsg').textContent='Produto adicionado à Lista de compra.';
+}
+async function renderShoppingList(){
+  const [compras,cadastro]=await Promise.all([
+    db.from('lista_compras').select('*').order('criado_em',{ascending:false}),
+    db.from('produtos').select('id,nome,estoque_atual,estoque_minimo,codigo_barras')
+  ]);
+  if(compras.error||cadastro.error){$('#content').innerHTML=`<div class="msg">Erro ao carregar Lista de compra: ${esc((compras.error||cadastro.error).message)}</div>`;return}
+  const porId=new Map((cadastro.data||[]).map(p=>[String(p.id),p]));
+  $('#content').innerHTML=`<div class="sectionhead"><div><h2>Lista de compra</h2><div class="muted">${compras.data.length} produto(s)</div></div><button class="btn secondary" onclick="renderModule(5)">Ver Estoque</button></div><div id="purchaseMsg" class="msg" role="status"></div><div class="tablewrap">${compras.data.length?`<table><thead><tr><th>Produto</th><th>Estoque atual</th><th>Estoque mínimo</th><th>Cód. barras</th><th>Adicionado em</th><th>Ações</th></tr></thead><tbody>${compras.data.map(item=>{const p=porId.get(String(item.produto_id));return `<tr><td>${esc(p?.nome||'Produto removido do cadastro')}</td><td>${p?.estoque_atual??'—'}</td><td>${p?.estoque_minimo??'—'}</td><td>${esc(p?.codigo_barras||'—')}</td><td>${new Date(item.criado_em).toLocaleDateString('pt-BR')}</td><td><button type="button" class="btn danger" data-remove-purchase="${esc(item.produto_id)}">Remover da lista</button></td></tr>`}).join('')}</tbody></table>`:'<div class="empty">A lista está vazia. Adicione produtos pelo Estoque.</div>'}</div>`;
+  $('#content').onclick=e=>{const btn=e.target.closest('[data-remove-purchase]');if(btn)removePurchaseItem(btn.dataset.removePurchase,btn)};
+}
+async function removePurchaseItem(id,btn){
+  btn.disabled=true;
+  const {error}=await db.from('lista_compras').delete().eq('produto_id',id);
+  if(error){btn.disabled=false;$('#purchaseMsg').textContent='Erro ao remover: '+error.message;return}
+  purchaseIds.delete(id);renderShoppingList();
 }
 function openProduct(p=null){$('#productModal').classList.remove('hidden');$('#productModalTitle').textContent=p?'Editar produto':'Novo produto';$('#productId').value=p?.id||'';$('#productName').value=p?.nome||'';$('#productBarcode').value=p?.codigo_barras||'';$('#productBrand').value=p?.marca||'';$('#productUnit').value=p?.unidade||'un';$('#productStock').value=p?.estoque_atual??0;$('#productMin').value=p?.estoque_minimo??0;$('#productCost').value=p?.valor_custo??0;$('#productRetail').value=p?.valor_varejo??0;$('#productWholesale').value=p?.valor_atacado??0;atualizarLucroPeloValor('varejo');atualizarLucroPeloValor('atacado');$('#productTime').value=p?.tempo||'';$('#productEffect').value=p?.efeito||'';$('#productSupplier').value=p?.fornecedor||'';$('#productColor').value=p?.cor||'';$('#productNoise').value=p?.ruido||'';$('#productVideoUrl').value=p?.video_url||'';$('#productPhoto').value='';const im=$('#productPreview');if(p?.foto_url){im.src=p.foto_url;im.classList.remove('hidden')}else im.classList.add('hidden');$('#productMsg').textContent=''}
 function closeProduct(){$('#productModal').classList.add('hidden')}
