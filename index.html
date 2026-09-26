@@ -204,6 +204,1258 @@ function novaDespesa(){
  <form id="despForm"><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px">
  <label style="grid-column:1/-1"><span class="finlbl">Descrição</span><input name="descricao" required style="${inp}"></label>
  <label><span class="finlbl">Valor total</span><input name="valor" type="number" min="0.01" step="0.01" required style="${inp}"></label>
+ <label style="position:relative"><span class="finlbl">Categoria</span><input type="hidden" name="categoria" id="despCategoria" value=""><button type="button" id="catSelectBtn" style="${inp};text-align:left;display:flex;justify-content:space-between;align-items:center;cursor:pointer"><span id="catSelectText" style="color:#8f9aad">Selecione a categoria</span><span style="font-size:11px">▼</span></button><div id="catDropdown" style="display:none;position:absolute;left:0;right:0;top:70px;z-index:30;background:#0f141d;border:1px solid #384254;border-radius:10px;box-shadow:0 14px 35px rgba(0,0,0,.45);padding:6px;max-height:250px;overflow:auto"><div id="catOptions">${cats.map(x=>`<button type="button" class="cat-option" data-value="${esc(x)}" style="display:block;width:100%;border:0;background:transparent;color:#fff;text-align:left;padding:8px 9px;border-radius:7px;font-size:14px;cursor:pointer">${esc(x)}</button>`).join('')}</div><button type="button" id="addCategoria" style="display:block;width:100%;border:0;border-top:1px solid #30394a;background:transparent;color:#ff7a35;text-align:left;padding:7px 9px 5px;margin-top:3px;font-size:12px;font-weight:700;cursor:pointer">+ Adicionar categoria</button></div></label>
+ <label><span class="finlbl">Forma de pagamento</span><select name="forma" style="${inp}">${['PIX','Dinheiro','Débito','Crédito','Boleto','Transferência','Outro'].map(x=>`<option>${x}</option>`).join('')}</select></label>
+ <label><span class="finlbl">Condição</span><select name="condicao" id="despCond" style="${inp}"><option>À vista</option><option>Parcelado</option></select></label>
+ <label style="grid-column:1/-1"><span class="finlbl">Relacionar a um evento</span><input name="veiculo_evento" placeholder="Nome ou identificação do evento (opcional)" style="${inp}"></label>
+ <div id="despVista" style="display:contents"><label><span class="finlbl">Data / vencimento</span><input name="vencimento" type="date" value="${finISODate()}" style="${inp}"></label><label><span class="finlbl">Situação</span><select name="status" style="${inp}"><option>A pagar</option><option>Já foi paga</option></select></label></div>
+ <div id="despParc" style="display:none;grid-column:1/-1"><label style="max-width:250px;display:block"><span class="finlbl">Quantidade de parcelas</span><input name="parcelas" id="despQtd" type="number" min="2" max="60" value="2" style="${inp}"></label><div id="despParcelasLista" style="margin-top:12px"></div><div id="despSoma" style="margin-top:10px;font-size:13px;font-weight:700"></div></div>
+ </div>
+ <div style="margin-top:16px;display:flex;align-items:center;justify-content:flex-start"><label style="display:flex;align-items:center;gap:9px;cursor:pointer;background:#0f141d;border:1px solid #30394a;border-radius:10px;padding:10px 12px"><input type="checkbox" name="recorrente" id="despRecorrente" style="width:18px;height:18px"><span>Despesa recorrente</span></label></div>
+ <div id="despErro" style="color:#ff8b78;font-size:13px;margin-top:12px"></div><div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px"><button type="button" id="despCancelar" class="btn secondary">Cancelar</button><button type="submit" id="despSalvar" class="btn primary">Salvar despesa</button></div></form>`;
+ overlay.appendChild(box);document.body.appendChild(overlay);box.querySelectorAll('.finlbl').forEach(x=>x.style.cssText='display:block;font-size:13px;font-weight:700;margin-bottom:6px;color:#dce2eb');
+ const fechar=()=>overlay.remove(),cond=box.querySelector('#despCond'),vista=box.querySelector('#despVista'),parc=box.querySelector('#despParc'),form=box.querySelector('#despForm'),salvar=box.querySelector('#despSalvar'),rec=box.querySelector('#despRecorrente');
+ function montarParcelas(){
+   if(cond.value!=='Parcelado')return;
+   const total=Number(form.valor.value||0),q=Math.max(2,Math.min(60,Math.floor(Number(form.parcelas.value||2)))),lista=box.querySelector('#despParcelasLista');
+   const antigos=[...lista.querySelectorAll('.parc-row')].map(r=>({data:r.querySelector('.parc-data')?.value,valor:r.querySelector('.parc-valor')?.value}));
+   const base=Math.floor((total/q)*100)/100,rest=Math.round((total-base*q)*100)/100,primeira=antigos[0]?.data||form.vencimento?.value||finISODate();
+   lista.innerHTML=`<div style="display:grid;grid-template-columns:70px 1fr 1fr;gap:8px;color:#8f9aad;font-size:12px;margin-bottom:6px"><b>Parcela</b><b>Vencimento</b><b>Valor</b></div>`+
+   Array.from({length:q},(_,i)=>{const data=antigos[i]?.data||finAddMonths(primeira,i),valor=antigos[i]?.valor??(i===0?(base+rest):base).toFixed(2);return `<div class="parc-row" style="display:grid;grid-template-columns:70px 1fr 1fr;gap:8px;margin-bottom:8px;align-items:center"><b>${i+1}/${q}</b><input class="parc-data" type="date" value="${data}" style="${inp}"><input class="parc-valor" type="number" min="0" step="0.01" value="${valor}" style="${inp}"></div>`}).join('');
+   lista.querySelectorAll('.parc-valor').forEach(x=>x.oninput=validarSoma);
+   validarSoma();
+ }
+ function validarSoma(){
+   if(cond.value!=='Parcelado'){salvar.disabled=false;return true}
+   const total=Math.round(Number(form.valor.value||0)*100)/100,soma=Math.round([...box.querySelectorAll('.parc-valor')].reduce((s,x)=>s+Number(x.value||0),0)*100)/100,dif=Math.round((total-soma)*100)/100,el=box.querySelector('#despSoma');
+   if(Math.abs(dif)<.001){el.style.color='#73d69a';el.textContent=`Total das parcelas: ${money(soma)} • Fechou com o valor total.`;salvar.disabled=false;return true}
+   el.style.color='#ff8b78';el.textContent=dif>0?`Total das parcelas: ${money(soma)} • Faltam ${money(dif)}.`:`Total das parcelas: ${money(soma)} • Excedeu ${money(Math.abs(dif))}.`;salvar.disabled=true;return false
+ }
+ function alternar(){
+   const isP=cond.value==='Parcelado';vista.style.display=isP?'none':'contents';parc.style.display=isP?'block':'none';
+   if(isP){rec.checked=false;rec.disabled=true;montarParcelas()}else{rec.disabled=false;salvar.disabled=false}
+ }
+ const catBtn=box.querySelector('#catSelectBtn'),catDrop=box.querySelector('#catDropdown'),catHidden=box.querySelector('#despCategoria'),catText=box.querySelector('#catSelectText'),catOptions=box.querySelector('#catOptions');
+ function escolherCategoria(nome){catHidden.value=nome;catText.textContent=nome;catText.style.color='#fff';catDrop.style.display='none'}
+ function ligarCategorias(){catOptions.querySelectorAll('.cat-option').forEach(b=>b.onclick=()=>escolherCategoria(b.dataset.value))}
+ ligarCategorias();
+ catBtn.onclick=()=>{catDrop.style.display=catDrop.style.display==='block'?'none':'block'};
+ box.querySelector('#addCategoria').onclick=()=>{
+   catDrop.style.display='none';
+   const pop=document.createElement('div');pop.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100001;display:flex;align-items:center;justify-content:center;padding:18px';
+   const card=document.createElement('div');card.style.cssText='width:min(390px,100%);background:#151b26;border:1px solid #384254;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.6);padding:18px;color:#fff';
+   card.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><h3 style="margin:0;font-size:18px">Nova categoria</h3><button type="button" id="catX" style="border:0;background:transparent;color:#fff;font-size:22px;cursor:pointer">×</button></div><label><span style="display:block;font-size:13px;font-weight:700;margin-bottom:6px">Nome da categoria</span><input id="novaCatNome" style="${inp}" placeholder="Digite a categoria"></label><div id="novaCatErro" style="color:#ff8b78;font-size:12px;margin-top:8px"></div><div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px"><button type="button" id="catCancel" class="btn secondary">Cancelar</button><button type="button" id="catSave" class="btn primary">Salvar</button></div>`;
+   pop.appendChild(card);document.body.appendChild(pop);
+   const fecharCat=()=>pop.remove(),nomeInput=card.querySelector('#novaCatNome');
+   card.querySelector('#catX').onclick=fecharCat;card.querySelector('#catCancel').onclick=fecharCat;pop.onclick=e=>{if(e.target===pop)fecharCat()};
+   card.querySelector('#catSave').onclick=()=>{
+     const nome=nomeInput.value.trim(),err=card.querySelector('#novaCatErro');if(!nome){err.textContent='Digite o nome da categoria.';return}
+     const a=finLoad(FIN_CAT_KEY);const existente=a.find(x=>x.toLowerCase()===nome.toLowerCase());
+     const final=existente||nome;if(!existente){a.push(nome);a.sort((x,y)=>x.localeCompare(y,'pt-BR'));finSave(FIN_CAT_KEY,a);const b=document.createElement('button');b.type='button';b.className='cat-option';b.dataset.value=nome;b.textContent=nome;b.style.cssText='display:block;width:100%;border:0;background:transparent;color:#fff;text-align:left;padding:8px 9px;border-radius:7px;font-size:14px;cursor:pointer';catOptions.appendChild(b);ligarCategorias()}
+     escolherCategoria(final);fecharCat();
+   };
+   nomeInput.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();card.querySelector('#catSave').click()}};setTimeout(()=>nomeInput.focus(),30);
+ };
+ cond.onchange=alternar;form.valor.oninput=()=>{if(cond.value==='Parcelado')montarParcelas()};form.parcelas.oninput=montarParcelas;alternar();
+ box.querySelector('#despX').onclick=fechar;box.querySelector('#despCancelar').onclick=fechar;overlay.onclick=e=>{if(e.target===overlay)fechar()};
+ form.onsubmit=e=>{
+   e.preventDefault();const d=Object.fromEntries(new FormData(form).entries()),erro=box.querySelector('#despErro');erro.textContent='';const valor=Number(d.valor);
+   if(!d.descricao?.trim()){erro.textContent='Informe a descrição.';return}if(!Number.isFinite(valor)||valor<=0){erro.textContent='Informe um valor válido.';return}if(!d.categoria){erro.textContent='Selecione ou adicione uma categoria.';return}
+   const a=finLoad(FIN_MOV_KEY),grupo=crypto.randomUUID(),agora=new Date().toISOString(),comum={tipo:'saida',descricao_base:d.descricao.trim(),categoria:d.categoria,veiculo_evento:d.veiculo_evento||'',forma:d.forma||'',condicao:d.condicao||'À vista',grupo_parcelas:grupo,criado_em:agora};
+   if(d.condicao==='Parcelado'){
+     if(!validarSoma()){erro.textContent='A soma das parcelas precisa ser exatamente igual ao valor total.';return}
+     const rows=[...box.querySelectorAll('.parc-row')],q=rows.length;
+     rows.forEach((r,i)=>a.push({...comum,id:crypto.randomUUID(),descricao:`${d.descricao.trim()} • Parcela ${i+1}/${q}`,valor:Number(r.querySelector('.parc-valor').value||0),valor_total:valor,parcela:i+1,total_parcelas:q,vencimento:r.querySelector('.parc-data').value,status:'pendente',data:null}));
+   }else if(rec.checked){
+     const rid=crypto.randomUUID(),dt=d.vencimento||finISODate(),pago=d.status==='Já foi paga';
+     for(let i=0;i<60;i++)a.push({...comum,id:crypto.randomUUID(),descricao:d.descricao.trim(),valor,valor_total:valor,parcela:1,total_parcelas:1,vencimento:finAddMonths(dt,i),status:(i===0&&pago)?'pago':'pendente',data:(i===0&&pago)?dt:null,recorrencia_id:rid,recorrencia_ativa:true,recorrencia_inicio:dt});
+   }else{
+     const pago=d.status==='Já foi paga';a.push({...comum,id:crypto.randomUUID(),descricao:d.descricao.trim(),valor,valor_total:valor,parcela:1,total_parcelas:1,vencimento:d.vencimento||finISODate(),status:pago?'pago':'pendente',data:pago?(d.vencimento||finISODate()):null});
+   }
+   finSave(FIN_MOV_KEY,a);fechar();renderFinanceiro();
+ };setTimeout(()=>form.descricao.focus(),50);
+}
+function finalizarRecorrencia(rid){
+ if(!confirm('Finalizar esta despesa recorrente? Os meses já lançados permanecem no histórico e os próximos lançamentos serão cancelados.'))return;
+ const hoje=finISODate(),a=finLoad(FIN_MOV_KEY),novo=a.filter(x=>!(x.recorrencia_id===rid&&x.status!=='pago'&&String(x.vencimento||'')>hoje));
+ novo.forEach(x=>{if(x.recorrencia_id===rid)x.recorrencia_ativa=false});
+ finSave(FIN_MOV_KEY,novo);renderFinanceiro();
+}
+function pagarDespesa(id){const a=finLoad(FIN_MOV_KEY),x=a.find(y=>y.id===id);if(!x)return;finModal('Dar baixa na despesa',[{name:'descricao',label:'Despesa',value:x.descricao||'',full:true},{name:'data',label:'Data do pagamento',type:'date',value:finISODate(),required:true},{name:'forma',label:'Forma de pagamento',type:'select',options:['PIX','Dinheiro','Débito','Crédito','Boleto','Transferência','Outro']}],d=>{x.status='pago';x.data=d.data||finISODate();x.forma=d.forma||x.forma||'';finSave(FIN_MOV_KEY,a);renderFinanceiro();return true})}
+async function cobrarCliente(id){const rec=(await finRecebiveis()).find(x=>String(x.id)===String(id));if(!rec)return;finModal('Registrar cobrança',[{name:'meio',label:'Cobrança por',type:'select',options:['WhatsApp','Ligação']},{name:'prox',label:'Cobrar novamente em',type:'date',value:finAddDays(finISODate(),3)},{name:'obs',label:'Observação / o que o cliente falou',type:'textarea',full:true}],d=>{const meio=d.meio||'WhatsApp',a=finLoad(FIN_COB_KEY);a.push({id:crypto.randomUUID(),orcamento_id:id,cliente:rec.cliente_nome,data:finISODate(),meio,observacao:d.obs||'',proxima_data:d.prox||'',criado_em:new Date().toISOString()});finSave(FIN_COB_KEY,a);if(meio.toLowerCase().includes('whats')){let tel=String(rec.cliente_telefone||'').replace(/\D/g,'');if(tel.length===10||tel.length===11)tel='55'+tel;if(tel){const msg=`Olá ${rec.cliente_nome||''}, tudo bem? Consta em nosso controle financeiro um saldo de ${money(rec.saldo)} referente ao evento ${rec.evento_nome||''}, com vencimento em ${finDate(rec.vencimento)}. Podemos confirmar a previsão de pagamento? CZ Efeitos Especiais.`;window.open('https://wa.me/'+tel+'?text='+encodeURIComponent(msg),'_blank','noopener')}}renderFinanceiro('vencidos');return true})}
+
+
+async function renderDashboard(){
+  const c = await Promise.all([
+    count('clientes'),
+    count('eventos'),
+    count('ativos'),
+    count('produtos')
+  ]);
+
+  $('#content').innerHTML = `
+    <div style="margin-bottom:24px">
+      <div style="font-size:13px;color:#ff641f;font-weight:800;letter-spacing:1px">
+        CZ EFEITOS ESPECIAIS
+      </div>
+      <h2 style="margin:5px 0 4px;font-size:30px">Painel de Controle</h2>
+      <div class="muted">Gestão rápida da sua operação</div>
+    </div>
+
+    <div style="
+      background:linear-gradient(135deg,#ff641f,#d94700);
+      border-radius:18px;
+      padding:22px;
+      margin-bottom:24px;
+      box-shadow:0 8px 25px rgba(0,0,0,.25);
+    ">
+      <div style="font-size:14px;font-weight:700;opacity:.9">
+        ACESSO RÁPIDO
+      </div>
+
+      <div style="
+        display:grid;
+        grid-template-columns:repeat(2,1fr);
+        gap:12px;
+        margin-top:16px;
+      ">
+        <button class="btn"
+          onclick="renderModule(2)"
+          style="background:#fff;color:#111;padding:18px 8px;border-radius:14px;font-weight:800">
+          <div style="font-size:27px;margin-bottom:6px">📝</div>
+          Novo Orçamento
+        </button>
+
+        <button class="btn"
+          onclick="renderModule(1)"
+          style="background:#fff;color:#111;padding:18px 8px;border-radius:14px;font-weight:800">
+          <div style="font-size:27px;margin-bottom:6px">👥</div>
+          Clientes
+        </button>
+
+        <button class="btn"
+          onclick="renderModule(4)"
+          style="background:#fff;color:#111;padding:18px 8px;border-radius:14px;font-weight:800">
+          <div style="font-size:27px;margin-bottom:6px">📅</div>
+          Eventos
+        </button>
+
+        <button class="btn"
+          onclick="renderModule(6)"
+          style="background:#fff;color:#111;padding:18px 8px;border-radius:14px;font-weight:800">
+          <div style="font-size:27px;margin-bottom:6px">🏷️</div>
+          Equipamentos
+        </button>
+      </div>
+    </div>
+
+    <div id="dashFinanceiro"><div class="muted">Carregando resumo financeiro...</div></div>
+
+    <div style="margin-bottom:12px">
+      <h3 style="margin:0">Visão geral</h3>
+      <div class="muted">Resumo da operação</div>
+    </div>
+
+    <div style="
+      display:grid;
+      grid-template-columns:repeat(2,1fr);
+      gap:12px;
+    ">
+      <div class="card" style="margin:0;padding:18px">
+        <div style="font-size:25px">👥</div>
+        <div class="muted">Clientes</div>
+        <div style="font-size:28px;font-weight:800">${c[0]}</div>
+      </div>
+
+      <div class="card" style="margin:0;padding:18px">
+        <div style="font-size:25px">📅</div>
+        <div class="muted">Eventos</div>
+        <div style="font-size:28px;font-weight:800">${c[1]}</div>
+      </div>
+
+      <div class="card" style="margin:0;padding:18px">
+        <div style="font-size:25px">⚙️</div>
+        <div class="muted">Equipamentos</div>
+        <div style="font-size:28px;font-weight:800">${c[2]}</div>
+      </div>
+
+      <div class="card" style="margin:0;padding:18px">
+        <div style="font-size:25px">📦</div>
+        <div class="muted">Produtos</div>
+        <div style="font-size:28px;font-weight:800">${c[3]}</div>
+      </div>
+    </div>
+  `;
+  const receb=await finRecebiveis(),desp=finDespesas(),fr=finResumoMes(receb,desp);
+  const df=$('#dashFinanceiro');if(df)df.innerHTML=`<div class="sectionhead" style="margin-bottom:10px"><div><h3 style="margin:0">Financeiro do dia</h3><div class="muted">Clique para ver o que receber ou pagar</div></div><button class="btn primary" onclick="novaDespesa()">+ Nova despesa</button></div><div class="cards" style="margin-bottom:18px"><div class="card" style="cursor:pointer" onclick="abrirFinanceFiltro('receber_hoje')"><div class="muted">💰 A receber hoje</div><div class="n">${money(fr.receberHoje)}</div></div><div class="card" style="cursor:pointer" onclick="abrirFinanceFiltro('receber_mes')"><div class="muted">📅 A receber restante do mês</div><div class="n">${money(fr.receberMes)}</div></div><div class="card" style="cursor:pointer" onclick="abrirFinanceFiltro('pagar_hoje')"><div class="muted">💸 A pagar hoje</div><div class="n">${money(fr.pagarHoje)}</div></div><div class="card" style="cursor:pointer" onclick="abrirFinanceFiltro('pagar_mes')"><div class="muted">🧾 A pagar restante do mês</div><div class="n">${money(fr.pagarMes)}</div></div><div class="card" style="cursor:pointer" onclick="abrirFinanceFiltro('vencidos')"><div class="muted">🔴 Clientes vencidos</div><div class="n">${money(fr.vencidos)}</div></div><div class="card" style="cursor:pointer" onclick="renderFinanceiro()"><div class="muted">📞 Cobranças para hoje</div><div class="n">${fr.cobrancas.length}</div></div></div>`;
+}
+async function renderOrcamentos(novo=false){
+  const itensProduto = [];
+  const itensAtivo = [];
+  if(!novo){
+    $('#content').innerHTML = `<div class="sectionhead"><div><h2>Orçamentos</h2><div class="muted">Propostas salvas</div></div><button class="btn primary" type="button" onclick="renderOrcamentos(true)">+ Novo orçamento</button></div><div class="card"><div id="orcPropostasSalvas"><div class="muted">Carregando...</div></div></div>`;
+    await carregarPropostasSalvas();
+    return;
+  }
+  $('#content').innerHTML = `
+    <div style="margin-bottom:22px">
+      <div style="font-size:13px;color:#ff641f;font-weight:800;letter-spacing:1px">
+        CZ EFEITOS ESPECIAIS
+      </div>
+      <h2 style="margin:5px 0">Novo Orçamento</h2>
+      <div class="muted">Elaboração do projeto e composição do investimento</div>
+    </div>
+
+    <!-- 1 PROJETO / EVENTO -->
+    <div class="card" style="margin-bottom:18px">
+      <h3 style="margin-top:0">📋 1. Projeto / Evento</h3>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px">
+
+      
+<div class="field">
+  <label>Cliente</label>
+  <input id="orcCliente" placeholder="Buscar cliente cadastrado">
+</div>
+
+<div class="field">
+  <label>Telefone</label>
+  <input id="orcTelefone" placeholder="Telefone">
+</div>
+
+<div class="field">
+  <label>Projeto / Evento</label>
+  <input id="orcEvento" placeholder="Nome do evento">
+</div>
+
+<div class="field">
+  <label>Data</label>
+  <input id="orcData" type="date">
+</div>
+
+<div class="field">
+  <label>Local do evento</label>
+  <input id="orcLocalEvento" placeholder="Local do evento">
+</div>
+
+<div class="field">
+  <label>Horário inicial</label>
+  <input id="orcHorario" type="time">
+</div>
+
+<div class="field">
+  <label>Horário de montagem</label>
+  <input id="orcHorarioMontagem" type="time">
+</div>
+
+<div class="field">
+  <label>Responsável pelo evento</label>
+  <input id="orcResponsavelEvento" placeholder="Nome do responsável">
+</div>
+
+<div class="field">
+  <label>Telefone do responsável</label>
+  <input id="orcTelefoneResponsavel" placeholder="Telefone">
+</div>
+<div class="field">
+  <label>Téc. responsável</label>
+  <input id="orcTecnicoResponsavel" placeholder="Nome do técnico responsável">
+</div>
+
+
+</div>
+</div>
+
+   <!-- CUSTO INICIAL DO EVENTO -->
+<div class="card" style="margin-bottom:18px">
+
+  <h3 style="margin-top:0">💰 Custo inicial do evento</h3>
+
+  <!-- DESLOCAMENTO -->
+  <h4 style="margin:18px 0 10px">🚗 Deslocamento</h4>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
+
+    <div class="field">
+      <label>Veículo</label>
+      <input id="orcVeiculo" placeholder="Veículo">
+    </div>
+
+    <div class="field">
+      <label>Km rodado</label>
+      <input id="orcKm" type="number" min="0" value="0">
+    </div>
+</div>
+
+<div class="field">
+  <label>Valor do km</label>
+  <input id="orcValorKm" type="number" min="0" step="0.01" value="0" readonly>
+</div>
+
+
+    <div class="field">
+      <label>Pedágio</label>
+      <input id="orcPedagio" type="number" min="0" step="0.01" value="0">
+    </div>
+
+  </div>
+
+  <!-- EQUIPE -->
+<h4 style="margin:22px 0 10px">👷 Equipe</h4>
+
+<div id="orcEquipeLista">
+
+  <div class="orc-equipe-linha"
+     style="display:grid;grid-template-columns:1.5fr .7fr .8fr .9fr .8fr .9fr;gap:8px;align-items:end;">
+    <div class="field">
+      <label>Nome do colaborador</label>
+      <input class="equipeNome" placeholder="Nome">
+    </div>
+
+    <div class="field">
+  <label>Qtd. diária</label>
+  <input class="equipeDiarias" type="number" min="0" value="0">
+</div>
+
+<div class="field">
+  <label>Valor diária</label>
+  <input class="equipeValorDiaria" type="number" min="0" step="0.01" value="0">
+</div>
+<div class="field">
+  <label>Valor alimentação</label>
+  <input class="equipeAlimentacao" type="number" min="0" step="0.01" value="0">
+</div>
+    <div class="field">
+      <label>Estadia</label>
+      <input class="equipeEstadia" type="number" min="0" step="0.01" value="0">
+    </div>
+
+    <div class="field">
+      <label>Total</label>
+      <input class="equipeTotal" value="R$ 0,00" readonly>
+    </div>
+
+  </div>
+
+</div>
+
+<button type="button"
+        id="btnAdicionarColaborador"
+        class="btn secondary"
+        style="padding:6px 10px;font-size:12px;margin-top:4px">
+  + Adicionar colaborador
+</button>
+<div style="margin-top:14px;text-align:right;font-weight:700;font-size:16px;">Total da Equipe: <span id="orcTotalEquipe">R$ 0,00</span></div>
+</div>
+    <!-- 2 PRODUTOS -->
+    <div class="card" style="margin-bottom:18px">
+      <div class="sectionhead">
+        <div>
+          <h3 style="margin:0">📦 2. Produtos de Consumo</h3>
+          <div class="muted">Tabela 1 aplicada automaticamente</div>
+        </div>
+
+      </div>
+
+      <div id="orcProdutoPicker" style="margin-top:16px" class="muted">Carregando produtos cadastrados...</div>
+      <div id="orcProdutosLista" style="margin-top:16px" class="muted">Nenhum produto adicionado.</div>
+    </div>
+
+    <!-- 3 EQUIPAMENTOS -->
+    <div class="card" style="margin-bottom:18px">
+      <div class="sectionhead">
+        <div>
+          <h3 style="margin:0">⚙️ 3. Equipamentos</h3>
+          <div class="muted">Tabela 1 aplicada automaticamente</div>
+        </div>
+
+        <button id="orcAddAsset" class="btn primary" type="button">
+          + Adicionar Equipamento
+        </button>
+      </div>
+
+      <div id="orcAtivosLista" style="margin-top:16px" class="muted">Nenhum equipamento adicionado.</div>
+    </div>
+
+    <!-- RESUMO -->
+    <div style="
+      background:linear-gradient(135deg,#ff641f,#d94700);
+      border-radius:18px;
+      padding:22px;
+      margin-bottom:20px
+    ">
+      <div style="font-size:13px;font-weight:800;letter-spacing:1px">
+        RESUMO DO PROJETO
+      </div>
+
+      <div style="margin-top:16px;font-size:14px">
+        Composição interna do orçamento
+      </div>
+
+      <div style="margin-top:18px;font-size:14px">
+        INVESTIMENTO DO CLIENTE
+      </div>
+
+      <div id="orcInvestimento" style="font-size:34px;font-weight:900;margin-top:4px">
+        R$ 0,00
+      </div>
+    </div>
+
+
+    <div class="card" style="margin-bottom:18px">
+      <h3 style="margin-top:0">💳 Forma e condição de pagamento</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
+        <div class="field"><label>Forma de pagamento</label><select id="orcFormaPagamento"><option>PIX</option><option>Dinheiro</option><option>Cartão de débito</option><option>Cartão de crédito</option></select></div>
+        <div class="field" id="orcParcelasBox" style="display:none"><label>Parcelas do cartão</label><input id="orcParcelas" type="number" min="1" max="10" value="1" list="parcelasOp"><datalist id="parcelasOp">${Array.from({length:10},(_,i)=>`<option value="${i+1}">${i+1}x</option>`).join('')}</datalist></div>
+        <div class="field"><label>Entrada prevista (40%)</label><input id="orcEntradaPrevista" readonly value="R$ 0,00"></div>
+        <div class="field"><label>Saldo previsto (60%)</label><input id="orcSaldoPrevisto" readonly value="R$ 0,00"></div>
+        <div class="field"><label>Vencimento do saldo</label><input id="orcVencimentoSaldo" type="date" readonly></div>
+      </div>
+      <div class="muted" style="margin-top:8px">A entrada é uma condição prevista. O valor só entra como pago quando for dada baixa no Financeiro. O saldo vence 5 dias antes do evento e pode receber baixas parciais.</div>
+    </div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button id="orcSave" class="btn secondary" type="button">
+        Salvar Rascunho
+      </button>
+
+      <button id="orcPrint" class="btn primary" type="button">
+        Gerar Proposta
+      </button>
+    </div>
+    <div id="orcMsg" class="msg" role="status"></div>
+  `;
+
+ const atualizarEquipe = () => {
+  let totalEquipe = 0;
+
+  document.querySelectorAll('.orc-equipe-linha, .linhaEquipe').forEach(linha => {
+    const diaria = Number(linha.querySelector('.equipeValorDiaria')?.value || 0);
+    const dias = Number(linha.querySelector('.equipeDiarias')?.value || 0);
+    const estadia = Number(linha.querySelector('.equipeEstadia')?.value || 0);
+const alimentacao = Number(linha.querySelector('.equipeAlimentacao')?.value || 0);
+   const total = (diaria * dias) + (alimentacao * dias) + (estadia * dias);
+    totalEquipe += total;
+
+    const campoTotal = linha.querySelector('.equipeTotal');
+    if (campoTotal) {
+      campoTotal.value = total.toLocaleString('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+      });
+    }
+  });
+const campoTotalEquipe = document.querySelector('#orcTotalEquipe');
+if (campoTotalEquipe) {
+  campoTotalEquipe.textContent = totalEquipe.toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL'
+  });
+}
+  const deslocamento = (Number($('#orcKm').value||0) * Number($('#orcValorKm').value||0)) + Number($('#orcPedagio').value||0);
+  const itens = [...itensProduto,...itensAtivo].reduce((s,item)=>s+item.quantidade*item.preco,0);
+  const totalGeral=totalEquipe+deslocamento+itens; $('#orcInvestimento').textContent = money(totalGeral); if($('#orcEntradaPrevista'))$('#orcEntradaPrevista').value=money(totalGeral*.4);if($('#orcSaldoPrevisto'))$('#orcSaldoPrevisto').value=money(totalGeral*.6);
+};
+
+document.querySelectorAll('.orc-equipe-linha input, .linhaEquipe input').forEach(input => {
+  input.addEventListener('input', atualizarEquipe);
+});
+['orcKm','orcValorKm','orcPedagio'].forEach(id=>$('#'+id).addEventListener('input',atualizarEquipe));
+$('#orcFormaPagamento').onchange=()=>{$('#orcParcelasBox').style.display=$('#orcFormaPagamento').value==='Cartão de crédito'?'block':'none'};$('#orcData').addEventListener('change',()=>{$('#orcVencimentoSaldo').value=$('#orcData').value?finAddDays($('#orcData').value,-5):''});
+
+$('#btnAdicionarColaborador').onclick = () => {
+  const container = $('#orcEquipeLista');
+
+  const novaLinha = document.createElement('div');
+  novaLinha.className = 'linhaEquipe';
+novaLinha.style = 'display:grid;grid-template-columns:1.5fr .7fr .8fr .9fr .8fr .9fr auto;gap:8px;margin-top:10px;align-items:end';
+  novaLinha.innerHTML = `
+    <div class="field">
+      <label>Nome do colaborador</label>
+      <input class="equipeNome" placeholder="Nome">
+</div>
+      <div class="field">
+  <label>Qtd. diária</label>
+  <input class="equipeDiarias" type="number" min="0" value="0">
+</div>
+
+<div class="field">
+  <label>Valor diária</label>
+  <input class="equipeValorDiaria" type="number" min="0" step="0.01" value="0">
+</div>
+<div class="field">
+  <label>Valor alimentação</label>
+  <input class="equipeAlimentacao" type="number" min="0" step="0.01" value="0">
+</div>
+    <div class="field">
+      <label>Estadia</label>
+      <input class="equipeEstadia" type="number" min="0" step="0.01" value="0">
+    </div>
+
+    <div class="field">
+      <label>Total</label>
+      <input class="equipeTotal" value="R$ 0,00" readonly>
+    </div>
+
+    <button type="button" class="btn secondary removerColaborador"
+      style="padding:6px 10px;font-size:12px;margin-bottom:2px">
+      ✕
+    </button>
+  `;
+
+  container.appendChild(novaLinha);
+
+  novaLinha.querySelectorAll('input').forEach(input => {
+    input.addEventListener('input', atualizarEquipe);
+  });
+
+  novaLinha.querySelector('.removerColaborador').onclick = () => {
+    novaLinha.remove();
+    atualizarEquipe();
+  };
+};
+
+atualizarEquipe();
+  function mostrarItens(tipo){
+    const lista=tipo==='produto'?itensProduto:itensAtivo;
+    const destino=$(tipo==='produto'?'#orcProdutosLista':'#orcAtivosLista');
+    destino.innerHTML=lista.length?`<div class="tablewrap"><table><thead><tr><th>${tipo==='produto'?'Produto':'Equipamento'}</th><th>Quantidade</th><th>Valor unitário</th><th>Tabela de preço</th><th>Valor total</th><th>Ação</th></tr></thead><tbody>${lista.map((item,i)=>`<tr><td>${esc(item.nome)}</td><td>${item.quantidade}</td><td>${money(item.preco)}</td><td>Tabela ${item.tabela}</td><td>${money(item.quantidade*item.preco)}</td><td><button type="button" class="btn danger" data-remover="${i}">Remover</button></td></tr>`).join('')}</tbody></table></div><div style="text-align:right;margin-top:12px;font-weight:700;color:var(--text)">Total ${tipo==='produto'?'dos produtos':'dos equipamentos'}: ${money(lista.reduce((total,item)=>total+item.quantidade*item.preco,0))}</div>`:'Nenhum item adicionado.';
+    destino.querySelectorAll('[data-remover]').forEach(btn=>btn.onclick=()=>{lista.splice(Number(btn.dataset.remover),1);mostrarItens(tipo);atualizarEquipe()});
+  }
+  async function prepararProdutos(){
+    const destino=$('#orcProdutoPicker');
+    const {data,error}=await db.from('produtos').select('*').order('nome');
+    if(!destino || !destino.isConnected)return;
+    if(error){destino.textContent='Erro ao carregar produtos: '+error.message;return}
+    if(!data?.length){destino.innerHTML='<p>Nenhum produto cadastrado. Cadastre um produto no menu Estoque antes de adicioná-lo ao orçamento.</p>';return}
+    destino.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;align-items:start">
+      <div class="field"><label>Produto</label><select id="orcProdutoSelect"><option value="">Selecione o produto</option>${data.map((item,i)=>`<option value="${i}">${esc(item.nome)}</option>`).join('')}</select><button id="orcConfirmarProduto" type="button" class="btn primary" style="margin-top:10px">+ Adicionar Produto</button></div>
+      <div class="field"><label>Quantidade</label><input id="orcProdutoQtd" type="number" min="1" step="1" value="1"></div>
+      <div class="field"><label>Valor unitário</label><input id="orcProdutoUnitario" readonly></div>
+      <div class="field"><label>Tabela de preço</label><select id="orcProdutoTabela"><option value="1">Tabela 1 (varejo)</option><option value="2">Tabela 2 (atacado)</option></select></div>
+      <div class="field"><label>Valor total da linha</label><input id="orcProdutoTotal" readonly></div>
+    </div><div id="orcProdutoMsg" class="msg" role="status"></div>`;
+    const precoSelecionado=()=>{
+      const item=data[Number($('#orcProdutoSelect').value)];
+      if($('#orcProdutoSelect').value===''||!item)return null;
+      const valor=$('#orcProdutoTabela').value==='1'?item.valor_varejo:item.valor_atacado;
+      return valor===null||valor===undefined||valor===''?null:Number(valor);
+    };
+    const atualizarPreview=()=>{
+      const preco=precoSelecionado(),quantidade=Number($('#orcProdutoQtd').value);
+      $('#orcProdutoUnitario').value=preco===null||!Number.isFinite(preco)?'Preço não cadastrado':money(preco);
+      $('#orcProdutoTotal').value=preco===null||!Number.isFinite(preco)||!Number.isInteger(quantidade)||quantidade<1?'—':money(preco*quantidade);
+    };
+    ['orcProdutoSelect','orcProdutoTabela','orcProdutoQtd'].forEach(id=>$('#'+id).addEventListener('input',atualizarPreview));
+    $('#orcConfirmarProduto').onclick=()=>{
+      const indice=$('#orcProdutoSelect').value,quantidade=Number($('#orcProdutoQtd').value),preco=precoSelecionado();
+      if(indice===''){$('#orcProdutoMsg').textContent='Selecione um produto.';return}
+      if(!Number.isInteger(quantidade)||quantidade<1){$('#orcProdutoMsg').textContent='Informe uma quantidade inteira maior que zero.';return}
+      if(preco===null||!Number.isFinite(preco)||preco<0){$('#orcProdutoMsg').textContent='Cadastre o preço desta tabela no produto antes de adicioná-lo.';return}
+      const item=data[Number(indice)];
+      itensProduto.push({id:item.id,nome:item.nome,quantidade,preco,tabela:Number($('#orcProdutoTabela').value)});
+      $('#orcProdutoMsg').textContent='Produto adicionado.';
+      $('#orcProdutoSelect').value='';$('#orcProdutoQtd').value='1';atualizarPreview();
+      mostrarItens('produto');atualizarEquipe();
+    };
+    atualizarPreview();
+  }
+  async function adicionarItem(tipo){
+    const destino=$(tipo==='produto'?'#orcProdutosLista':'#orcAtivosLista');
+    const tabela=tipo==='produto'?'produtos':'ativos';
+    destino.innerHTML='<div class="muted">Carregando itens cadastrados...</div>';
+    const {data,error}=await db.from(tabela).select('*').order('nome');
+    if(error){destino.textContent='Erro ao carregar '+tabela+': '+error.message;return}
+    if(!data?.length){destino.innerHTML=`<p>Nenhum ${tipo==='produto'?'produto':'equipamento'} cadastrado.</p><button type="button" class="btn secondary" id="irCadastro">Abrir cadastro</button>`;$('#irCadastro').onclick=()=>renderModule(tipo==='produto'?5:6);return}
+    destino.innerHTML=`<div class="row"><div class="field"><label>${tipo==='produto'?'Produto':'Equipamento'}</label><select id="orcItemSelect">${data.map((item,i)=>`<option value="${i}">${esc(item.nome)}</option>`).join('')}</select></div><div class="field"><label>Quantidade</label><input id="orcItemQtd" type="number" min="1" step="1" value="1"></div><div class="field"><label>Tabela de preço</label><select id="orcItemTabela"><option value="1">Tabela 1</option><option value="2">Tabela 2</option></select></div></div><div class="actions"><button type="button" id="orcCancelarItem" class="btn secondary">Cancelar</button><button type="button" id="orcConfirmarItem" class="btn primary">Adicionar ao orçamento</button></div><div id="orcItemMsg" class="msg"></div>`;
+    $('#orcCancelarItem').onclick=()=>mostrarItens(tipo);
+    $('#orcConfirmarItem').onclick=()=>{
+      const item=data[Number($('#orcItemSelect').value)];
+      const quantidade=Number($('#orcItemQtd').value);
+      if(!Number.isInteger(quantidade)||quantidade<1){$('#orcItemMsg').textContent='Informe uma quantidade inteira maior que zero.';return}
+      const tab=Number($('#orcItemTabela').value);
+      const preco=Number(tipo==='produto'?(tab===1?item.valor_varejo:item.valor_atacado):(tab===1?item.valor_locacao_tabela1:item.valor_locacao_tabela2));
+      if(!Number.isFinite(preco)||preco<0){$('#orcItemMsg').textContent='Cadastre o valor desta tabela antes de adicionar.';return}
+      (tipo==='produto'?itensProduto:itensAtivo).push({id:item.id,nome:item.nome,quantidade,preco,tabela:tab});
+      mostrarItens(tipo);atualizarEquipe();
+    };
+  }
+  function dadosProposta(){
+    const equipe=[...document.querySelectorAll('.orc-equipe-linha, .linhaEquipe')].map(l=>({
+      nome:l.querySelector('.equipeNome')?.value?.trim()||'',
+      diarias:Number(l.querySelector('.equipeDiarias')?.value||0),
+      valor_diaria:Number(l.querySelector('.equipeValorDiaria')?.value||0),
+      alimentacao:Number(l.querySelector('.equipeAlimentacao')?.value||0),
+      estadia:Number(l.querySelector('.equipeEstadia')?.value||0)
+    })).filter(x=>x.nome||x.diarias||x.valor_diaria||x.alimentacao||x.estadia);
+    const totalEquipe=equipe.reduce((s,x)=>s+(x.valor_diaria*x.diarias)+(x.alimentacao*x.diarias)+(x.estadia*x.diarias),0);
+    const deslocamento=(Number($('#orcKm').value||0)*Number($('#orcValorKm').value||0))+Number($('#orcPedagio').value||0);
+    const totalItens=[...itensProduto,...itensAtivo].reduce((s,x)=>s+(x.quantidade*x.preco),0);
+    return {
+      cliente:$('#orcCliente').value.trim(), telefone:$('#orcTelefone').value.trim(),
+      evento:$('#orcEvento').value.trim(), data_evento:$('#orcData').value||null,
+      local_evento:$('#orcLocalEvento').value.trim(), horario:$('#orcHorario').value||null,
+      horario_montagem:$('#orcHorarioMontagem').value||null,
+      responsavel_evento:$('#orcResponsavelEvento').value.trim(), telefone_responsavel:$('#orcTelefoneResponsavel').value.trim(),
+      tecnico_responsavel:$('#orcTecnicoResponsavel').value.trim(),
+      produtos:itensProduto.map(x=>({...x})), equipamentos:itensAtivo.map(x=>({...x})), equipe,
+      deslocamento:{veiculo:$('#orcVeiculo')?.value?.trim()||'',km:Number($('#orcKm').value||0),valor_km:Number($('#orcValorKm').value||0),pedagio:Number($('#orcPedagio').value||0)},
+      pagamento:{forma:$('#orcFormaPagamento')?.value||'PIX',parcelas:$('#orcFormaPagamento')?.value==='Cartão de crédito'?Math.max(1,Math.min(10,Number($('#orcParcelas')?.value||1))):1,entrada_percentual:40,saldo_percentual:60,vencimento_saldo:$('#orcVencimentoSaldo')?.value||null},
+      total:Number((totalEquipe+deslocamento+totalItens).toFixed(2))
+    };
+  }
+  function validarProposta(d){
+    if(!d.cliente)return 'Informe o nome do cliente.';
+    if(!d.evento)return 'Informe o nome do projeto/evento.';
+    if(!d.data_evento)return 'Informe a data do evento.';
+    if(!d.produtos.length&&!d.equipamentos.length)return 'Adicione pelo menos um produto ou equipamento.';
+    return '';
+  }
+  function gerarPdfProposta(d,numero){
+    if(!window.jspdf?.jsPDF)throw new Error('Não foi possível carregar o gerador de PDF.');
+    const pdf=new window.jspdf.jsPDF({unit:'mm',format:'a4'});
+    const W=210; let y=0;
+    const novaPagina=()=>{pdf.addPage();cabecalho(false);y=34};
+    const cabecalho=(capa=true)=>{
+      pdf.setFillColor(18,22,28);pdf.rect(0,0,W,capa?42:25,'F');
+      pdf.setTextColor(212,170,76);pdf.setFont('helvetica','bold');pdf.setFontSize(capa?20:14);pdf.text('CZ EFEITOS ESPECIAIS',15,capa?18:15);
+      pdf.setTextColor(255,255,255);pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.text('PROPOSTA COMERCIAL',15,capa?27:20);
+      pdf.setTextColor(80,80,80);
+    };
+    cabecalho(true); y=52;
+    pdf.setFont('helvetica','bold');pdf.setFontSize(15);pdf.setTextColor(25,25,25);pdf.text('Proposta '+numero,15,y); y+=9;
+    pdf.setFont('helvetica','normal');pdf.setFontSize(10);
+    const dataFmt=d.data_evento?new Date(d.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—';
+    const infos=[['Cliente',d.cliente],['Projeto / Evento',d.evento],['Data do evento',dataFmt],['Local',d.local_evento||'—'],['Horário',d.horario||'—']];
+    infos.forEach(([a,b])=>{pdf.setFont('helvetica','bold');pdf.text(a+':',15,y);pdf.setFont('helvetica','normal');pdf.text(String(b),48,y);y+=7});
+    y+=4;pdf.setDrawColor(212,170,76);pdf.line(15,y,195,y);y+=10;
+    pdf.setFont('helvetica','bold');pdf.setFontSize(12);pdf.text('Serviços, produtos e equipamentos',15,y);y+=8;
+    const linhas=[...d.produtos.map(x=>({nome:x.nome,qtd:x.quantidade,tipo:'Produto / serviço'})),...d.equipamentos.map(x=>({nome:x.nome,qtd:x.quantidade,tipo:'Equipamento'}))];
+    pdf.setFontSize(9);pdf.setFillColor(242,242,242);pdf.rect(15,y-5,180,8,'F');pdf.text('Descrição',18,y);pdf.text('Tipo',135,y);pdf.text('Qtd.',185,y,{align:'right'});y+=8;
+    pdf.setFont('helvetica','normal');
+    linhas.forEach(x=>{if(y>265){novaPagina()} const nome=pdf.splitTextToSize(String(x.nome),108);pdf.text(nome,18,y);pdf.text(x.tipo,135,y);pdf.text(String(x.qtd),185,y,{align:'right'});y+=Math.max(7,nome.length*5);pdf.setDrawColor(230);pdf.line(15,y-3,195,y-3)});
+    if(y>245){novaPagina()}
+    y+=8;pdf.setFillColor(18,22,28);pdf.roundedRect(15,y,180,28,3,3,'F');
+    pdf.setTextColor(255,255,255);pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.text('INVESTIMENTO TOTAL',22,y+9);
+    pdf.setTextColor(212,170,76);pdf.setFont('helvetica','bold');pdf.setFontSize(19);pdf.text(money(d.total),22,y+21);
+    y+=39;if(d.pagamento){pdf.setTextColor(45,45,45);pdf.setFont('helvetica','bold');pdf.setFontSize(10);pdf.text('Condição de pagamento',15,y);y+=6;pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.text('Forma: '+String(d.pagamento.forma||'—')+(d.pagamento.forma==='Cartão de crédito'?' • '+String(d.pagamento.parcelas||1)+'x':''),15,y);y+=5;pdf.text('Entrada prevista (40%): '+money(d.total*.4),15,y);y+=5;pdf.text('Saldo (60%): '+money(d.total*.6)+' • vencimento: '+(d.pagamento.vencimento_saldo?finDate(d.pagamento.vencimento_saldo):'—'),15,y);y+=8;}pdf.setTextColor(75,75,75);pdf.setFont('helvetica','normal');pdf.setFontSize(8);
+    pdf.text('CZ Efeitos Especiais • Proposta gerada em '+new Date().toLocaleString('pt-BR'),15,y);
+    pdf.save('proposta-'+numero.replace(/[^a-zA-Z0-9_-]/g,'-')+'-'+d.cliente.replace(/[^a-zA-Z0-9_-]/g,'-')+'.pdf');
+  }
+  async function proximoNumeroProposta(){
+    const {data,error}=await db.from('orcamentos').select('numero').order('criado_em',{ascending:false}).limit(200);
+    if(error)throw error;
+    let maior=0;
+    (data||[]).forEach(x=>{const n=parseInt(String(x.numero||'').replace(/\D/g,''),10);if(Number.isFinite(n)&&n>maior)maior=n});
+    return String(maior+1).padStart(3,'0');
+  }
+  async function salvarProposta(status='enviado'){
+    const d=dadosProposta(),erro=validarProposta(d);if(erro)throw new Error(erro);
+    const numero=await proximoNumeroProposta();
+    const payload={numero,status,cliente_nome:d.cliente,cliente_telefone:d.telefone||null,evento_nome:d.evento,data_evento:d.data_evento,local_evento:d.local_evento||null,valor_total:d.total,dados:d,criado_em:new Date().toISOString()};
+    const {data,error}=await db.from('orcamentos').insert(payload).select('*').single();
+    if(error)throw error;
+    return {registro:data,d,numero};
+  }
+  function iconeOlho(){return '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="2.5" fill="currentColor"/></svg>'}
+  function iconeWhats(){return '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M20 11.7a8 8 0 0 1-11.8 7L4 20l1.3-4.1A8 8 0 1 1 20 11.7Z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9 8.5c.4 2.6 2 4.2 4.6 4.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'}
+  function abrirWhatsPreenchimento(p){
+    let tel=String(p.cliente_telefone||p.dados?.telefone||'').replace(/\D/g,'');
+    if(tel.length===10||tel.length===11)tel='55'+tel;
+    if(!tel){alert('Esta proposta não possui telefone do cliente.');return}
+    const msg=`Olá ${p.cliente_nome||''}! Para darmos continuidade à proposta ${p.numero||''} da CZ Efeitos Especiais, preciso que você envie os dados para o preenchimento do cadastro do evento:
+
+• Nome completo / Razão social
+• CPF/CNPJ
+• RG (se pessoa física)
+• Endereço completo
+• Nome do evento
+• Local completo do evento
+• Data e horário
+• Responsável no local
+
+Obrigado!`;
+    window.open('https://wa.me/'+tel+'?text='+encodeURIComponent(msg),'_blank','noopener');
+  }
+  async function excluirProposta(id){
+    if(!confirm('Excluir esta proposta? Se existir um evento vinculado e ele ainda não estiver FINALIZADO, todo o processo operacional desse orçamento também será excluído. Eventos finalizados serão preservados.'))return;
+    try{
+      const {data:orc,error:eo}=await db.from('orcamentos').select('id,dados').eq('id',id).single();
+      if(eo)throw eo;
+      const eventoId=orc?.dados?.evento_operacional_id||null;
+      if(eventoId){
+        const {data:ev,error:ee}=await db.from('eventos_operacionais').select('id,status').eq('id',eventoId).maybeSingle();
+        if(ee)throw ee;
+        if(ev&&ev.status!=='finalizado'){
+          const {error:em}=await db.from('evento_materiais').delete().eq('evento_id',eventoId);
+          if(em)throw em;
+          const {error:ed}=await db.from('eventos_operacionais').delete().eq('id',eventoId);
+          if(ed)throw ed;
+        }
+      }
+      const {error}=await db.from('orcamentos').delete().eq('id',id);
+      if(error)throw error;
+      await carregarPropostasSalvas();
+    }catch(error){alert('Não foi possível excluir a proposta: '+error.message)}
+  }
+  async function propostaVirarEvento(p){
+    const {data:cs,error}=await db.from('clientes').select('id,nome,telefone,endereco').order('nome');
+    if(error){alert('Erro ao carregar clientes: '+error.message);return}
+    const d=p.dados||{};
+    const alvo=(cs||[]).find(c=>String(c.telefone||'').replace(/\D/g,'')===String(p.cliente_telefone||d.telefone||'').replace(/\D/g,''))||(cs||[]).find(c=>String(c.nome||'').toLowerCase()===String(p.cliente_nome||'').toLowerCase());
+    $('#content').innerHTML=`<div class="sectionhead"><div><h2>Novo evento — proposta ${esc(p.numero||'')}</h2><div class="muted">Preencha e confira o cadastro completo. Contrato não é obrigatório para criar o evento.</div></div><button class="btn secondary" id="voltarOrcamentoEvento">Voltar</button></div>
+    <div class="card">
+      <h3 style="margin-top:0">Cadastro do cliente</h3>
+      <div class="row"><div class="field"><label>Cliente cadastrado</label><select id="evCliente"><option value="">Novo cliente / selecionar</option>${(cs||[]).map(c=>`<option value="${esc(c.id)}">${esc(c.nome)}</option>`).join('')}</select></div><div class="field"><label>Nome completo / Razão social *</label><input id="evClienteNome" value="${esc(p.cliente_nome||d.cliente||'')}"></div></div>
+      <div class="row"><div class="field"><label>Telefone *</label><input id="evClienteTelefone" value="${esc(p.cliente_telefone||d.telefone||'')}"></div><div class="field"><label>Endereço completo *</label><input id="evClienteEndereco" value="${esc(alvo?.endereco||'')}"></div></div>
+      <h3>Dados do evento</h3>
+      <div class="row"><div class="field"><label>Evento *</label><input id="evNome" value="${esc(p.evento_nome||d.evento||'')}"></div><div class="field"><label>Data *</label><input id="evData" type="date" value="${esc(p.data_evento||d.data_evento||'')}"></div></div>
+      <div class="row"><div class="field"><label>Local completo do evento *</label><input id="evLocal" value="${esc(d.local_evento||'')}"></div><div class="field"><label>Horário *</label><input id="evHora" type="time" value="${esc(d.horario||'')}"></div></div>
+      <div class="row"><div class="field"><label>Horário de montagem</label><input id="evMontagem" type="time" value="${esc(d.horario_montagem||'')}"></div><div class="field"><label>Técnico responsável</label><input id="evTecnico" value="${esc(d.tecnico_responsavel||'')}"></div></div>
+      <div class="row"><div class="field"><label>Responsável no local</label><input id="evResponsavel" value="${esc(d.responsavel_evento||'')}"></div><div class="field"><label>Telefone do responsável</label><input id="evTelefoneResponsavel" value="${esc(d.telefone_responsavel||'')}"></div></div>
+      <div class="actions"><button class="btn primary" id="salvarEventoProposta">Criar evento</button></div><div id="evMsg" class="msg"></div>
+    </div>`;
+    if(alvo)$('#evCliente').value=alvo.id;
+    $('#evCliente').onchange=()=>{const c=(cs||[]).find(x=>String(x.id)===String($('#evCliente').value));if(!c)return;$('#evClienteNome').value=c.nome||'';$('#evClienteTelefone').value=c.telefone||'';$('#evClienteEndereco').value=c.endereco||''};
+    $('#voltarOrcamentoEvento').onclick=()=>renderOrcamentos();
+    $('#salvarEventoProposta').onclick=async()=>{
+      const nome=$('#evClienteNome').value.trim(),tel=$('#evClienteTelefone').value.trim(),endereco=$('#evClienteEndereco').value.trim(),evento=$('#evNome').value.trim(),dataEv=$('#evData').value,local=$('#evLocal').value.trim(),hora=$('#evHora').value;
+      if(!nome||!tel||!endereco||!evento||!dataEv||!local||!hora){$('#evMsg').textContent='Complete os campos obrigatórios: cliente, telefone, endereço, evento, data, local e horário.';return}
+      const btn=$('#salvarEventoProposta');btn.disabled=true;$('#evMsg').textContent='Salvando cadastro e criando evento...';
+      try{
+        let clienteId=$('#evCliente').value||null;
+        if(clienteId){const {error:ec}=await db.from('clientes').update({nome,telefone:tel,endereco,atualizado_em:new Date().toISOString()}).eq('id',clienteId);if(ec)throw ec}
+        else{const {data:nc,error:ec}=await db.from('clientes').insert({nome,telefone:tel,endereco,origem:'proposta',observacoes:'Cadastro completado pela proposta '+(p.numero||''),atualizado_em:new Date().toISOString()}).select('id').single();if(ec)throw ec;clienteId=nc.id}
+        const payload={cliente_id:clienteId,cliente_nome:nome,cliente_telefone:tel,nome_evento:evento,data_evento:dataEv,local_evento:local,horario_evento:hora,horario_montagem:$('#evMontagem').value||null,tecnico_responsavel:$('#evTecnico').value.trim()||null,status:'aguardando_separacao'};
+        const {data:ev,error:ee}=await db.from('eventos_operacionais').insert(payload).select().single();if(ee)throw ee;
+        const itensOrc=[...(d.produtos||[]).map(x=>({...x,tipo:'produto'})),...(d.equipamentos||[]).map(x=>({...x,tipo:'ativo'}))];
+        if(itensOrc.length){
+          const idsProdutos=itensOrc.filter(x=>x.tipo==='produto'&&x.id).map(x=>x.id);
+          const idsAtivos=itensOrc.filter(x=>x.tipo==='ativo'&&x.id).map(x=>x.id);
+          const [rp,ra]=await Promise.all([
+            idsProdutos.length?db.from('produtos').select('id,nome,codigo_barras').in('id',idsProdutos):Promise.resolve({data:[],error:null}),
+            idsAtivos.length?db.from('ativos').select('id,nome,codigo_barras,codigo_interno').in('id',idsAtivos):Promise.resolve({data:[],error:null})
+          ]);
+          if(rp.error)throw rp.error;if(ra.error)throw ra.error;
+          const mp=new Map((rp.data||[]).map(x=>[String(x.id),x])),ma=new Map((ra.data||[]).map(x=>[String(x.id),x]));
+          const materiais=itensOrc.map(x=>{const cad=x.tipo==='produto'?mp.get(String(x.id)):ma.get(String(x.id));return {evento_id:ev.id,tipo:x.tipo,item_id:x.id||null,nome_item:cad?.nome||x.nome||'Item do orçamento',codigo:x.tipo==='produto'?(cad?.codigo_barras||null):(cad?.codigo_barras||cad?.codigo_interno||null),quantidade_necessaria:Number(x.quantidade||1),quantidade_bipada:0}});
+          const {error:em}=await db.from('evento_materiais').insert(materiais);if(em)throw em;
+        }
+        const dadosAtualizados={...d,evento_operacional_id:ev.id};
+        const {error:eoVinculo}=await db.from('orcamentos').update({dados:dadosAtualizados}).eq('id',p.id);
+        if(eoVinculo)throw eoVinculo;
+        $('#evMsg').textContent='Evento criado. Abrindo a página de Eventos...';
+        await renderEventos();
+      }catch(e){$('#evMsg').textContent='Erro: '+e.message;btn.disabled=false}
+    };
+  }
+  async function carregarPropostasSalvas(){
+    const box=$('#orcPropostasSalvas');if(!box)return;
+    const {data,error}=await db.from('orcamentos').select('id,numero,status,cliente_nome,cliente_telefone,evento_nome,data_evento,valor_total,criado_em,dados').order('criado_em',{ascending:false}).limit(100);
+    if(error){box.innerHTML='<div class="muted">Erro ao carregar propostas: '+esc(error.message)+'</div>';return}
+    box.innerHTML=data?.length?`<div class="tablewrap"><table class="orcamentos-lista"><thead><tr><th>Cliente</th><th>Data</th><th>Evento</th><th>Valor</th><th>Status</th><th>Nº Proposta</th><th>Ações</th></tr></thead><tbody>${data.map(x=>`<tr><td>${esc(x.cliente_nome||'')}</td><td>${x.data_evento?new Date(x.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${esc(x.evento_nome||'')}</td><td>${money(x.valor_total)}</td><td>${esc(x.status||'')}</td><td><b>${esc(x.numero||'')}</b></td><td><div style="display:flex;gap:5px;align-items:center;flex-wrap:nowrap"><button type="button" class="btn secondary btnVisualizarProposta" data-id="${esc(x.id)}" title="Visualizar proposta" aria-label="Visualizar proposta" style="padding:5px 7px;min-height:auto">${iconeOlho()}</button><button type="button" class="btn secondary btnWhatsProposta" data-id="${esc(x.id)}" title="Enviar preenchimento pelo WhatsApp" aria-label="Enviar preenchimento pelo WhatsApp" style="padding:5px 7px;min-height:auto">${iconeWhats()}</button><button type="button" class="btn secondary btnEventoProposta" data-id="${esc(x.id)}" title="Virar evento" aria-label="Virar evento" style="font-size:11px;padding:5px 8px;min-height:auto">Evento</button><button type="button" class="btn danger btnExcluirProposta" data-id="${esc(x.id)}" title="Excluir proposta" aria-label="Excluir proposta" style="font-size:14px;padding:4px 8px;min-height:auto">×</button></div></td></tr>`).join('')}</tbody></table></div>`:'<div class="muted">Nenhuma proposta gerada ainda.</div>';
+    box.querySelectorAll('.btnVisualizarProposta').forEach(btn=>{btn.onclick=()=>{const p=data.find(x=>String(x.id)===String(btn.dataset.id));if(!p)return;if(!p.dados||typeof p.dados!=='object'){alert('Esta proposta não possui os dados completos salvos para visualização.');return}gerarPdfProposta(p.dados,p.numero||'sem-numero')}});
+    box.querySelectorAll('.btnEventoProposta').forEach(btn=>{btn.onclick=()=>{const p=data.find(x=>String(x.id)===String(btn.dataset.id));if(p)propostaVirarEvento(p)}});
+    box.querySelectorAll('.btnWhatsProposta').forEach(btn=>{btn.onclick=()=>{const p=data.find(x=>String(x.id)===String(btn.dataset.id));if(p)abrirWhatsPreenchimento(p)}});
+    box.querySelectorAll('.btnExcluirProposta').forEach(btn=>{btn.onclick=()=>excluirProposta(btn.dataset.id)});
+  }
+  prepararProdutos();
+  $('#orcAddAsset').onclick=()=>adicionarItem('ativo');
+  $('#orcSave').onclick=()=>{$('#orcMsg').textContent='Rascunho não é gerado como proposta. Use GERAR PROPOSTA quando estiver pronto.'};
+  $('#orcPrint').onclick=async()=>{
+    const btn=$('#orcPrint');btn.disabled=true;$('#orcMsg').textContent='Salvando proposta e preparando PDF...';
+    try{const r=await salvarProposta('enviado');gerarPdfProposta(r.d,r.numero);alert('Proposta '+r.numero+' salva em Orçamentos e PDF gerado.');await renderOrcamentos()}
+    catch(e){$('#orcMsg').textContent='Erro ao gerar proposta: '+e.message}
+    finally{btn.disabled=false}
+  };
+}
+  
+  async function renderClients(){const {data,error}=await db.from('clientes').select('*').order('criado_em',{ascending:false});if(error){$('#content').innerHTML=`<div class="msg">Erro ao carregar clientes: ${error.message}</div>`;return}clients=data||[];$('#content').innerHTML=`<div class="sectionhead"><div><h2>Clientes</h2><div class="muted">${clients.length} cliente(s) cadastrado(s)</div></div><button class="btn primary" onclick="openClient()">+ Novo cliente</button></div><div class="tablewrap">${clients.length?`<table><thead><tr><th>Nome</th><th>Telefone</th><th>Origem</th><th>Endereço</th><th>Ações</th></tr></thead><tbody>${clients.map(c=>`<tr><td>${esc(c.nome)}</td><td>${esc(c.telefone||'')}</td><td>${esc(c.origem||'')}</td><td>${esc(c.endereco||'')}</td><td><div class="actions"><button class="btn secondary" onclick="editClient('${c.id}')">Editar</button><button class="btn secondary" onclick="historicoCliente('${c.id}')">Histórico</button></div></td></tr>`).join('')}</tbody></table>`:`<div class="empty">Nenhum cliente cadastrado.</div>`}</div>`}
+function esc(v){return String(v).replace(/[&<>'"]/g,a=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[a]))}
+function openClient(c=null){$('#clientModal').classList.remove('hidden');$('#modalTitle').textContent=c?'Cadastro completo do cliente':'Novo cliente';$('#clientId').value=c?.id||'';$('#clientName').value=c?.nome||'';$('#clientPhone').value=c?.telefone||'';$('#clientAddress').value=c?.endereco||'';$('#clientOrigin').value=c?.origem||'manual';$('#clientNotes').value=c?.observacoes||'';$('#clientMsg').textContent='';const hb=$('#clientHistoryBtn'),dbtn=$('#deleteClientBtn'),hh=$('#clientHistory');if(hb)hb.classList.toggle('hidden',!c);if(dbtn)dbtn.classList.toggle('hidden',!c);if(hh){hh.classList.add('hidden');hh.innerHTML=''}}
+function closeClient(){$('#clientModal').classList.add('hidden')}
+async function editClient(id){const {data,error}=await db.from('clientes').select('*').eq('id',id).single();if(error){alert('Erro ao carregar o cadastro completo do cliente: '+error.message);return}openClient(data)}
+async function historicoCliente(id){await editClient(id);setTimeout(()=>mostrarHistoricoCliente(),0)}
+async function mostrarHistoricoCliente(){const id=$('#clientId').value;if(!id)return;const nome=$('#clientName').value.trim(),tel=$('#clientPhone').value.trim();const hh=$('#clientHistory');hh.classList.remove('hidden');hh.innerHTML='<div class=\"muted\">Carregando histórico...</div>';const {data,error}=await db.from('orcamentos').select('id,numero,status,cliente_nome,cliente_telefone,evento_nome,data_evento,valor_total,criado_em').order('criado_em',{ascending:false}).limit(500);if(error){hh.innerHTML='<div class=\"msg\">Erro: '+esc(error.message)+'</div>';return}const nt=tel.replace(/\D/g,'');const relacionados=(data||[]).filter(o=>(nt&&String(o.cliente_telefone||'').replace(/\D/g,'')===nt)||String(o.cliente_nome||'').trim().toLowerCase()===nome.toLowerCase());const fechados=relacionados.filter(o=>['fechado','aprovado','aceito','contrato','contratado','finalizado'].includes(String(o.status||'').toLowerCase()));const lista=fechados.length?fechados:relacionados;hh.innerHTML='<h3 style=\"margin:0 0 10px\">Histórico de orçamentos '+(fechados.length?'fechados':'do cliente')+'</h3>'+(lista.length?'<div class=\"tablewrap\"><table><thead><tr><th>Nº</th><th>Evento</th><th>Data</th><th>Valor</th><th>Status</th></tr></thead><tbody>'+lista.map(o=>'<tr><td><b>'+esc(o.numero||'—')+'</b></td><td>'+esc(o.evento_nome||'—')+'</td><td>'+(o.data_evento?new Date(o.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—')+'</td><td>'+money(o.valor_total)+'</td><td>'+esc(o.status||'—')+'</td></tr>').join('')+'</tbody></table></div>':'<div class=\"empty\">Nenhum orçamento encontrado para este cliente.</div>')}
+$('#clientHistoryBtn').onclick=mostrarHistoricoCliente;
+$('#deleteClientBtn').onclick=()=>{const id=$('#clientId').value;if(id)deleteClient(id)};
+$('#saveClientBtn').onclick=async()=>{const id=$('#clientId').value,payload={nome:$('#clientName').value.trim(),telefone:$('#clientPhone').value.trim()||null,endereco:$('#clientAddress').value.trim()||null,origem:$('#clientOrigin').value.trim()||'manual',observacoes:$('#clientNotes').value.trim()||null,atualizado_em:new Date().toISOString()};if(!payload.nome){$('#clientMsg').textContent='Informe o nome do cliente.';return}const q=id?db.from('clientes').update(payload).eq('id',id):db.from('clientes').insert(payload);const {error}=await q;if(error){$('#clientMsg').textContent='Erro: '+error.message;return}closeClient();renderClients()};
+async function deleteClient(id){if(!confirm('Excluir este cliente?'))return;const {error}=await db.from('clientes').delete().eq('id',id);if(error){alert('Não foi possível excluir: '+error.message);return}closeClient();renderClients()}
+function safeHttpUrl(v){try{const u=new URL(v);return ['http:','https:'].includes(u.protocol)?u.href:null}catch{return null}}
+function money(v){return Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
+  function calcularPrecosProduto(){
+  const custo = Number($('#productCost')?.value || 0);
+  const varejoPercent = Number($('#productRetailPercent')?.value || 0);
+  const atacadoPercent = Number($('#productWholesalePercent')?.value || 0);
+
+  const varejoLucro = custo * (varejoPercent / 100);
+  const atacadoLucro = custo * (atacadoPercent / 100);
+
+  if($('#productRetail')) $('#productRetail').value = (custo + varejoLucro).toFixed(2);
+  if($('#productRetailProfit')) $('#productRetailProfit').value = varejoLucro.toFixed(2);
+
+  if($('#productWholesale')) $('#productWholesale').value = (custo + atacadoLucro).toFixed(2);
+  if($('#productWholesaleProfit')) $('#productWholesaleProfit').value = atacadoLucro.toFixed(2);
+}
+
+['productCost','productRetailPercent','productWholesalePercent'].forEach(id=>{
+  document.getElementById(id)?.addEventListener('input', calcularPrecosProduto);
+});
+function atualizarLucroPeloValor(tipo){
+  const custo=Number($('#productCost').value||0);
+  const campoValor=tipo==='varejo'?'#productRetail':'#productWholesale';
+  const campoPercent=tipo==='varejo'?'#productRetailPercent':'#productWholesalePercent';
+  const campoLucro=tipo==='varejo'?'#productRetailProfit':'#productWholesaleProfit';
+  const lucro=Number($(campoValor).value||0)-custo;
+  $(campoLucro).value=lucro.toFixed(2);
+  $(campoPercent).value=custo>0?((lucro/custo)*100).toFixed(2):'0';
+}
+$('#productRetail').addEventListener('input',()=>atualizarLucroPeloValor('varejo'));
+$('#productWholesale').addEventListener('input',()=>atualizarLucroPeloValor('atacado'));
+async function uploadPhoto(file,folder){if(!file)return null;if(file.size>5*1024*1024)throw new Error('A foto deve ter no máximo 5 MB.');const ext=(file.name.split('.').pop()||'jpg').toLowerCase();const path=`${folder}/${crypto.randomUUID()}.${ext}`;const {error}=await db.storage.from('fotos').upload(path,file,{cacheControl:'3600',upsert:false});if(error)throw error;return db.storage.from('fotos').getPublicUrl(path).data.publicUrl}
+function textoFiltro(v){return String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim()}
+async function renderProducts(){
+  const [{data,error},compra]=await Promise.all([
+    db.from('produtos').select('*').order('nome'),
+    db.from('lista_compras').select('produto_id')
+  ]);
+  if(error){$('#content').innerHTML=`<div class="msg">Erro ao carregar produtos: ${esc(error.message)}</div>`;return}
+  products=data||[];
+  purchaseIds=new Set((compra.data||[]).map(item=>item.produto_id));
+  const estoqueMinimo=products.filter(p=>Number(p.estoque_atual||0)<=Number(p.estoque_minimo||0));
+  $('#content').innerHTML=`
+    <div class="sectionhead"><div><h2>Estoque / Produtos</h2><div id="productCount" class="muted">${products.length} produto(s)</div></div><button class="btn primary" onclick="openProduct()">+ Novo produto</button></div>
+    <div class="card" style="margin-bottom:16px"><h3 style="margin:0 0 10px">Produtos no estoque mínimo (${estoqueMinimo.length})</h3>${estoqueMinimo.length?`<div class="tablewrap"><table><thead><tr><th>Produto</th><th>Estoque atual</th><th>Estoque mínimo</th></tr></thead><tbody>${estoqueMinimo.map(p=>`<tr><td>${esc(p.nome)}</td><td>${p.estoque_atual??0}</td><td>${p.estoque_minimo??0}</td></tr>`).join('')}</tbody></table></div>`:'<div class="muted">Nenhum produto no estoque mínimo.</div>'}</div>
+    ${compra.error?`<div class="msg">A Lista de compra precisa ser criada no Supabase: ${esc(compra.error.message)}</div>`:''}
+    <div id="productActionMsg" class="msg" role="status"></div>
+    <div class="filters" aria-label="Filtrar produtos">
+      <div class="field"><label>Filtrar pelo nome</label><input id="filterName" placeholder="Nome do produto"></div>
+      <div class="field"><label>Filtrar pelo tempo</label><input id="filterTime" placeholder="Tempo"></div>
+      <div class="field"><label>Filtrar pela cor</label><input id="filterColor" placeholder="Cor"></div>
+      <div class="field"><label>Filtrar pelo ruído</label><input id="filterNoise" placeholder="Ruído"></div>
+      <div class="field"><label>Filtrar pelo fornecedor</label><input id="filterSupplier" placeholder="Fornecedor"></div>
+      <div class="field"><label>Filtrar pela marca</label><input id="filterBrand" placeholder="Marca"></div>
+    </div>
+    <div id="productResults" class="tablewrap"></div>`;
+  const filtros=[['filterName','nome'],['filterTime','tempo'],['filterColor','cor'],['filterNoise','ruido'],['filterSupplier','fornecedor'],['filterBrand','marca']];
+  function filtrarProdutos(){
+    const encontrados=products.filter(p=>filtros.every(([id,campo])=>textoFiltro(p[campo]).includes(textoFiltro($('#'+id).value))));
+    $('#productCount').textContent=`${encontrados.length} de ${products.length} produto(s)`;
+    $('#productResults').innerHTML=encontrados.length?`<table class="product-table"><thead><tr><th>Produto</th><th>Varejo</th><th>Atacado</th><th>Cor</th><th>Tempo</th><th>Unidade</th><th>Foto</th><th>Ver vídeo</th><th>Estoque</th><th>Custo</th><th>Cód. barras</th><th>Ações</th></tr></thead><tbody>${encontrados.map(p=>`<tr><td class="product-title">${esc(p.nome)}</td><td>${money(p.valor_varejo)}</td><td>${money(p.valor_atacado)}</td><td>${esc(p.cor||'—')}</td><td>${esc(p.tempo||'—')}</td><td>${esc(p.unidade||'—')}</td><td>${p.foto_url?`<img class="thumb" src="${esc(p.foto_url)}" alt="">`:'—'}</td><td>${safeHttpUrl(p.video_url)?`<a href="${esc(safeHttpUrl(p.video_url))}" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">Ver vídeo</a>`:'—'}</td><td>${p.estoque_atual??0}</td><td>${money(p.valor_custo)}</td><td>${esc(p.codigo_barras||'—')}</td><td><button type="button" class="btn secondary product-action-toggle" data-toggle-product-actions aria-expanded="false">Ação ▾</button><div class="product-actions hidden"><button type="button" class="btn secondary" data-edit-product="${esc(p.id)}">Editar</button><button type="button" class="btn secondary" data-add-purchase="${esc(p.id)}" ${purchaseIds.has(String(p.id))?'disabled':''}>${purchaseIds.has(String(p.id))?'Na lista':'+ Lista de compra'}</button></div></td></tr>`).join('')}</tbody></table>`:`<div class="empty">${products.length?'Nenhum produto corresponde aos filtros.':'Nenhum produto cadastrado.'}</div>`;
+  }
+  filtros.forEach(([id])=>$('#'+id).addEventListener('input',filtrarProdutos));
+  $('#productResults').onclick=e=>{
+    const toggle=e.target.closest('[data-toggle-product-actions]');
+    if(toggle){
+      const menu=toggle.nextElementSibling,abrir=menu.classList.contains('hidden');
+      $('#productResults').querySelectorAll('.product-actions').forEach(el=>el.classList.add('hidden'));
+      $('#productResults').querySelectorAll('[data-toggle-product-actions]').forEach(el=>el.setAttribute('aria-expanded','false'));
+      menu.classList.toggle('hidden',!abrir);toggle.setAttribute('aria-expanded',String(abrir));return;
+    }
+    const editar=e.target.closest('[data-edit-product]');if(editar){editProduct(editar.dataset.editProduct);return}
+    const adicionar=e.target.closest('[data-add-purchase]');if(adicionar)addPurchaseItem(adicionar.dataset.addPurchase,adicionar);
+  };
+  filtrarProdutos();
+}
+async function addPurchaseItem(id,btn){
+  btn.disabled=true;
+  const {error}=await db.from('lista_compras').insert({produto_id:id});
+  if(error){btn.disabled=false;$('#productActionMsg').textContent=error.code==='23505'?'Este produto já está na Lista de compra.':'Erro ao adicionar à Lista de compra: '+error.message;return}
+  purchaseIds.add(id);btn.textContent='Na lista';$('#productActionMsg').textContent='Produto adicionado à Lista de compra.';
+}
+async function renderShoppingList(){
+  const [compras,cadastro]=await Promise.all([
+    db.from('lista_compras').select('*').order('criado_em',{ascending:false}),
+    db.from('produtos').select('id,nome,marca,fornecedor,valor_custo,estoque_atual,estoque_minimo,codigo_barras')
+  ]);
+  if(compras.error||cadastro.error){$('#content').innerHTML=`<div class="msg">Erro ao carregar Lista de compra: ${esc((compras.error||cadastro.error).message)}</div>`;return}
+  const porId=new Map((cadastro.data||[]).map(p=>[String(p.id),p]));
+  const linhas=(compras.data||[]).map(item=>({...item,produto:porId.get(String(item.produto_id))}));
+  $('#content').innerHTML=`<div class="sectionhead"><div><h2>Lista de compra</h2><div class="muted">${linhas.length} produto(s)</div></div><div class="actions"><button id="purchasePdf" type="button" class="btn primary" ${linhas.length?'':'disabled'}>Gerar PDF</button><button class="btn secondary" onclick="renderModule(5)">Ver Estoque</button></div></div><div id="purchaseMsg" class="msg" role="status"></div><div class="tablewrap">${linhas.length?`<table><thead><tr><th>Produto</th><th>Marca</th><th>Fornecedor</th><th>Qtd. para comprar</th><th>Última compra (un.)</th><th>Total último custo</th><th>Novo valor (un.)</th><th>Total compra atual</th><th>Ações</th></tr></thead><tbody>${linhas.map((item,i)=>{const p=item.produto;return `<tr data-purchase-row="${i}"><td>${esc(p?.nome||'Produto removido do cadastro')}</td><td>${esc(p?.marca||'—')}</td><td>${esc(p?.fornecedor||'—')}</td><td><input class="purchase-input" data-purchase-qty="${i}" type="number" min="0.01" step="0.01" value="${Number(item.quantidade??1)}" aria-label="Quantidade para comprar de ${esc(p?.nome||'produto')}"></td><td>${money(p?.valor_custo)}</td><td data-last-total="${i}"></td><td><input class="purchase-input" data-purchase-current="${i}" type="number" min="0" step="0.01" value="${item.valor_compra_atual??''}" placeholder="Preencher" aria-label="Novo valor unitário de ${esc(p?.nome||'produto')}"></td><td data-current-total="${i}"></td><td><button type="button" class="btn danger" data-remove-purchase="${esc(item.produto_id)}">Remover</button></td></tr>`}).join('')}</tbody></table>`:'<div class="empty">A lista está vazia. Adicione produtos pelo Estoque.</div>'}</div><div class="card" style="margin-top:16px"><div>Total pelo último custo: <strong id="purchaseGrandLast">R$ 0,00</strong></div><div style="margin-top:8px">Total da compra atual: <strong id="purchaseGrandCurrent">R$ 0,00</strong> <span id="purchasePending" class="muted"></span></div></div>`;
+  const pendentes=new Set();
+  const atualizarTotais=()=>{
+    let ultimo=0,atual=0,faltando=0;
+    linhas.forEach((item,i)=>{
+      const q=Number($(`[data-purchase-qty="${i}"]`).value);
+      const raw=$(`[data-purchase-current="${i}"]`).value;
+      const novo=raw===''?null:Number(raw);
+      const anterior=Number(item.produto?.valor_custo||0);
+      const quantidade=Number.isFinite(q)&&q>0?q:0;
+      ultimo+=quantidade*anterior;
+      $(`[data-last-total="${i}"]`).textContent=money(quantidade*anterior);
+      if(novo===null||!Number.isFinite(novo)||novo<0){faltando++;$(`[data-current-total="${i}"]`).textContent='Pendente'}
+      else {atual+=quantidade*novo;$(`[data-current-total="${i}"]`).textContent=money(quantidade*novo)}
+    });
+    $('#purchaseGrandLast').textContent=money(ultimo);
+    $('#purchaseGrandCurrent').textContent=money(atual);
+    $('#purchasePending').textContent=faltando?`(${faltando} preço(s) pendente(s))`:'';
+  };
+  $('#content').onclick=e=>{const btn=e.target.closest('[data-remove-purchase]');if(btn)removePurchaseItem(btn.dataset.removePurchase,btn)};
+  $('#content').oninput=e=>{if(e.target.matches('[data-purchase-qty],[data-purchase-current]'))atualizarTotais()};
+  $('#content').onchange=e=>{
+    const input=e.target;
+    const tipo=input.dataset.purchaseQty!==undefined?'quantidade':input.dataset.purchaseCurrent!==undefined?'valor_compra_atual':null;
+    if(!tipo)return;
+    const i=Number(tipo==='quantidade'?input.dataset.purchaseQty:input.dataset.purchaseCurrent);
+    const item=linhas[i],raw=input.value;
+    const valor=raw===''&&tipo==='valor_compra_atual'?null:Number(raw);
+    if((tipo==='quantidade'&&(!Number.isFinite(valor)||valor<=0))||(valor!==null&&(!Number.isFinite(valor)||valor<0))){
+      $('#purchaseMsg').textContent=tipo==='quantidade'?'Informe uma quantidade maior que zero.':'Informe um valor de compra válido.';
+      input.value=item[tipo]??'';atualizarTotais();return;
+    }
+    input.disabled=true;
+    const salvar=(async()=>{
+      const {error}=await db.from('lista_compras').update({[tipo]:valor}).eq('produto_id',item.produto_id);
+      input.disabled=false;
+      if(error){$('#purchaseMsg').textContent='Erro ao salvar: '+error.message;input.value=item[tipo]??''}
+      else {item[tipo]=valor;$('#purchaseMsg').textContent='Lista de compra atualizada.'}
+      atualizarTotais();
+    })();
+    pendentes.add(salvar);salvar.finally(()=>pendentes.delete(salvar));
+  };
+  $('#purchasePdf').onclick=async()=>{await Promise.all([...pendentes]);gerarPdfCompras(linhas)};
+  atualizarTotais();
+}
+function gerarPdfCompras(linhas){
+  if(!window.jspdf?.jsPDF){$('#purchaseMsg').textContent='Não foi possível carregar o gerador de PDF. Atualize a página e tente novamente.';return}
+  const pdf=new window.jspdf.jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const xs=[12,62,90,132,149,183,217,253],larguras=[48,26,40,15,32,32,34,32];
+  const cabecalhos=['Produto','Marca','Fornecedor','Qtd.','Último un.','Novo un.','Total último','Total atual'];
+  let y=0;
+  function cabecalho(){
+    pdf.setFillColor(22,31,42);pdf.rect(0,0,297,30,'F');pdf.setTextColor(255,255,255);pdf.setFontSize(16);pdf.text('CZ Efeitos Especiais | Lista de compra',12,15);
+    pdf.setFontSize(9);pdf.text(new Date().toLocaleString('pt-BR'),285,15,{align:'right'});
+    pdf.setTextColor(30,35,40);pdf.setFontSize(8);pdf.setFont('helvetica','bold');
+    cabecalhos.forEach((h,i)=>pdf.text(h,xs[i],36));pdf.setDrawColor(180);pdf.line(12,39,285,39);pdf.setFont('helvetica','normal');y=42;
+  }
+  cabecalho();let totalAnterior=0,totalAtual=0,faltando=0;
+  linhas.forEach(item=>{
+    if(y>181){pdf.addPage();cabecalho()}
+    const quantidade=Number(item.quantidade||1),anterior=Number(item.produto?.valor_custo||0);
+    const novo=item.valor_compra_atual===null||item.valor_compra_atual===undefined?null:Number(item.valor_compra_atual);
+    totalAnterior+=quantidade*anterior;if(novo===null)faltando++;else totalAtual+=quantidade*novo;
+    const p=item.produto||{};
+    const valores=[p.nome||'Produto removido',p.marca||'—',p.fornecedor||'—',String(quantidade),money(anterior),novo===null?'Pendente':money(novo),money(quantidade*anterior),novo===null?'Pendente':money(quantidade*novo)];
+    pdf.setFontSize(8);
+    valores.forEach((v,i)=>{const texto=pdf.splitTextToSize(String(v),larguras[i]).slice(0,2);pdf.text(texto,xs[i],y+4)});
+    pdf.setDrawColor(225);pdf.line(12,y+11,285,y+11);y+=13;
+  });
+  if(y>177){pdf.addPage();cabecalho()}
+  pdf.setFont('helvetica','bold');pdf.setFontSize(10);
+  pdf.text('Total pelo último custo: '+money(totalAnterior),12,y+9);
+  pdf.text('Total da compra atual: '+money(totalAtual)+(faltando?` (${faltando} preço(s) pendente(s))`:''),12,y+16);
+  pdf.save('lista-de-compra-cz-'+new Date().toISOString().slice(0,10)+'.pdf');
+}
+async function removePurchaseItem(id,btn){
+  btn.disabled=true;
+  const {error}=await db.from('lista_compras').delete().eq('produto_id',id);
+  if(error){btn.disabled=false;$('#purchaseMsg').textContent='Erro ao remover: '+error.message;return}
+  purchaseIds.delete(id);renderShoppingList();
+}
+function openProduct(p=null){$('#productModal').classList.remove('hidden');$('#productModalTitle').textContent=p?'Editar produto':'Novo produto';$('#productId').value=p?.id||'';$('#productName').value=p?.nome||'';$('#productBarcode').value=p?.codigo_barras||'';$('#productBrand').value=p?.marca||'';$('#productUnit').value=p?.unidade||'un';$('#productStock').value=p?.estoque_atual??0;$('#productMin').value=p?.estoque_minimo??0;$('#productCost').value=p?.valor_custo??0;$('#productRetail').value=p?.valor_varejo??0;$('#productWholesale').value=p?.valor_atacado??0;atualizarLucroPeloValor('varejo');atualizarLucroPeloValor('atacado');$('#productTime').value=p?.tempo||'';$('#productEffect').value=p?.efeito||'';$('#productSupplier').value=p?.fornecedor||'';$('#productColor').value=p?.cor||'';$('#productNoise').value=p?.ruido||'';$('#productVideoUrl').value=p?.video_url||'';$('#productPhoto').value='';const im=$('#productPreview');if(p?.foto_url){im.src=p.foto_url;im.classList.remove('hidden')}else im.classList.add('hidden');$('#productMsg').textContent=''}
+function closeProduct(){$('#productModal').classList.add('hidden')}
+function editProduct(id){openProduct(products.find(p=>p.id===id))}
+$('#productPhoto').onchange=e=>{const f=e.target.files[0];if(f){$('#productPreview').src=URL.createObjectURL(f);$('#productPreview').classList.remove('hidden')}};
+$('#saveProductBtn').onclick=async()=>{const id=$('#productId').value;$('#productMsg').textContent='Salvando...';try{let foto_url=id?products.find(p=>p.id===id)?.foto_url:null;const f=$('#productPhoto').files[0];if(f)foto_url=await uploadPhoto(f,'produtos');const payload={nome:$('#productName').value.trim(),codigo_barras:$('#productBarcode').value.trim()||null,marca:$('#productBrand').value.trim()||null,unidade:$('#productUnit').value.trim()||'unidade',estoque_atual:+$('#productStock').value||0,estoque_minimo:+$('#productMin').value||0,valor_custo:+$('#productCost').value||0,valor_varejo:+$('#productRetail').value||0,valor_atacado:+$('#productWholesale').value||0,tempo:$('#productTime').value.trim()||null,fornecedor:$('#productSupplier').value.trim()||null,efeito:$('#productEffect').value.trim()||null,cor:$('#productColor').value.trim()||null,ruido:$('#productNoise').value||null,foto_url,video_url:$('#productVideoUrl').value.trim()||null,atualizado_em:new Date().toISOString()};if(!payload.nome)throw new Error('Informe o nome do produto.');if(payload.video_url&&!safeHttpUrl(payload.video_url))throw new Error('Informe um link de vídeo válido começando com https:// ou http://.');const {error}=await(id?db.from('produtos').update(payload).eq('id',id):db.from('produtos').insert(payload));if(error)throw error;closeProduct();renderProducts()}catch(e){$('#productMsg').textContent='Erro: '+e.message}};
+async function renderAssets(){const {data,error}=await db.from('ativos').select('*').order('nome');if(error){$('#content').innerHTML=`<div class="msg">Erro ao carregar ativos: ${error.message}</div>`;return}assets=data||[];$('#content').innerHTML=`<div class="sectionhead"><div><h2>Ativos / Equipamentos</h2><div class="muted">${assets.length} ativo(s)</div></div><button class="btn primary" onclick="openAsset()">+ Novo ativo</button></div><div class="tablewrap">${assets.length?`<table><thead><tr><th>Foto</th><th>Equipamento</th><th>Código</th><th>Cód. barras</th><th>Compra</th><th>Valor compra</th><th>Status</th><th>Ações</th></tr></thead><tbody>${assets.map(a=>`<tr><td>${a.foto_url?`<img class="thumb" src="${esc(a.foto_url)}">`:'—'}</td><td>${esc(a.nome)}</td><td>${esc(a.codigo_interno||'')}</td><td>${esc(a.codigo_barras||'')}</td><td>${a.data_compra?new Date(a.data_compra+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${money(a.valor_compra)}</td><td>${esc(a.status||'')}</td><td><button class="btn secondary" onclick="editAsset('${a.id}')">Editar</button></td></tr>`).join('')}</tbody></table>`:`<div class="empty">Nenhum ativo cadastrado.</div>`}</div>`}
+function openAsset(a=null){$('#assetModal').classList.remove('hidden');$('#assetModalTitle').textContent=a?'Editar ativo':'Novo ativo';$('#assetId').value=a?.id||'';$('#assetName').value=a?.nome||'';$('#assetCode').value=a?.codigo_interno||'';$('#assetBarcode').value=a?.codigo_barras||'';$('#assetSupplier').value=a?.fornecedor||'';$('#assetPurchaseDate').value=a?.data_compra||'';$('#assetPurchaseValue').value=a?.valor_compra??0;$('#assetRent1').value=a?.valor_locacao_tabela1??0;$('#assetRent2').value=a?.valor_locacao_tabela2??0;$('#assetWeight').value=a?.peso??'';$('#assetCase').value=String(a?.possui_case??false);$('#assetNotes').value=a?.observacoes||'';$('#assetPhoto').value='';const im=$('#assetPreview');if(a?.foto_url){im.src=a.foto_url;im.classList.remove('hidden')}else im.classList.add('hidden');$('#assetMsg').textContent=''}
+function closeAsset(){$('#assetModal').classList.add('hidden')}
+function editAsset(id){openAsset(assets.find(a=>a.id===id))}
+$('#assetPhoto').onchange=e=>{const f=e.target.files[0];if(f){$('#assetPreview').src=URL.createObjectURL(f);$('#assetPreview').classList.remove('hidden')}};
+$('#saveAssetBtn').onclick=async()=>{const id=$('#assetId').value;$('#assetMsg').textContent='Salvando...';try{let foto_url=id?assets.find(a=>a.id===id)?.foto_url:null;const f=$('#assetPhoto').files[0];if(f)foto_url=await uploadPhoto(f,'ativos');const payload={nome:$('#assetName').value.trim(),codigo_interno:$('#assetCode').value.trim()||null,codigo_barras:$('#assetBarcode').value.trim()||null,fornecedor:$('#assetSupplier').value.trim()||null,data_compra:$('#assetPurchaseDate').value||null,valor_compra:+$('#assetPurchaseValue').value||0,valor_locacao_tabela1:+$('#assetRent1').value||0,valor_locacao_tabela2:+$('#assetRent2').value||0,peso:$('#assetWeight').value?+$('#assetWeight').value:null,possui_case:$('#assetCase').value==='true',observacoes:$('#assetNotes').value.trim()||null,foto_url,atualizado_em:new Date().toISOString()};if(!payload.nome)throw new Error('Informe o nome do equipamento.');const {error}=await(id?db.from('ativos').update(payload).eq('id',id):db.from('ativos').insert(payload));if(error)throw error;closeAsset();renderAssets()}catch(e){$('#assetMsg').textContent='Erro: '+e.message}};
+
+
+// ===== MÓDULO EVENTOS / OPERAÇÃO =====
+async function renderEventos(){
+  const {data,error}=await db.from('eventos_operacionais').select('*').order('data_evento',{ascending:true});
+  if(error){$('#content').innerHTML=`<div class="sectionhead"><h2>Eventos</h2></div><div class="msg">Para ativar Eventos, execute primeiro o SQL desta versão no Supabase.<br>${esc(error.message)}</div>`;return}
+  const eventos=data||[];
+  const conclusao=eventos.filter(e=>['aguardando_retorno','finalizado'].includes(e.status));
+  const operacionais=eventos.filter(e=>!['aguardando_retorno','finalizado'].includes(e.status));
+  $('#content').innerHTML=`
+    <div class="sectionhead"><div><h2>📅 Eventos</h2><div class="muted">Agenda operacional — sem valores financeiros</div></div><button class="btn primary" id="novoEventoBtn">+ Novo evento</button></div>
+    <div class="cards" style="margin-bottom:16px">
+      <div class="card"><div class="muted">Próximos eventos</div><div class="n">${operacionais.length}</div></div>
+      <div class="card"><div class="muted">Em separação</div><div class="n">${eventos.filter(e=>['aguardando_separacao','separando'].includes(e.status)).length}</div></div>
+      <div class="card"><div class="muted">Aguardando retorno</div><div class="n">${eventos.filter(e=>e.status==='aguardando_retorno').length}</div></div>
+    </div>
+    <h3>Eventos / Separação</h3>
+    <div class="tablewrap">${operacionais.length?`<table><thead><tr><th>Data</th><th>Cliente</th><th>Evento</th><th>Local</th><th>Status</th><th>Operação</th></tr></thead><tbody>${operacionais.map(e=>`<tr><td>${e.data_evento?new Date(e.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${esc(e.cliente_nome||'')}</td><td>${esc(e.nome_evento||'')}</td><td>${esc(e.local_evento||'')}</td><td>${statusEventoLabel(e.status)}</td><td><button class="btn primary" onclick="abrirEvento('${e.id}')">Iniciar evento</button></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhum evento em separação.</div>'}</div>
+`;
+  $('#novoEventoBtn').onclick=()=>novoEventoManual();
+}
+function statusEventoLabel(s){return ({aguardando_separacao:'⏳ Aguardando separação',separando:'📦 Separando',material_pronto:'✅ Material conferido',liberado:'🚚 Saída liberada',em_execucao:'🎆 Em execução',aguardando_retorno:'↩️ Aguardando retorno',finalizado:'🏁 Finalizado'})[s]||esc(s||'Aguardando separação')}
+async function novoEventoManual(){
+  const {data:cs}=await db.from('clientes').select('id,nome,telefone').order('nome');
+  $('#content').innerHTML=`<div class="sectionhead"><div><h2>Novo evento</h2><div class="muted">Cadastro operacional. Os valores não aparecem neste módulo.</div></div><button class="btn secondary" onclick="renderEventos()">Voltar</button></div>
+  <div class="card"><div class="row"><div class="field"><label>Cliente *</label><select id="evCliente"><option value="">Selecione</option>${(cs||[]).map(c=>`<option value="${esc(c.id)}" data-nome="${esc(c.nome)}" data-tel="${esc(c.telefone||'')}">${esc(c.nome)}</option>`).join('')}</select></div><div class="field"><label>Evento *</label><input id="evNome"></div></div><div class="row"><div class="field"><label>Data *</label><input id="evData" type="date"></div><div class="field"><label>Local</label><input id="evLocal"></div></div><div class="row"><div class="field"><label>Horário</label><input id="evHora" type="time"></div><div class="field"><label>Horário de montagem</label><input id="evMontagem" type="time"></div></div><div class="field"><label>Técnico responsável</label><input id="evTecnico"></div><div class="actions"><button class="btn primary" id="salvarEvento">Criar evento</button></div><div id="evMsg" class="msg"></div></div>`;
+  $('#salvarEvento').onclick=async()=>{const sel=$('#evCliente'),opt=sel.options[sel.selectedIndex];if(!sel.value||!$('#evNome').value.trim()||!$('#evData').value){$('#evMsg').textContent='Informe cliente, evento e data.';return}const payload={cliente_id:sel.value,cliente_nome:opt.dataset.nome,cliente_telefone:opt.dataset.tel||null,nome_evento:$('#evNome').value.trim(),data_evento:$('#evData').value,local_evento:$('#evLocal').value.trim()||null,horario_evento:$('#evHora').value||null,horario_montagem:$('#evMontagem').value||null,tecnico_responsavel:$('#evTecnico').value.trim()||null,status:'aguardando_separacao'};const {data,error}=await db.from('eventos_operacionais').insert(payload).select().single();if(error){$('#evMsg').textContent='Erro: '+error.message;return}abrirEvento(data.id)};
+}
+function registroConferencia(mid){try{const v=localStorage.getItem('cz_conf_'+mid)||localStorage.getItem('cz_saida_'+mid);if(!v)return '—';return new Date(v).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})}catch(_){return '—'}}
+async function abrirEvento(id){
+ const [evr,matr]=await Promise.all([db.from('eventos_operacionais').select('*').eq('id',id).single(),db.from('evento_materiais').select('*').eq('evento_id',id).order('criado_em')]);
+ if(evr.error){alert(evr.error.message);return} const e=evr.data,mats=matr.data||[];
+ const total=mats.reduce((s,m)=>s+Number(m.quantidade_necessaria||0),0),conf=mats.reduce((s,m)=>s+Number(m.quantidade_bipada||0),0),completo=total>0&&conf>=total;
+ const pendentes=mats.filter(m=>Number(m.quantidade_bipada||0)<Number(m.quantidade_necessaria||0));
+ const conferidos=mats.filter(m=>Number(m.quantidade_bipada||0)>=Number(m.quantidade_necessaria||0));
+ const emRetorno=['aguardando_retorno','finalizado'].includes(e.status);
+ $('#content').innerHTML=`<div class="sectionhead"><div><h2>🎪 ${esc(e.nome_evento)}</h2><div class="muted">${esc(e.cliente_nome)} • ${e.data_evento?new Date(e.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):''} • ${esc(e.local_evento||'')}</div></div><button class="btn secondary" onclick="renderEventos()">Voltar à agenda</button></div>
+ <div class="card" style="margin-bottom:16px"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px"><div><span class="muted">Status</span><div><b>${statusEventoLabel(e.status)}</b></div></div><div><span class="muted">Técnico</span><div>${esc(e.tecnico_responsavel||'—')}</div></div><div><span class="muted">Horário</span><div>${esc(e.horario_evento||'—')}</div></div><div><span class="muted">Montagem</span><div>${esc(e.horario_montagem||'—')}</div></div></div></div>
+ ${emRetorno?`<div class="card"><h3 style="margin-top:0">Conclusão de evento</h3><div class="msg"><b>↩️ Aguardando retorno</b></div><div class="muted" style="margin-top:10px">Área preparada para a próxima etapa: conferência de retorno dos materiais e equipamentos.</div>${e.status!=='finalizado'?`<div class="actions"><button class="btn secondary" onclick="mudarStatusEvento('${id}','finalizado')">FINALIZAR EVENTO</button></div>`:''}</div>`:`
+ <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">📦 Separação e conferência</h3><div class="muted" style="margin-bottom:10px">Bipe ou digite o código para conferir a saída do material.</div><div style="display:flex;gap:8px;flex-wrap:wrap"><input id="scanEvento" placeholder="Bipe o código do produto ou equipamento" autocomplete="off" style="flex:1;min-width:220px;background:#0b1118;color:#fff;border:1px solid var(--line);border-radius:9px;padding:12px"><button class="btn primary" id="btnBipar">CONF.</button><button class="btn secondary" id="btnAddMat">+ Material extra</button></div><div id="scanMsg" class="msg"></div></div>
+ <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">Lista para separação</h3><div class="tablewrap">${pendentes.length?`<table><thead><tr><th>Quant.</th><th>Descrição</th><th>Cód.</th><th>Conf.</th><th>Horário e data da conf.</th><th>Status</th></tr></thead><tbody>${pendentes.map(m=>`<tr><td>${m.quantidade_necessaria}</td><td><b>${esc(m.nome_item)}</b></td><td><b>${esc(m.codigo||'SEM CÓDIGO')}</b></td><td><b>${m.quantidade_bipada}/${m.quantidade_necessaria}</b></td><td>${Number(m.quantidade_bipada)>0?registroConferencia(m.id):'—'}</td><td><span title="Quantidade ainda não conferida" style="display:inline-block;width:14px;height:14px;border-radius:3px;background:#d62828"></span></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhum material pendente de conferência.</div>'}</div></div>
+ <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">✅ Material conferidos</h3><div class="tablewrap">${conferidos.length?`<table><thead><tr><th>Quant.</th><th>Descrição</th><th>Cód.</th><th>Conf.</th><th>Horário e data da conf.</th><th>Status</th></tr></thead><tbody>${conferidos.map(m=>`<tr><td>${m.quantidade_necessaria}</td><td>${esc(m.nome_item)}</td><td><b>${esc(m.codigo||'—')}</b></td><td><b>${m.quantidade_bipada}/${m.quantidade_necessaria}</b></td><td>${registroConferencia(m.id)}</td><td>✅</td></tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhum material conferido ainda.</div>'}</div></div>
+ <div class="card" style="margin-top:16px"><div><b>Progresso da conferência:</b> ${conf}/${total} unidade(s)</div>${completo?'<div class="msg" style="margin-top:8px">✅ Todos os materiais foram conferidos. A saída pode ser liberada.</div>':''}<div class="actions"><button class="btn primary" ${completo?'':'disabled'} onclick="mudarStatusEvento('${id}','material_pronto')">CONCLUIR CONFERÊNCIA</button><button class="btn primary" ${e.status==='material_pronto'?'':'disabled'} onclick="liberarSaidaEvento('${id}')">LIBERAR SAÍDA</button></div></div>`}`;
+ if(!emRetorno){$('#btnBipar').onclick=()=>biparEvento(id);$('#scanEvento').addEventListener('keydown',x=>{if(x.key==='Enter')biparEvento(id)});$('#btnAddMat').onclick=()=>adicionarMaterialEvento(id);$('#scanEvento').focus()}
+}
+async function adicionarMaterialEvento(eventoId){
+ const [pr,ar]=await Promise.all([db.from('produtos').select('id,nome,codigo_barras').order('nome'),db.from('ativos').select('id,nome,codigo_barras,codigo_interno,status').order('nome')]);
+ const op=[...(pr.data||[]).map(x=>({tipo:'produto',...x,codigo:x.codigo_barras||''})),...(ar.data||[]).map(x=>({tipo:'ativo',...x,codigo:x.codigo_barras||x.codigo_interno||''}))];
+ const escolha=prompt('Digite parte do nome ou código do material:');if(!escolha)return;const q=textoFiltro(escolha);const achados=op.filter(x=>textoFiltro(x.nome).includes(q)||textoFiltro(x.codigo).includes(q));if(!achados.length){alert('Material não encontrado.');return}let item=achados[0];if(achados.length>1){const lista=achados.slice(0,10).map((x,i)=>`${i+1} - ${x.nome} (${x.codigo||'sem código'})`).join('\n');const n=Number(prompt('Escolha o número:\n'+lista));if(!n||!achados[n-1])return;item=achados[n-1]}
+ const qtd=Number(prompt('Quantidade necessária:',1));if(!Number.isFinite(qtd)||qtd<=0)return;
+ const {error}=await db.from('evento_materiais').insert({evento_id:eventoId,tipo:item.tipo,item_id:item.id,nome_item:item.nome,codigo:item.codigo||null,quantidade_necessaria:qtd,quantidade_bipada:0});if(error){alert('Erro: '+error.message);return}abrirEvento(eventoId);
+}
+async function biparEvento(eventoId){const campo=$('#scanEvento'),codigo=campo.value.trim();if(!codigo){$('#scanMsg').textContent='Bipe ou digite um código.';return}const {data,error}=await db.from('evento_materiais').select('*').eq('evento_id',eventoId).eq('codigo',codigo);if(error){$('#scanMsg').textContent=error.message;return}const item=data?.[0];if(!item){$('#scanMsg').textContent='Código não pertence aos materiais deste evento.';return}if(Number(item.quantidade_bipada)>=Number(item.quantidade_necessaria)){ $('#scanMsg').textContent='Quantidade deste item já está completa.';return}const novo=Number(item.quantidade_bipada)+1;const {error:up}=await db.from('evento_materiais').update({quantidade_bipada:novo}).eq('id',item.id);if(up){$('#scanMsg').textContent=up.message;return}try{localStorage.setItem('cz_conf_'+item.id,new Date().toISOString())}catch(_){}campo.value='';abrirEvento(eventoId)}
+async function liberarSaidaEvento(id){
+ const {data:e,error:ee}=await db.from('eventos_operacionais').select('status').eq('id',id).single();if(ee){alert(ee.message);return}
+ if(e.status!=='material_pronto'){alert('Primeiro clique em CONCLUIR CONFERÊNCIA. Só depois a saída pode ser liberada.');return}
+ const {data:m,error:me}=await db.from('evento_materiais').select('quantidade_necessaria,quantidade_bipada').eq('evento_id',id);if(me){alert(me.message);return}
+ if(!(m||[]).length||(m||[]).some(x=>Number(x.quantidade_bipada||0)<Number(x.quantidade_necessaria||0))){alert('Ainda existem itens sem conferência completa.');return}
+ const {error}=await db.from('eventos_operacionais').update({status:'aguardando_retorno',atualizado_em:new Date().toISOString()}).eq('id',id);if(error){alert(error.message);return}
+ try{localStorage.setItem('cz_saida_evento_'+id,new Date().toISOString())}catch(_){}renderRetornoEventos()
+}
+function retornoKey(mid){return 'cz_retorno_'+mid}
+function retornoInfo(mid){try{return JSON.parse(localStorage.getItem(retornoKey(mid))||'{"qtd":0,"registros":[],"status":""}')}catch(_){return {qtd:0,registros:[],status:''}}}
+function salvarRetorno(mid,obj){try{localStorage.setItem(retornoKey(mid),JSON.stringify(obj))}catch(_){}}
+function dataUltimoRetorno(mid){const r=retornoInfo(mid),v=r.registros?.[r.registros.length-1];return v?new Date(v).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}):'—'}
+async function renderRetornoEventos(){
+ const {data,error}=await db.from('eventos_operacionais').select('*').in('status',['aguardando_retorno','finalizado']).order('data_evento',{ascending:true});
+ if(error){$('#content').innerHTML='<div class="msg">Erro: '+esc(error.message)+'</div>';return}
+ const es=data||[];$('#content').innerHTML=`<div class="sectionhead"><div><h2>↩️ Retorno de evento</h2><div class="muted">Conferência da devolução após a saída do evento.</div></div><button class="btn secondary" onclick="renderEventos()">Voltar aos eventos</button></div><div class="tablewrap">${es.length?`<table><thead><tr><th>Data</th><th>Cliente</th><th>Evento</th><th>Status</th><th>Operação</th></tr></thead><tbody>${es.map(e=>`<tr><td>${e.data_evento?new Date(e.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${esc(e.cliente_nome||'')}</td><td>${esc(e.nome_evento||'')}</td><td>${statusEventoLabel(e.status)}</td><td><button class="btn primary" onclick="abrirRetornoEvento('${e.id}')">${e.status==='finalizado'?'Ver retorno':'Iniciar retorno'}</button></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhum evento aguardando retorno.</div>'}</div>`
+}
+async function abrirRetornoEvento(id){
+ const [evr,matr]=await Promise.all([db.from('eventos_operacionais').select('*').eq('id',id).single(),db.from('evento_materiais').select('*').eq('evento_id',id).order('criado_em')]);if(evr.error||matr.error){alert((evr.error||matr.error).message);return}
+ const e=evr.data,mats=(matr.data||[]).filter(m=>Number(m.quantidade_bipada||0)>0);const finalizado=e.status==='finalizado';
+ const linhas=mats.map(m=>{const r=retornoInfo(m.id),esperado=Number(m.quantidade_bipada||0),q=Math.min(Number(r.qtd||0),esperado),ok=q>=esperado,perda=r.status==='perda',man=r.status==='manutencao';return `<tr><td>${esperado}</td><td><b>${esc(m.nome_item)}</b><div class="muted">${m.tipo==='ativo'?'Ativo':'Consumo'}</div></td><td><b>${esc(m.codigo||'—')}</b></td><td>${q}/${esperado}</td><td>${dataUltimoRetorno(m.id)}</td><td>${man?'🛠️ Manutenção':perda?'⚠️ Perda':ok?'✅ Devolvido':'🟥 Pendente'}</td><td>${m.tipo==='ativo'&&!finalizado?`<button class="btn secondary" onclick="marcarManutencaoRetorno('${id}','${m.id}','${m.item_id||''}')">Manutenção</button> <button class="btn danger" onclick="marcarPerdaRetorno('${id}','${m.id}','${m.item_id||''}')">Perda</button>`:(m.tipo==='produto'?'<span class="muted">Ao bipar, volta ao estoque</span>':'—')}</td></tr>`}).join('');
+ $('#content').innerHTML=`<div class="sectionhead"><div><h2>↩️ Retorno — ${esc(e.nome_evento)}</h2><div class="muted">${esc(e.cliente_nome||'')} • compare a devolução com a conferência de saída</div></div><button class="btn secondary" onclick="renderRetornoEventos()">Voltar</button></div><div class="card" style="margin-bottom:16px"><div><b>Status:</b> ${statusEventoLabel(e.status)}</div>${!finalizado?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><input id="scanRetorno" placeholder="Bipe o código devolvido" autocomplete="off" style="flex:1;min-width:240px;background:#0b1118;color:#fff;border:1px solid var(--line);border-radius:9px;padding:12px"><button class="btn primary" id="btnRetorno">CONF. DEVOLUÇÃO</button></div><div id="retMsg" class="msg"></div>`:''}</div><div class="tablewrap"><table><thead><tr><th>Qtd. saída</th><th>Descrição</th><th>Cód.</th><th>Retorno</th><th>Data e hora</th><th>Status</th><th>Ocorrência</th></tr></thead><tbody>${linhas||'<tr><td colspan="7">Nenhum item registrado na saída.</td></tr>'}</tbody></table></div>${!finalizado?`<div class="card" style="margin-top:16px"><div class="muted">Ativos precisam ser devolvidos, enviados para manutenção ou marcados como perda. Materiais de consumo devolvidos voltam ao estoque no momento da bipagem.</div><div class="actions"><button class="btn primary" onclick="finalizarRetornoEvento('${id}')">CONCLUIR RETORNO DO EVENTO</button></div></div>`:''}`;
+ if(!finalizado){$('#btnRetorno').onclick=()=>biparRetornoEvento(id);$('#scanRetorno').addEventListener('keydown',x=>{if(x.key==='Enter')biparRetornoEvento(id)});$('#scanRetorno').focus()}
+}
+async function biparRetornoEvento(eventoId){const c=$('#scanRetorno'),codigo=c.value.trim();if(!codigo){$('#retMsg').textContent='Bipe ou digite um código.';return}const {data,error}=await db.from('evento_materiais').select('*').eq('evento_id',eventoId).eq('codigo',codigo);if(error){$('#retMsg').textContent=error.message;return}const m=(data||[]).find(x=>Number(x.quantidade_bipada||0)>0);if(!m){$('#retMsg').textContent='Este código não consta na saída deste evento.';return}const esperado=Number(m.quantidade_bipada||0),r=retornoInfo(m.id);if(Number(r.qtd||0)>=esperado){$('#retMsg').textContent='A devolução deste item já está completa.';return}r.qtd=Number(r.qtd||0)+1;r.registros=[...(r.registros||[]),new Date().toISOString()];r.status='devolvido';salvarRetorno(m.id,r);
+ if(m.tipo==='produto'&&m.item_id){const {data:p}=await db.from('produtos').select('estoque_atual').eq('id',m.item_id).single();if(p){const {error:up}=await db.from('produtos').update({estoque_atual:Number(p.estoque_atual||0)+1}).eq('id',m.item_id);if(up){r.qtd--;r.registros.pop();salvarRetorno(m.id,r);$('#retMsg').textContent='Não foi possível devolver ao estoque: '+up.message;return}}}
+ if(m.tipo==='ativo'&&m.item_id)await db.from('ativos').update({status:'disponivel'}).eq('id',m.item_id);c.value='';abrirRetornoEvento(eventoId)}
+async function marcarManutencaoRetorno(eventoId,mid,ativoId){const r=retornoInfo(mid);r.status='manutencao';salvarRetorno(mid,r);if(ativoId){const {error}=await db.from('ativos').update({status:'manutencao'}).eq('id',ativoId);if(error){alert(error.message);return}}abrirRetornoEvento(eventoId)}
+async function marcarPerdaRetorno(eventoId,mid,ativoId){if(!confirm('Confirmar este ativo como perda?'))return;const r=retornoInfo(mid);r.status='perda';salvarRetorno(mid,r);if(ativoId){const {error}=await db.from('ativos').update({status:'perdido'}).eq('id',ativoId);if(error){alert(error.message);return}}abrirRetornoEvento(eventoId)}
+async function finalizarRetornoEvento(id){const {data:m,error}=await db.from('evento_materiais').select('*').eq('evento_id',id);if(error){alert(error.message);return}const ativos=(m||[]).filter(x=>x.tipo==='ativo'&&Number(x.quantidade_bipada||0)>0);const pend=ativos.filter(x=>{const r=retornoInfo(x.id);return Number(r.qtd||0)<Number(x.quantidade_bipada||0)&&!['perda','manutencao'].includes(r.status)});if(pend.length){alert('Ainda existem ativos sem retorno. Bipe o ativo ou marque a ocorrência como Manutenção ou Perda.');return}if(!confirm('Concluir o retorno e finalizar este evento?'))return;const {error:up}=await db.from('eventos_operacionais').update({status:'finalizado',atualizado_em:new Date().toISOString()}).eq('id',id);if(up){alert(up.message);return}renderRetornoEventos()}
+async function removerMaterialEvento(id,eventoId){if(!confirm('Remover este material do evento?'))return;const {error}=await db.from('evento_materiais').delete().eq('id',id);if(error){alert(error.message);return}abrirEvento(eventoId)}
+async function mudarStatusEvento(id,status){const {error}=await db.from('eventos_operacionais').update({status,atualizado_em:new Date().toISOString()}).eq('id',id);if(error){alert(error.message);return}abrirEvento(id)}
+
+boot();
+</script></body></html><!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CZ Efeitos Especiais — Gestão</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@4.2.1/dist/jspdf.umd.min.js"></script>
+<style>
+:root{--bg:#090d12;--panel:#111821;--panel2:#161f2a;--line:#273342;--text:#f5f7f8;--muted:#94a0ae;--accent:#ff641f;--ok:#38b86b;--danger:#ef5350}*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:var(--text)}button,input,textarea{font:inherit}.hidden{display:none!important}.login{min-height:100vh;display:grid;place-items:center;padding:24px}.loginbox{width:min(420px,100%);background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:28px}.brand{font-size:34px;font-weight:900;color:var(--accent);line-height:.9}.brand small{display:block;font-size:11px;letter-spacing:2px;color:#fff;margin-top:8px}.field{margin-top:16px}.field label{display:block;font-size:13px;color:var(--muted);margin-bottom:7px}.field input,.field textarea,.field select{width:100%;background:#0b1118;color:#fff;border:1px solid var(--line);border-radius:9px;padding:12px;outline:none}.field textarea{min-height:90px}.thumb{width:64px;height:64px;object-fit:cover;border-radius:9px;border:1px solid var(--line);background:#0b1118}.preview{width:140px;height:140px;object-fit:cover;border-radius:12px;border:1px solid var(--line);background:#0b1118;margin-top:10px}.btn{border:0;border-radius:9px;padding:11px 15px;cursor:pointer;font-weight:700}.primary{background:var(--accent);color:#fff}.secondary{background:#22303d;color:#fff}.danger{background:#3a1e21;color:#ffb0b0}.full{width:100%}.msg{margin-top:12px;color:#ffb0b0;font-size:13px}.app{display:grid;grid-template-columns:245px 1fr;min-height:100vh}.side{background:#070d11;border-right:1px solid var(--line);padding:22px 14px}.side .brand{margin:4px 8px 26px}.nav button{display:block;width:100%;text-align:left;padding:11px 12px;margin:4px 0;border:0;border-radius:8px;background:transparent;color:#cbd4dc;cursor:pointer}.nav button:hover,.nav button.active{background:#1c2833;color:#fff}.nav button.active{border-left:3px solid var(--accent)}.main{min-width:0}.top{height:68px;background:#10171f;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 24px}.content{padding:24px}.cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}.card .n{font-size:28px;font-weight:800;margin-top:8px}.muted{color:var(--muted)}.sectionhead{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}.sectionhead h2{margin:0}.tablewrap{overflow:auto;border:1px solid var(--line);border-radius:12px}table{width:100%;border-collapse:collapse;background:var(--panel)}th,td{padding:12px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}th{font-size:12px;color:var(--muted);background:#0e151d}.empty{padding:30px;text-align:center;color:var(--muted)}.modal{position:fixed;inset:0;background:#000a;display:grid;place-items:center;padding:20px;z-index:10}.modalbox{width:min(620px,100%);max-height:90vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}.placeholder{padding:36px;background:var(--panel);border:1px dashed var(--line);border-radius:14px;color:var(--muted)}@media(max-width:900px){.app{grid-template-columns:1fr}.side{display:none}.cards{grid-template-columns:1fr 1fr}}@media(max-width:560px){.cards,.row{grid-template-columns:1fr}.content{padding:16px}.top{padding:0 16px}}
+@media(max-width:900px){#menuBtn{display:inline-block!important}.side.mobile-open{display:block;position:fixed;inset:0 auto 0 0;width:min(290px,85vw);z-index:20;overflow:auto;box-shadow:0 0 0 100vw #000a}.top{height:auto;min-height:68px;gap:8px}.top #userName{display:none}.orc-equipe-linha,.linhaEquipe{grid-template-columns:repeat(2,minmax(0,1fr))!important}.sectionhead{flex-wrap:wrap}}
+.filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:0 0 16px;padding:14px;background:var(--panel);border:1px solid var(--line);border-radius:12px}.filters .field{margin:0}.btn:disabled{opacity:.55;cursor:not-allowed}.product-actions{display:flex;align-items:center;gap:5px}.product-actions .btn{padding:6px 8px;font-size:12px;white-space:nowrap}.product-table tbody td{font-size:11px}.product-table .product-title{font-size:16px;font-weight:800;color:var(--text)}.product-action-toggle{padding:6px 10px;font-size:12px}.product-actions{margin-top:7px}.product-actions .btn{font-size:11px}
+
+/* Lista de orçamentos: cabeçalhos e dados centralizados */
+.orcamentos-lista th,
+.orcamentos-lista td{
+  text-align:center;
+  vertical-align:middle;
+}
+.orcamentos-lista td:last-child > div{
+  justify-content:center;
+}
+</style>
+</head><body>
+<section id="login" class="login"><div class="loginbox"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><h3>Acesso ao sistema</h3><div class="field"><label>E-mail</label><input id="email" type="email"></div><div class="field"><label>Senha</label><input id="password" type="password"></div><button id="loginBtn" class="btn primary full" style="margin-top:18px">ENTRAR</button><button type="button" class="btn secondary full" style="margin-top:8px" onclick="recuperarSenha()">Esqueci minha senha</button><div id="loginMsg" class="msg"></div></div></section>
+<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><div class="muted" style="font-size:12px">Sistema de gestão CZ</div></div><div><span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
+<div id="clientModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="modalTitle">Novo cliente</h2><button class="btn secondary" onclick="closeClient()">Fechar</button></div><input id="clientId" type="hidden"><div class="row"><div class="field"><label>Nome *</label><input id="clientName"></div><div class="field"><label>Telefone</label><input id="clientPhone"></div></div><div class="field"><label>Endereço completo</label><input id="clientAddress"></div><div class="row"><div class="field"><label>Origem</label><input id="clientOrigin" value="manual"></div><div></div></div><div class="field"><label>Observações</label><textarea id="clientNotes"></textarea></div><div class="actions"><button class="btn secondary" onclick="closeClient()">Cancelar</button><button id="deleteClientBtn" class="btn danger hidden" type="button">Excluir cliente</button><button id="clientHistoryBtn" class="btn secondary hidden" type="button">Histórico</button><button id="saveClientBtn" class="btn primary">Salvar cliente</button></div><div id="clientHistory" class="hidden" style="margin-top:14px"></div><div id="clientMsg" class="msg"></div></div></div>
+
+<div id="productModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="productModalTitle">Novo produto</h2><button class="btn secondary" onclick="closeProduct()">Fechar</button></div><input id="productId" type="hidden"><div class="row"><div class="field"><label>Nome *</label><input id="productName"></div><div class="field"><label>Unidade *</label><select id="productUnit"><option value="">Selecione</option><option value="un">UN</option><option value="monotiro">Monotiro</option><option value="torta">Torta</option><option value="placa">Placa</option><option value="kg">Kg</option><option value="litro">Litro</option><option value="caixa">Caixa</option></select></div></div>
+<div class="field"><label>Marca do produto</label><input id="productBrand" type="text" placeholder="Informe a marca"></div>
+<div class="field"><label>Código de barras</label><input id="productBarcode" type="text" inputmode="numeric" autocomplete="off" placeholder="Digite ou leia o código"></div>
+<div class="row"><div class="field"><label>Estoque atual</label><input id="productStock" type="number" step="0.01"></div><div class="field"><label>Estoque mínimo</label><input id="productMin" type="number" step="0.01"></div></div>
+<div class="field"><label>Valor de custo</label><input id="productCost" type="number" step="0.01"></div>
+<div class="row"><div class="field"><label>% de lucro (varejo)</label><input id="productRetailPercent" type="number" step="0.01" value="0"></div><div class="field"><label>% de lucro (atacado)</label><input id="productWholesalePercent" type="number" step="0.01" value="0"></div></div>
+<div class="row"><div class="field"><label>Valor un. varejo</label><input id="productRetail" type="number" step="0.01"></div><div class="field"><label>Valor un. atacado</label><input id="productWholesale" type="number" step="0.01"></div></div>
+<div class="row"><div class="field"><label>Lucro varejo R$</label><input id="productRetailProfit" type="number" step="0.01" value="0" readonly></div><div class="field"><label>Lucro atacado R$</label><input id="productWholesaleProfit" type="number" step="0.01" value="0" readonly></div></div>
+<div class="field"><label>Fornecedor</label><input id="productSupplier" type="text"></div><div class="field"><label>Tempo</label><input id="productTime" type="text"></div><div class="field"><label>Efeito</label><input id="productEffect" type="text"></div><div class="field"><label>Cor</label><input id="productColor" type="text"></div><div class="field"><label>Ruído</label><select id="productNoise"><option value="">Selecione</option><option value="baixo">Baixo ruído</option><option value="alto">Alto ruído</option></select></div><div class="field"><label>Foto do produto (máx. 5 MB)</label><input id="productPhoto" type="file" accept="image/*"><img id="productPreview" class="preview hidden"></div><div class="field"><label>Link do vídeo do produto</label><input id="productVideoUrl" type="url" placeholder="https://..." inputmode="url"></div><div class="actions"><button class="btn secondary" onclick="closeProduct()">Cancelar</button><button id="saveProductBtn" class="btn primary">Salvar produto</button></div><div id="productMsg" class="msg"></div></div></div>
+<div id="assetModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="assetModalTitle">Novo ativo</h2><button class="btn secondary" onclick="closeAsset()">Fechar</button></div><input id="assetId" type="hidden"><div class="row"><div class="field"><label>Nome do equipamento *</label><input id="assetName"></div><div class="field"><label>Código interno</label><input id="assetCode"></div></div><div class="row"><div class="field"><label>Código de barras</label><input id="assetBarcode"></div><div class="field"><label>Fornecedor</label><input id="assetSupplier"></div></div><div class="row"><div class="field"><label>Data da compra</label><input id="assetPurchaseDate" type="date"></div><div class="field"><label>Valor da compra</label><input id="assetPurchaseValue" type="number" step="0.01"></div></div><div class="row"><div class="field"><label>Locação tabela 1</label><input id="assetRent1" type="number" step="0.01"></div><div class="field"><label>Locação tabela 2</label><input id="assetRent2" type="number" step="0.01"></div></div><div class="row"><div class="field"><label>Peso (kg)</label><input id="assetWeight" type="number" step="0.01"></div><div class="field"><label>Possui case?</label><select id="assetCase"><option value="false">Não</option><option value="true">Sim</option></select></div></div><div class="field"><label>Foto do ativo (máx. 5 MB)</label><input id="assetPhoto" type="file" accept="image/*"><img id="assetPreview" class="preview hidden"></div><div class="field"><label>Observações</label><textarea id="assetNotes"></textarea></div><div class="actions"><button class="btn secondary" onclick="closeAsset()">Cancelar</button><button id="saveAssetBtn" class="btn primary">Salvar ativo</button></div><div id="assetMsg" class="msg"></div></div></div>
+<script>
+const SUPABASE_URL='https://locvpksjntwnlqrytqqx.supabase.co';
+const SUPABASE_KEY='sb_publishable_UN34ALY6Oxc1_V863pgq3Q_hNj7tuIQ';
+const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const $=s=>document.querySelector(s); let clients=[],products=[],assets=[],purchaseIds=new Set();
+const modules=['Dashboard','Clientes','Orçamentos','Contratos','Eventos','Retorno de evento','Estoque','Ativos / Equipamentos','Colaboradores','Manutenção','Financeiro / DRE','Agenda','Relatórios','Configurações','Lista de compra'];
+$('#nav').innerHTML=modules.map((m,i)=>`<button data-i="${i}" class="${i===0?'active':''}">${m}</button>`).join('');
+$('#nav').onclick=e=>{const b=e.target.closest('button');if(!b)return;document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');$('.side').classList.remove('mobile-open');renderModule(+b.dataset.i)};
+$('#menuBtn').onclick=()=>$('.side').classList.toggle('mobile-open');
+let modoRecuperacao = false;
+
+db.auth.onAuthStateChange((event, session) => {
+  if (event === 'PASSWORD_RECOVERY') {
+    modoRecuperacao = true;
+    setTimeout(() => mostrarNovaSenha(), 100);
+  }
+});
+
+async function boot(){
+  const {data:{session}} = await db.auth.getSession();
+
+  if (modoRecuperacao) return;
+
+  if (session) {
+    showApp(session.user);
+  } else {
+    showLogin();
+  }
+}
+
+function mostrarNovaSenha(){
+  $('#app').classList.add('hidden');
+  $('#login').classList.remove('hidden');
+
+  $('.loginbox').innerHTML = `
+    <div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div>
+    <h3>Redefinir senha</h3>
+
+    <div class="field">
+      <label>Nova senha</label>
+      <input id="novaSenha" type="password">
+    </div>
+
+    <div class="field">
+      <label>Confirmar nova senha</label>
+      <input id="confirmarSenha" type="password">
+    </div>
+
+    <button type="button" class="btn primary full"
+      style="margin-top:18px"
+      onclick="salvarNovaSenha()">
+      SALVAR NOVA SENHA
+    </button>
+
+    <div id="novaSenhaMsg" class="msg"></div>
+  `;
+}
+
+async function salvarNovaSenha(){
+  const senha = $('#novaSenha').value;
+  const confirmar = $('#confirmarSenha').value;
+  const msg = $('#novaSenhaMsg');
+
+  if (!senha || !confirmar) {
+    msg.textContent = 'Preencha os dois campos.';
+    return;
+  }
+
+  if (senha.length < 6) {
+    msg.textContent = 'A senha precisa ter pelo menos 6 caracteres.';
+    return;
+  }
+
+  if (senha !== confirmar) {
+    msg.textContent = 'As senhas não são iguais.';
+    return;
+  }
+
+  msg.textContent = 'Salvando nova senha...';
+
+  const {error} = await db.auth.updateUser({
+    password: senha
+  });
+
+  if (error) {
+    msg.textContent = 'Erro: ' + error.message;
+    return;
+  }
+
+  await db.auth.signOut();
+
+  alert('Senha alterada com sucesso! Entre com sua nova senha.');
+  window.location.href = 'https://cz-efeitos-especiais.vercel.app';
+}
+function showLogin(){$('#login').classList.remove('hidden');$('#app').classList.add('hidden')}
+async function showApp(user){$('#login').classList.add('hidden');$('#app').classList.remove('hidden');$('#userName').textContent=user.email||'';renderModule(0)}
+$('#loginBtn').onclick=async()=>{const email=$('#email').value.trim(),password=$('#password').value;$('#loginMsg').textContent='Entrando...';const {data,error}=await db.auth.signInWithPassword({email,password});if(error){$('#loginMsg').textContent='Não foi possível entrar: '+error.message;return}$('#loginMsg').textContent='';showApp(data.user)};
+$('#logoutBtn').onclick=async()=>{await db.auth.signOut();showLogin()};
+  async function recuperarSenha(){
+  const email = $('#email').value.trim();
+  if(!email){
+    $('#loginMsg').textContent='Digite seu e-mail primeiro.';
+    return;
+  }
+  const {error}=await db.auth.resetPasswordForEmail(email,{
+    redirectTo:'https://cz-efeitos-especiais.vercel.app'
+  });
+  $('#loginMsg').textContent=error
+    ? 'Erro: '+error.message
+    : 'Link de recuperação enviado para seu e-mail.';
+}
+async function renderModule(i){$('#pageTitle').textContent=modules[i];if(i===0)return renderDashboard();if(i===1)return renderClients();if(i===2)return renderOrcamentos();if(i===4)return renderEventos();if(i===5)return renderRetornoEventos();if(i===6)return renderProducts();if(i===7)return renderAssets();if(i===10)return renderFinanceiro();if(i===14)return renderShoppingList();$('#content').innerHTML=`<div class="sectionhead"><h2>${modules[i]}</h2></div><div class="placeholder">Módulo já previsto no banco de dados. A tela operacional será ativada nas próximas versões sem precisar recriar sua estrutura.</div>`}
+async function count(table){const {count,error}=await db.from(table).select('*',{count:'exact',head:true});return error?'—':count}
+
+const FIN_MOV_KEY='cz_fin_mov_v1', FIN_COB_KEY='cz_fin_cob_v1', FIN_CAT_KEY='cz_fin_categorias_v1';
+function finLoad(k){try{return JSON.parse(localStorage.getItem(k)||'[]')}catch(_){return []}}
+function finSave(k,v){localStorage.setItem(k,JSON.stringify(v))}
+function finDate(d){return d?new Date(d+'T12:00:00').toLocaleDateString('pt-BR'):'—'}
+function finISODate(dt=new Date()){const y=dt.getFullYear(),m=String(dt.getMonth()+1).padStart(2,'0'),d=String(dt.getDate()).padStart(2,'0');return `${y}-${m}-${d}`}
+function finAddDays(date,n){const d=new Date(date+'T12:00:00');d.setDate(d.getDate()+n);return finISODate(d)}
+function finPagamentos(orcId){return finLoad(FIN_MOV_KEY).filter(x=>x.tipo==='entrada'&&String(x.orcamento_id||'')===String(orcId||''))}
+function finPagoOrc(orcId){return finPagamentos(orcId).reduce((s,x)=>s+Number(x.valor||0),0)}
+function finStatus(total,pago,venc){const saldo=Math.max(0,total-pago),hoje=finISODate();if(saldo<=.009)return '✅ Quitado';if(pago>0&&venc<hoje)return '🔴 Parcial / vencido';if(venc<hoje)return '🔴 Vencido';if(pago>0)return '🟡 Parcial';return '⏳ Pendente'}
+async function finRecebiveis(){
+ const {data,error}=await db.from('orcamentos').select('id,numero,cliente_nome,cliente_telefone,evento_nome,data_evento,valor_total,criado_em,dados').order('criado_em',{ascending:false}).limit(300);if(error)return [];
+ return (data||[]).map(o=>{const total=Number(o.valor_total||0),pago=finPagoOrc(o.id),venc=o.data_evento?finAddDays(o.data_evento,-5):String(o.criado_em||'').slice(0,10),entrada=total*.4;return {...o,total,pago,saldo:Math.max(0,total-pago),entrada,vencimento:venc,status_fin:finStatus(total,pago,venc)}}).filter(x=>x.total>0);
+}
+function finDespesas(){return finLoad(FIN_MOV_KEY).filter(x=>x.tipo==='saida')}
+function finResumoMes(receb,desp){const hoje=finISODate(),ym=hoje.slice(0,7);return {hoje,receberHoje:receb.filter(x=>x.saldo>0&&x.vencimento===hoje).reduce((s,x)=>s+x.saldo,0),receberMes:receb.filter(x=>x.saldo>0&&x.vencimento>hoje&&x.vencimento.startsWith(ym)).reduce((s,x)=>s+x.saldo,0),pagarHoje:desp.filter(x=>x.status!=='pago'&&x.vencimento===hoje).reduce((s,x)=>s+Number(x.valor||0),0),pagarMes:desp.filter(x=>x.status!=='pago'&&x.vencimento>hoje&&String(x.vencimento||'').startsWith(ym)).reduce((s,x)=>s+Number(x.valor||0),0),vencidos:receb.filter(x=>x.saldo>0&&x.vencimento<hoje).reduce((s,x)=>s+x.saldo,0),cobrancas:finLoad(FIN_COB_KEY).filter(x=>x.proxima_data===hoje)}}
+async function abrirFinanceFiltro(tipo){await renderFinanceiro(tipo)}
+async function renderFinanceiro(filtro='todos'){
+ const receb=await finRecebiveis(),desp=finDespesas(),r=finResumoMes(receb,desp),hoje=r.hoje,ym=hoje.slice(0,7);
+ let listaR=receb.filter(x=>x.saldo>0),listaP=desp.filter(x=>x.status!=='pago');
+ if(filtro==='receber_hoje')listaR=listaR.filter(x=>x.vencimento===hoje);
+ if(filtro==='receber_mes')listaR=listaR.filter(x=>x.vencimento>hoje&&x.vencimento.startsWith(ym));
+ if(filtro==='vencidos')listaR=listaR.filter(x=>x.vencimento<hoje);
+ if(filtro==='pagar_hoje')listaP=listaP.filter(x=>x.vencimento===hoje);
+ if(filtro==='pagar_mes')listaP=listaP.filter(x=>x.vencimento>hoje&&String(x.vencimento||'').startsWith(ym));
+ $('#content').innerHTML=`<div class="sectionhead"><div><h2>💰 Financeiro</h2><div class="muted">Contas a receber, devedores, contas a pagar e caixa</div></div><div class="actions"><button class="btn secondary" onclick="novaMovimentacao('entrada')">+ Nova entrada</button><button class="btn primary" onclick="novaDespesa()">+ Nova despesa</button></div></div>
+ <div class="cards" style="margin-bottom:16px"><div class="card"><div class="muted">A receber hoje</div><div class="n">${money(r.receberHoje)}</div></div><div class="card"><div class="muted">Restante do mês</div><div class="n">${money(r.receberMes)}</div></div><div class="card"><div class="muted">A pagar hoje</div><div class="n">${money(r.pagarHoje)}</div></div><div class="card"><div class="muted">A pagar restante do mês</div><div class="n">${money(r.pagarMes)}</div></div></div>
+ <div class="card"><h3 style="margin-top:0">Contas a receber / Devedores</h3><div class="tablewrap">${listaR.length?`<table><thead><tr><th>Cliente</th><th>Evento</th><th>Total</th><th>Pago</th><th>Falta</th><th>Vencimento</th><th>Status</th><th>Ações</th></tr></thead><tbody>${listaR.map(x=>`<tr><td>${esc(x.cliente_nome||'')}</td><td>${esc(x.evento_nome||'')}</td><td>${money(x.total)}</td><td>${money(x.pago)}</td><td><b>${money(x.saldo)}</b></td><td>${finDate(x.vencimento)}</td><td>${x.status_fin}</td><td><div class="actions"><button class="btn primary" onclick="darBaixaCliente('${x.id}')">Dar baixa</button><button class="btn secondary" onclick="cobrarCliente('${x.id}')">Cobrança</button></div></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhum valor pendente neste filtro.</div>'}</div></div>
+ <div class="card"><h3 style="margin-top:0">Contas a pagar</h3><div class="tablewrap">${listaP.length?`<table><thead><tr><th>Vencimento</th><th>Descrição</th><th>Categoria</th><th>Evento relacionado</th><th>Valor</th><th>Ação</th></tr></thead><tbody>${listaP.map(x=>`<tr><td>${finDate(x.vencimento)}</td><td>${esc(x.descricao||'')}${x.recorrencia_id?'<div class="muted" style="font-size:11px">↻ Recorrente</div>':''}</td><td>${esc(x.categoria||'')}</td><td>${esc(x.veiculo_evento||'—')}</td><td>${money(x.valor)}</td><td><div class="actions"><button class="btn primary" onclick="pagarDespesa('${x.id}')">Dar baixa</button>${x.recorrencia_id&&x.recorrencia_ativa!==false?`<button class="btn secondary" onclick="finalizarRecorrencia('${x.recorrencia_id}')">Finalizar</button>`:''}</div></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhuma conta pendente neste filtro.</div>'}</div></div>`;
+}
+function finModal(titulo,campos,onSalvar){
+ document.getElementById('finModalOverlay')?.remove();
+ const overlay=document.createElement('div'); overlay.id='finModalOverlay';
+ overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.68);z-index:99999;display:flex;align-items:center;justify-content:center;padding:18px';
+ const box=document.createElement('div'); box.style.cssText='width:min(560px,100%);max-height:90vh;overflow:auto;background:#151b26;border:1px solid #30394a;border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.5);padding:22px;color:#fff';
+ box.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px"><div><div style="font-size:12px;color:#ff641f;font-weight:800;letter-spacing:.8px">CZ EFEITOS ESPECIAIS</div><h3 style="margin:4px 0 0;font-size:22px">${esc(titulo)}</h3></div><button type="button" id="finModalX" style="border:0;background:#252d3b;color:#fff;width:36px;height:36px;border-radius:10px;font-size:20px;cursor:pointer">×</button></div><form id="finModalForm"><div id="finModalCampos" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px"></div><div id="finModalErro" style="color:#ff8b78;font-size:13px;margin-top:12px"></div><div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px"><button type="button" id="finModalCancelar" class="btn secondary">Cancelar</button><button type="submit" class="btn primary">Salvar</button></div></form>`;
+ overlay.appendChild(box); document.body.appendChild(overlay);
+ const area=box.querySelector('#finModalCampos');
+ campos.forEach(c=>{const wrap=document.createElement('label');wrap.style.cssText=`display:block;${c.full?'grid-column:1/-1':''}`;wrap.innerHTML=`<span style="display:block;font-size:13px;font-weight:700;margin-bottom:6px;color:#dce2eb">${esc(c.label)}</span>`;let el;if(c.type==='select'){el=document.createElement('select');(c.options||[]).forEach(o=>{const op=document.createElement('option');op.value=o;op.textContent=o;el.appendChild(op)})}else if(c.type==='textarea'){el=document.createElement('textarea');el.rows=3}else{el=document.createElement('input');el.type=c.type||'text'}el.name=c.name;el.value=c.value??'';if(c.required)el.required=true;if(c.placeholder)el.placeholder=c.placeholder;el.style.cssText='width:100%;box-sizing:border-box;background:#0f141d;color:#fff;border:1px solid #384254;border-radius:10px;padding:11px 12px;font-size:14px;outline:none';wrap.appendChild(el);area.appendChild(wrap)});
+ const fechar=()=>overlay.remove(); box.querySelector('#finModalX').onclick=fechar;box.querySelector('#finModalCancelar').onclick=fechar;overlay.onclick=e=>{if(e.target===overlay)fechar()};
+ box.querySelector('#finModalForm').onsubmit=async e=>{e.preventDefault();const dados=Object.fromEntries(new FormData(e.currentTarget).entries());const erro=box.querySelector('#finModalErro');erro.textContent='';try{const ok=await onSalvar(dados);if(ok!==false)fechar()}catch(err){erro.textContent=err?.message||'Confira os dados e tente novamente.'}};
+ setTimeout(()=>area.querySelector('input,select,textarea')?.focus(),50);
+}
+async function darBaixaCliente(id){const rec=(await finRecebiveis()).find(x=>String(x.id)===String(id));if(!rec)return;finModal('Dar baixa no recebimento',[{name:'valor',label:`Valor recebido • Saldo ${money(rec.saldo)}`,type:'number',value:rec.saldo.toFixed(2),required:true},{name:'forma',label:'Forma de pagamento',type:'select',options:['PIX','Dinheiro','Débito','Crédito','Transferência','Outro']},{name:'data',label:'Data do pagamento',type:'date',value:finISODate(),required:true},{name:'obs',label:'Observação',type:'textarea',full:true}],d=>{const v=Number(d.valor);if(!Number.isFinite(v)||v<=0)throw new Error('Informe um valor válido.');const a=finLoad(FIN_MOV_KEY);a.push({id:crypto.randomUUID(),tipo:'entrada',orcamento_id:id,cliente:rec.cliente_nome,descricao:'Recebimento proposta '+(rec.numero||''),valor:v,forma:d.forma||'Não informado',data:d.data||finISODate(),vencimento:d.data||finISODate(),status:'pago',observacao:d.obs||'',criado_em:new Date().toISOString()});finSave(FIN_MOV_KEY,a);renderFinanceiro();return true})}
+function novaMovimentacao(tipo='entrada'){finModal('Nova entrada',[{name:'descricao',label:'Descrição da entrada',required:true,full:true},{name:'valor',label:'Valor',type:'number',required:true},{name:'forma',label:'Forma de pagamento',type:'select',options:['PIX','Dinheiro','Débito','Crédito','Transferência','Outro']},{name:'data',label:'Data',type:'date',value:finISODate(),required:true}],d=>{const valor=Number(d.valor);if(!d.descricao.trim())throw new Error('Informe a descrição.');if(!Number.isFinite(valor)||valor<=0)throw new Error('Informe um valor válido.');const a=finLoad(FIN_MOV_KEY);a.push({id:crypto.randomUUID(),tipo:'entrada',descricao:d.descricao.trim(),valor,forma:d.forma||'',data:d.data||finISODate(),vencimento:d.data||finISODate(),status:'pago',criado_em:new Date().toISOString()});finSave(FIN_MOV_KEY,a);renderFinanceiro();return true})}
+function finAddMonths(date,n){const [y,m,d]=String(date||finISODate()).split('-').map(Number),base=new Date(y,m-1+n,1,12),last=new Date(base.getFullYear(),base.getMonth()+1,0,12).getDate();base.setDate(Math.min(d,last));return finISODate(base)}
+function novaDespesa(){
+ document.getElementById('finModalOverlay')?.remove();
+ const overlay=document.createElement('div');overlay.id='finModalOverlay';overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.70);z-index:99999;display:flex;align-items:center;justify-content:center;padding:18px';
+ const box=document.createElement('div');box.style.cssText='width:min(820px,100%);max-height:92vh;overflow:auto;background:#151b26;border:1px solid #30394a;border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.55);padding:22px;color:#fff';
+ const inp='width:100%;box-sizing:border-box;background:#0f141d;color:#fff;border:1px solid #384254;border-radius:10px;padding:11px 12px;font-size:14px;outline:none';
+ const cats=finLoad(FIN_CAT_KEY);
+ box.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px"><div><div style="font-size:12px;color:#ff641f;font-weight:800;letter-spacing:.8px">CZ EFEITOS ESPECIAIS</div><h3 style="margin:4px 0 0;font-size:22px">Nova despesa</h3></div><button type="button" id="despX" style="border:0;background:#252d3b;color:#fff;width:36px;height:36px;border-radius:10px;font-size:20px;cursor:pointer">×</button></div>
+ <form id="despForm"><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px">
+ <label style="grid-column:1/-1"><span class="finlbl">Descrição</span><input name="descricao" required style="${inp}"></label>
+ <label><span class="finlbl">Valor total</span><input name="valor" type="number" min="0.01" step="0.01" required style="${inp}"></label>
  <label><span class="finlbl">Categoria</span><div style="display:flex;gap:8px"><select name="categoria" id="despCategoria" style="${inp}"><option value="">Selecione</option>${cats.map(x=>`<option>${esc(x)}</option>`).join('')}</select><button type="button" id="addCategoria" class="btn secondary" style="white-space:nowrap">+ Adicionar</button></div></label>
  <label><span class="finlbl">Forma de pagamento</span><select name="forma" style="${inp}">${['PIX','Dinheiro','Débito','Crédito','Boleto','Transferência','Outro'].map(x=>`<option>${x}</option>`).join('')}</select></label>
  <label><span class="finlbl">Condição</span><select name="condicao" id="despCond" style="${inp}"><option>À vista</option><option>Parcelado</option></select></label>
