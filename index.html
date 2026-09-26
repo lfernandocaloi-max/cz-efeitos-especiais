@@ -692,7 +692,7 @@ atualizarEquipe();
   $('#orcSave').onclick=()=>{$('#orcMsg').textContent='Rascunho não é gerado como proposta. Use GERAR PROPOSTA quando estiver pronto.'};
   $('#orcPrint').onclick=async()=>{
     const btn=$('#orcPrint');btn.disabled=true;$('#orcMsg').textContent='Salvando proposta e preparando PDF...';
-    try{const r=await salvarProposta('gerada');gerarPdfProposta(r.d,r.numero);$('#orcMsg').textContent='Proposta '+r.numero+' salva em Orçamentos e PDF gerado.';await carregarPropostasSalvas()}
+    try{const r=await salvarProposta('enviado');gerarPdfProposta(r.d,r.numero);$('#orcMsg').textContent='Proposta '+r.numero+' salva em Orçamentos e PDF gerado.';await carregarPropostasSalvas()}
     catch(e){$('#orcMsg').textContent='Erro ao gerar proposta: '+e.message}
     finally{btn.disabled=false}
   };
