@@ -24,6 +24,20 @@
 .client-status{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:5px;font-size:17px;font-weight:800}
 .client-status-incomplete{background:#8e2626;color:#fff}
 .client-status-complete{background:#155e39;color:#fff}
+.client-table{min-width:920px;table-layout:fixed}
+.client-table th,.client-table td{padding:9px 10px;vertical-align:middle}
+.client-table th:nth-child(1){width:7%}
+.client-table th:nth-child(2){width:20%}
+.client-table th:nth-child(3){width:15%}
+.client-table th:nth-child(4){width:35%}
+.client-table th:nth-child(5){width:9%}
+.client-table th:nth-child(6){width:14%}
+.client-table th:nth-child(1),.client-table td:nth-child(1),.client-table th:nth-child(3),.client-table td:nth-child(3),.client-table th:nth-child(5),.client-table td:nth-child(5),.client-table th:nth-child(6),.client-table td:nth-child(6){text-align:center}
+.client-table td:nth-child(2),.client-table td:nth-child(4){white-space:normal;overflow-wrap:anywhere}
+.client-table td:nth-child(2){font-size:15px;font-weight:700}
+.client-table td:nth-child(4){font-size:13px;line-height:1.35}
+.client-table .actions{margin:0;justify-content:center;gap:5px;flex-wrap:nowrap}
+.client-table .actions .btn{padding:6px 8px;font-size:11px;white-space:nowrap}
 .orc-travel-grid{display:grid;grid-template-columns:repeat(4,minmax(120px,180px));gap:10px}
 .orc-travel-grid .field,.orc-team-row .field{margin-top:4px;min-width:0}
 .orc-travel-grid input,.orc-team-row input{padding:7px 9px!important;font-size:13px!important;min-height:35px}
@@ -42,12 +56,12 @@
   <input id="clientId" type="hidden"><div class="muted" id="clientOpenedAt" style="font-size:13px">Data de abertura: será definida ao salvar</div>
   <div class="row"><div class="field"><label>Nome / Razão social *</label><input id="clientName" autocomplete="name"></div><div class="field"><label>Telefone *</label><input id="clientPhone" type="tel" inputmode="tel" autocomplete="tel"></div></div>
   <div class="field"><label class="client-switch"><input id="clientIsCompany" type="checkbox"> Cadastro com CNPJ (empresa)</label></div>
-  <div class="row"><div class="field"><label>E-mail</label><input id="clientEmail" type="email" autocomplete="email"></div><div class="field"><label>Profissão</label><input id="clientProfession"></div></div>
   <div class="row" id="clientPfFields"><div class="field"><label>CPF</label><input id="clientCpf" inputmode="numeric"></div><div class="field"><label>RG</label><input id="clientRg"></div></div>
   <div class="row hidden" id="clientPjFields"><div class="field"><label>CNPJ</label><input id="clientCnpj" inputmode="numeric"></div><div class="field"><label>IE (Inscrição Estadual)</label><input id="clientIe"></div></div>
   <div class="field"><label>Endereço</label><input id="clientAddress" autocomplete="street-address"></div>
   <div class="row"><div class="field"><label>Número</label><input id="clientNumber"></div><div class="field"><label>Complemento</label><input id="clientComplement"></div></div>
   <div class="row"><div class="field"><label>Cidade</label><input id="clientCity" autocomplete="address-level2"></div><div class="field"><label>CEP</label><input id="clientZip" inputmode="numeric" autocomplete="postal-code"></div></div>
+  <div class="row"><div class="field"><label>E-mail</label><input id="clientEmail" type="email" autocomplete="email"></div><div class="field"><label>Profissão</label><input id="clientProfession"></div></div>
   <div class="field"><label>Origem</label><input id="clientOrigin" value="manual"></div><div class="field"><label>Observações</label><textarea id="clientNotes"></textarea></div>
   <div class="actions"><button class="btn secondary" onclick="closeClient()">Cancelar</button><button id="deleteClientBtn" class="btn danger hidden" type="button">Excluir cliente</button><button id="clientHistoryBtn" class="btn secondary hidden" type="button">Histórico</button><button id="saveClientBtn" class="btn primary">Salvar cliente</button></div><div id="clientHistory" class="hidden" style="margin-top:14px"></div><div id="clientMsg" class="msg"></div></div></div>
 
@@ -920,7 +934,7 @@ Obrigado!`;
     ?`<span class="client-status client-status-incomplete" title="Faltam: ${esc(faltando.join(', '))}" aria-label="Cadastro incompleto: faltam ${esc(faltando.join(', '))}">■</span>`
     :'<span class="client-status client-status-complete" title="Cadastro completo" aria-label="Cadastro completo">✅</span>'}
   function numeroCadastroCliente(c){return c.numero_cliente==null?'—':String(c.numero_cliente).padStart(3,'0')}
-  async function renderClients(){const {data,error}=await db.from('clientes').select('*').order('criado_em',{ascending:false});if(error){$('#content').innerHTML=`<div class="msg">Erro ao carregar clientes: ${error.message}</div>`;return}clients=data||[];$('#content').innerHTML=`<div class="sectionhead"><div><h2>Clientes</h2><div class="muted">${clients.length} cliente(s) cadastrado(s)</div></div><button class="btn primary" onclick="openClient()">+ Novo cliente</button></div><div class="tablewrap">${clients.length?`<table><thead><tr><th>Nº</th><th>Data de abertura</th><th>Nome</th><th>Telefone</th><th>Endereço</th><th>Cadastro</th><th>Ações</th></tr></thead><tbody>${clients.map(c=>`<tr><td><b>${numeroCadastroCliente(c)}</b></td><td>${c.criado_em?new Date(c.criado_em).toLocaleDateString('pt-BR'):'—'}</td><td>${esc(c.nome)}</td><td>${esc(c.telefone||'')}</td><td>${esc([c.endereco,c.numero,c.complemento,c.cidade,c.cep].filter(Boolean).join(', ')||'—')}</td><td>${indicadorCadastroCliente(c)}</td><td><div class="actions"><button class="btn secondary" onclick="editClient('${c.id}')">Editar</button><button class="btn secondary" onclick="historicoCliente('${c.id}')">Histórico</button></div></td></tr>`).join('')}</tbody></table>`:`<div class="empty">Nenhum cliente cadastrado.</div>`}</div>`}
+  async function renderClients(){const {data,error}=await db.from('clientes').select('*').order('criado_em',{ascending:false});if(error){$('#content').innerHTML=`<div class="msg">Erro ao carregar clientes: ${error.message}</div>`;return}clients=data||[];$('#content').innerHTML=`<div class="sectionhead"><div><h2>Clientes</h2><div class="muted">${clients.length} cliente(s) cadastrado(s)</div></div><button class="btn primary" onclick="openClient()">+ Novo cliente</button></div><div class="tablewrap">${clients.length?`<table class="client-table"><thead><tr><th>Nº</th><th>Nome</th><th>Telefone</th><th>Endereço</th><th>Cadastro</th><th>Ações</th></tr></thead><tbody>${clients.map(c=>`<tr><td><b>${numeroCadastroCliente(c)}</b></td><td>${esc(c.nome)}</td><td>${esc(c.telefone||'')}</td><td>${esc([c.endereco,c.numero,c.complemento,c.cidade,c.cep].filter(Boolean).join(', ')||'—')}</td><td>${indicadorCadastroCliente(c)}</td><td><div class="actions"><button class="btn secondary" onclick="editClient('${c.id}')">Editar</button><button class="btn secondary" onclick="historicoCliente('${c.id}')">Histórico</button></div></td></tr>`).join('')}</tbody></table>`:`<div class="empty">Nenhum cliente cadastrado.</div>`}</div>`}
 function esc(v){return String(v).replace(/[&<>'"]/g,a=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[a]))}
 function atualizarTipoCliente(){const pj=$('#clientIsCompany').checked;$('#clientPfFields').classList.toggle('hidden',pj);$('#clientPjFields').classList.toggle('hidden',!pj)}
 $('#clientIsCompany').onchange=atualizarTipoCliente;
