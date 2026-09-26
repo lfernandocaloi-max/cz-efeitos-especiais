@@ -722,10 +722,25 @@ Obrigado!`;
     window.open('https://wa.me/'+tel+'?text='+encodeURIComponent(msg),'_blank','noopener');
   }
   async function excluirProposta(id){
-    if(!confirm('Excluir esta proposta? Esta ação não poderá ser desfeita.'))return;
-    const {error}=await db.from('orcamentos').delete().eq('id',id);
-    if(error){alert('Não foi possível excluir a proposta: '+error.message);return}
-    await carregarPropostasSalvas();
+    if(!confirm('Excluir esta proposta? Se existir um evento vinculado e ele ainda não estiver FINALIZADO, todo o processo operacional desse orçamento também será excluído. Eventos finalizados serão preservados.'))return;
+    try{
+      const {data:orc,error:eo}=await db.from('orcamentos').select('id,dados').eq('id',id).single();
+      if(eo)throw eo;
+      const eventoId=orc?.dados?.evento_operacional_id||null;
+      if(eventoId){
+        const {data:ev,error:ee}=await db.from('eventos_operacionais').select('id,status').eq('id',eventoId).maybeSingle();
+        if(ee)throw ee;
+        if(ev&&ev.status!=='finalizado'){
+          const {error:em}=await db.from('evento_materiais').delete().eq('evento_id',eventoId);
+          if(em)throw em;
+          const {error:ed}=await db.from('eventos_operacionais').delete().eq('id',eventoId);
+          if(ed)throw ed;
+        }
+      }
+      const {error}=await db.from('orcamentos').delete().eq('id',id);
+      if(error)throw error;
+      await carregarPropostasSalvas();
+    }catch(error){alert('Não foi possível excluir a proposta: '+error.message)}
   }
   async function propostaVirarEvento(p){
     const {data:cs,error}=await db.from('clientes').select('id,nome,telefone,endereco').order('nome');
@@ -770,7 +785,11 @@ Obrigado!`;
           const materiais=itensOrc.map(x=>{const cad=x.tipo==='produto'?mp.get(String(x.id)):ma.get(String(x.id));return {evento_id:ev.id,tipo:x.tipo,item_id:x.id||null,nome_item:cad?.nome||x.nome||'Item do orçamento',codigo:x.tipo==='produto'?(cad?.codigo_barras||null):(cad?.codigo_barras||cad?.codigo_interno||null),quantidade_necessaria:Number(x.quantidade||1),quantidade_bipada:0}});
           const {error:em}=await db.from('evento_materiais').insert(materiais);if(em)throw em;
         }
-        $('#evMsg').textContent='Evento criado com os materiais do orçamento. Iniciando separação...';abrirEvento(ev.id)
+        const dadosAtualizados={...d,evento_operacional_id:ev.id};
+        const {error:eoVinculo}=await db.from('orcamentos').update({dados:dadosAtualizados}).eq('id',p.id);
+        if(eoVinculo)throw eoVinculo;
+        $('#evMsg').textContent='Evento criado. Abrindo a página de Eventos...';
+        await renderEventos();
       }catch(e){$('#evMsg').textContent='Erro: '+e.message;btn.disabled=false}
     };
   }
