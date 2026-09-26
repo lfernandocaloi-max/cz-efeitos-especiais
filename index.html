@@ -40,7 +40,7 @@ const SUPABASE_URL='https://locvpksjntwnlqrytqqx.supabase.co';
 const SUPABASE_KEY='sb_publishable_UN34ALY6Oxc1_V863pgq3Q_hNj7tuIQ';
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const $=s=>document.querySelector(s); let clients=[],products=[],assets=[],purchaseIds=new Set();
-const modules=['Dashboard','Clientes','Orçamentos','Contratos','Eventos','Estoque','Ativos / Equipamentos','Colaboradores','Manutenção','Financeiro / DRE','Agenda','Relatórios','Configurações','Lista de compra'];
+const modules=['Dashboard','Clientes','Orçamentos','Contratos','Eventos','Retorno de evento','Estoque','Ativos / Equipamentos','Colaboradores','Manutenção','Financeiro / DRE','Agenda','Relatórios','Configurações','Lista de compra'];
 $('#nav').innerHTML=modules.map((m,i)=>`<button data-i="${i}" class="${i===0?'active':''}">${m}</button>`).join('');
 $('#nav').onclick=e=>{const b=e.target.closest('button');if(!b)return;document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');$('.side').classList.remove('mobile-open');renderModule(+b.dataset.i)};
 $('#menuBtn').onclick=()=>$('.side').classList.toggle('mobile-open');
@@ -146,7 +146,7 @@ $('#logoutBtn').onclick=async()=>{await db.auth.signOut();showLogin()};
     ? 'Erro: '+error.message
     : 'Link de recuperação enviado para seu e-mail.';
 }
-async function renderModule(i){$('#pageTitle').textContent=modules[i];if(i===0)return renderDashboard();if(i===1)return renderClients();if(i===2)return renderOrcamentos();if(i===4)return renderEventos();if(i===5)return renderProducts();if(i===6)return renderAssets();if(i===13)return renderShoppingList();$('#content').innerHTML=`<div class="sectionhead"><h2>${modules[i]}</h2></div><div class="placeholder">Módulo já previsto no banco de dados. A tela operacional será ativada nas próximas versões sem precisar recriar sua estrutura.</div>`}
+async function renderModule(i){$('#pageTitle').textContent=modules[i];if(i===0)return renderDashboard();if(i===1)return renderClients();if(i===2)return renderOrcamentos();if(i===4)return renderEventos();if(i===5)return renderRetornoEventos();if(i===6)return renderProducts();if(i===7)return renderAssets();if(i===14)return renderShoppingList();$('#content').innerHTML=`<div class="sectionhead"><h2>${modules[i]}</h2></div><div class="placeholder">Módulo já previsto no banco de dados. A tela operacional será ativada nas próximas versões sem precisar recriar sua estrutura.</div>`}
 async function count(table){const {count,error}=await db.from(table).select('*',{count:'exact',head:true});return error?'—':count}
 async function renderDashboard(){
   const c = await Promise.all([
@@ -1003,7 +1003,7 @@ async function renderEventos(){
     </div>
     <h3>Eventos / Separação</h3>
     <div class="tablewrap">${operacionais.length?`<table><thead><tr><th>Data</th><th>Cliente</th><th>Evento</th><th>Local</th><th>Status</th><th>Operação</th></tr></thead><tbody>${operacionais.map(e=>`<tr><td>${e.data_evento?new Date(e.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${esc(e.cliente_nome||'')}</td><td>${esc(e.nome_evento||'')}</td><td>${esc(e.local_evento||'')}</td><td>${statusEventoLabel(e.status)}</td><td><button class="btn primary" onclick="abrirEvento('${e.id}')">Iniciar evento</button></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhum evento em separação.</div>'}</div>
-    <div class="card" style="margin-top:22px"><div class="sectionhead" style="margin-bottom:8px"><div><h3 style="margin:0">Retorno de evento</h3></div><button class="btn secondary" onclick="renderRetornoEventos()">Abrir página de retorno</button></div><div class="muted" style="margin-bottom:12px">Eventos com saída liberada ficam aqui para fazer o retorno dos materiais e equipamentos.</div><div class="tablewrap">${conclusao.length?`<table><thead><tr><th>Data</th><th>Cliente</th><th>Evento</th><th>Local</th><th>Status</th><th>Operação</th></tr></thead><tbody>${conclusao.map(e=>`<tr><td>${e.data_evento?new Date(e.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${esc(e.cliente_nome||'')}</td><td>${esc(e.nome_evento||'')}</td><td>${esc(e.local_evento||'')}</td><td>${statusEventoLabel(e.status)}</td><td><button class="btn primary" onclick="abrirRetornoEvento('${e.id}')">${e.status==='finalizado'?'Ver retorno':'Fazer retorno'}</button></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhum evento aguardando retorno.</div>'}</div></div>`;
+`;
   $('#novoEventoBtn').onclick=()=>novoEventoManual();
 }
 function statusEventoLabel(s){return ({aguardando_separacao:'⏳ Aguardando separação',separando:'📦 Separando',material_pronto:'✅ Material conferido',liberado:'🚚 Saída liberada',em_execucao:'🎆 Em execução',aguardando_retorno:'↩️ Aguardando retorno',finalizado:'🏁 Finalizado'})[s]||esc(s||'Aguardando separação')}
