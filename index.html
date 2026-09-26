@@ -9,21 +9,6 @@
 :root{--bg:#090d12;--panel:#111821;--panel2:#161f2a;--line:#273342;--text:#f5f7f8;--muted:#94a0ae;--accent:#ff641f;--ok:#38b86b;--danger:#ef5350}*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:var(--text)}button,input,textarea{font:inherit}.hidden{display:none!important}.login{min-height:100vh;display:grid;place-items:center;padding:24px}.loginbox{width:min(420px,100%);background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:28px}.brand{font-size:34px;font-weight:900;color:var(--accent);line-height:.9}.brand small{display:block;font-size:11px;letter-spacing:2px;color:#fff;margin-top:8px}.field{margin-top:16px}.field label{display:block;font-size:13px;color:var(--muted);margin-bottom:7px}.field input,.field textarea,.field select{width:100%;background:#0b1118;color:#fff;border:1px solid var(--line);border-radius:9px;padding:12px;outline:none}.field textarea{min-height:90px}.thumb{width:64px;height:64px;object-fit:cover;border-radius:9px;border:1px solid var(--line);background:#0b1118}.preview{width:140px;height:140px;object-fit:cover;border-radius:12px;border:1px solid var(--line);background:#0b1118;margin-top:10px}.btn{border:0;border-radius:9px;padding:11px 15px;cursor:pointer;font-weight:700}.primary{background:var(--accent);color:#fff}.secondary{background:#22303d;color:#fff}.danger{background:#3a1e21;color:#ffb0b0}.full{width:100%}.msg{margin-top:12px;color:#ffb0b0;font-size:13px}.app{display:grid;grid-template-columns:245px 1fr;min-height:100vh}.side{background:#070d11;border-right:1px solid var(--line);padding:22px 14px}.side .brand{margin:4px 8px 26px}.nav button{display:block;width:100%;text-align:left;padding:11px 12px;margin:4px 0;border:0;border-radius:8px;background:transparent;color:#cbd4dc;cursor:pointer}.nav button:hover,.nav button.active{background:#1c2833;color:#fff}.nav button.active{border-left:3px solid var(--accent)}.main{min-width:0}.top{height:68px;background:#10171f;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 24px}.content{padding:24px}.cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}.card .n{font-size:28px;font-weight:800;margin-top:8px}.muted{color:var(--muted)}.sectionhead{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}.sectionhead h2{margin:0}.tablewrap{overflow:auto;border:1px solid var(--line);border-radius:12px}table{width:100%;border-collapse:collapse;background:var(--panel)}th,td{padding:12px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}th{font-size:12px;color:var(--muted);background:#0e151d}.empty{padding:30px;text-align:center;color:var(--muted)}.modal{position:fixed;inset:0;background:#000a;display:grid;place-items:center;padding:20px;z-index:10}.modalbox{width:min(620px,100%);max-height:90vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}.placeholder{padding:36px;background:var(--panel);border:1px dashed var(--line);border-radius:14px;color:var(--muted)}@media(max-width:900px){.app{grid-template-columns:1fr}.side{display:none}.cards{grid-template-columns:1fr 1fr}}@media(max-width:560px){.cards,.row{grid-template-columns:1fr}.content{padding:16px}.top{padding:0 16px}}
 @media(max-width:900px){#menuBtn{display:inline-block!important}.side.mobile-open{display:block;position:fixed;inset:0 auto 0 0;width:min(290px,85vw);z-index:20;overflow:auto;box-shadow:0 0 0 100vw #000a}.top{height:auto;min-height:68px;gap:8px}.top #userName{display:none}.orc-equipe-linha,.linhaEquipe{grid-template-columns:repeat(2,minmax(0,1fr))!important}.sectionhead{flex-wrap:wrap}}
 .filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:0 0 16px;padding:14px;background:var(--panel);border:1px solid var(--line);border-radius:12px}.filters .field{margin:0}.btn:disabled{opacity:.55;cursor:not-allowed}.product-actions{display:flex;align-items:center;gap:5px}.product-actions .btn{padding:6px 8px;font-size:12px;white-space:nowrap}.product-table tbody td{font-size:11px}.product-table .product-title{font-size:16px;font-weight:800;color:var(--text)}.product-action-toggle{padding:6px 10px;font-size:12px}.product-actions{margin-top:7px}.product-actions .btn{font-size:11px}
-/* Campos compactos: valores e datas ocupam apenas a largura necessaria. */
-.field{min-width:0;margin-top:12px}
-.field label{margin-bottom:5px}
-.field input,.field select,.field textarea{min-width:0;min-height:36px;padding:7px 10px;font-size:14px;max-width:360px}
-.field input[type="number"]{max-width:150px}
-.field input[type="date"],.field input[type="time"]{max-width:185px}
-.field select{max-width:260px}
-.field input[type="url"],.field input[type="email"],.field input[type="password"],.field input[type="file"],.field textarea{max-width:100%}
-.field textarea{min-height:72px}
-.filters{grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:8px}
-.filters .field input{max-width:100%}
-.purchase-input{width:105px;max-width:105px;min-height:34px;padding:6px 8px;font-size:14px;background:#0b1118;color:#fff;border:1px solid var(--line);border-radius:8px}
-.purchase-action{padding:5px 7px;font-size:11px;line-height:1.2;white-space:nowrap}
-[data-receive-qty]{width:90px;max-width:90px}
-@media(max-width:560px){.field input:not([type="number"]):not([type="date"]):not([type="time"]),.field select,.field textarea{max-width:100%}}
 </style>
 </head><body>
 <section id="login" class="login"><div class="loginbox"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><h3>Acesso ao sistema</h3><div class="field"><label>E-mail</label><input id="email" type="email"></div><div class="field"><label>Senha</label><input id="password" type="password"></div><button id="loginBtn" class="btn primary full" style="margin-top:18px">ENTRAR</button><button type="button" class="btn secondary full" style="margin-top:8px" onclick="recuperarSenha()">Esqueci minha senha</button><div id="loginMsg" class="msg"></div></div></section>
@@ -44,8 +29,8 @@
 const SUPABASE_URL='https://locvpksjntwnlqrytqqx.supabase.co';
 const SUPABASE_KEY='sb_publishable_UN34ALY6Oxc1_V863pgq3Q_hNj7tuIQ';
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
-const $=s=>document.querySelector(s); let clients=[],products=[],assets=[],purchaseIds=new Set(),productSaveSource='stock',activePurchaseListId=null;
-const modules=['Dashboard','Clientes','Orçamentos','Contratos','Eventos','Estoque','Ativos / Equipamentos','Colaboradores','Manutenção','Financeiro / DRE','Agenda','Relatórios','Configurações','Lista de compra','Atendimentos / WhatsApp'];
+const $=s=>document.querySelector(s); let clients=[],products=[],assets=[],purchaseIds=new Set();
+const modules=['Dashboard','Clientes','Orçamentos','Contratos','Eventos','Estoque','Ativos / Equipamentos','Colaboradores','Manutenção','Financeiro / DRE','Agenda','Relatórios','Configurações','Lista de compra'];
 $('#nav').innerHTML=modules.map((m,i)=>`<button data-i="${i}" class="${i===0?'active':''}">${m}</button>`).join('');
 $('#nav').onclick=e=>{const b=e.target.closest('button');if(!b)return;document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');$('.side').classList.remove('mobile-open');renderModule(+b.dataset.i)};
 $('#menuBtn').onclick=()=>$('.side').classList.toggle('mobile-open');
@@ -151,7 +136,7 @@ $('#logoutBtn').onclick=async()=>{await db.auth.signOut();showLogin()};
     ? 'Erro: '+error.message
     : 'Link de recuperação enviado para seu e-mail.';
 }
-async function renderModule(i){$('#pageTitle').textContent=modules[i];if(i===0)return renderDashboard();if(i===1)return renderClients();if(i===2)return renderOrcamentos();if(i===5)return renderProducts();if(i===6)return renderAssets();if(i===13)return renderShoppingList();if(i===14)return renderAtendimentos();$('#content').innerHTML=`<div class="sectionhead"><h2>${modules[i]}</h2></div><div class="placeholder">Módulo já previsto no banco de dados. A tela operacional será ativada nas próximas versões sem precisar recriar sua estrutura.</div>`}
+async function renderModule(i){$('#pageTitle').textContent=modules[i];if(i===0)return renderDashboard();if(i===1)return renderClients();if(i===2)return renderOrcamentos();if(i===4)return renderEventos();if(i===5)return renderProducts();if(i===6)return renderAssets();if(i===13)return renderShoppingList();$('#content').innerHTML=`<div class="sectionhead"><h2>${modules[i]}</h2></div><div class="placeholder">Módulo já previsto no banco de dados. A tela operacional será ativada nas próximas versões sem precisar recriar sua estrutura.</div>`}
 async function count(table){const {count,error}=await db.from(table).select('*',{count:'exact',head:true});return error?'—':count}
 async function renderDashboard(){
   const c = await Promise.all([
@@ -672,23 +657,18 @@ $('#productWholesale').addEventListener('input',()=>atualizarLucroPeloValor('ata
 async function uploadPhoto(file,folder){if(!file)return null;if(file.size>5*1024*1024)throw new Error('A foto deve ter no máximo 5 MB.');const ext=(file.name.split('.').pop()||'jpg').toLowerCase();const path=`${folder}/${crypto.randomUUID()}.${ext}`;const {error}=await db.storage.from('fotos').upload(path,file,{cacheControl:'3600',upsert:false});if(error)throw error;return db.storage.from('fotos').getPublicUrl(path).data.publicUrl}
 function textoFiltro(v){return String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim()}
 async function renderProducts(){
-  const [{data,error},listas]=await Promise.all([
+  const [{data,error},compra]=await Promise.all([
     db.from('produtos').select('*').order('nome'),
-    db.from('compras_listas').select('id,criado_em').eq('status','aberta').order('criado_em',{ascending:false})
+    db.from('lista_compras').select('produto_id')
   ]);
   if(error){$('#content').innerHTML=`<div class="msg">Erro ao carregar produtos: ${esc(error.message)}</div>`;return}
   products=data||[];
-  const abertas=listas.data||[];
-  if(!abertas.some(l=>l.id===activePurchaseListId))activePurchaseListId=abertas[0]?.id||null;
-  const itens=abertas.length?await db.from('compras_itens').select('lista_id,produto_id,quantidade,quantidade_recebida').in('lista_id',abertas.map(l=>l.id)):{data:[],error:null};
-  purchaseIds=new Set((itens.data||[]).filter(i=>i.lista_id===activePurchaseListId).map(i=>i.produto_id));
-  const datasPedido=new Map();
-  (itens.data||[]).forEach(i=>{const lista=abertas.find(l=>l.id===i.lista_id);if(lista&&Number(i.quantidade_recebida||0)<Number(i.quantidade)&&!datasPedido.has(i.produto_id))datasPedido.set(i.produto_id,lista.criado_em)});
+  purchaseIds=new Set((compra.data||[]).map(item=>item.produto_id));
   const estoqueMinimo=products.filter(p=>Number(p.estoque_atual||0)<=Number(p.estoque_minimo||0));
   $('#content').innerHTML=`
     <div class="sectionhead"><div><h2>Estoque / Produtos</h2><div id="productCount" class="muted">${products.length} produto(s)</div></div><button class="btn primary" onclick="openProduct()">+ Novo produto</button></div>
     <div class="card" style="margin-bottom:16px"><h3 style="margin:0 0 10px">Produtos no estoque mínimo (${estoqueMinimo.length})</h3>${estoqueMinimo.length?`<div class="tablewrap"><table><thead><tr><th>Produto</th><th>Estoque atual</th><th>Estoque mínimo</th></tr></thead><tbody>${estoqueMinimo.map(p=>`<tr><td>${esc(p.nome)}</td><td>${p.estoque_atual??0}</td><td>${p.estoque_minimo??0}</td></tr>`).join('')}</tbody></table></div>`:'<div class="muted">Nenhum produto no estoque mínimo.</div>'}</div>
-    ${listas.error||itens.error?`<div class="msg">Configure o histórico de compras no Supabase: ${esc((listas.error||itens.error).message)}</div>`:''}
+    ${compra.error?`<div class="msg">A Lista de compra precisa ser criada no Supabase: ${esc(compra.error.message)}</div>`:''}
     <div id="productActionMsg" class="msg" role="status"></div>
     <div class="filters" aria-label="Filtrar produtos">
       <div class="field"><label>Filtrar pelo nome</label><input id="filterName" placeholder="Nome do produto"></div>
@@ -703,7 +683,7 @@ async function renderProducts(){
   function filtrarProdutos(){
     const encontrados=products.filter(p=>filtros.every(([id,campo])=>textoFiltro(p[campo]).includes(textoFiltro($('#'+id).value))));
     $('#productCount').textContent=`${encontrados.length} de ${products.length} produto(s)`;
-    $('#productResults').innerHTML=encontrados.length?`<table class="product-table"><thead><tr><th>Produto</th><th>Varejo</th><th>Atacado</th><th>Cor</th><th>Tempo</th><th>Unidade</th><th>Foto</th><th>Ver vídeo</th><th>Estoque</th><th>Status</th><th>Custo</th><th>Cód. barras</th><th>Ações</th></tr></thead><tbody>${encontrados.map(p=>`<tr><td class="product-title">${esc(p.nome)}</td><td>${money(p.valor_varejo)}</td><td>${money(p.valor_atacado)}</td><td>${esc(p.cor||'—')}</td><td>${esc(p.tempo||'—')}</td><td>${esc(p.unidade||'—')}</td><td>${p.foto_url?`<img class="thumb" src="${esc(p.foto_url)}" alt="">`:'—'}</td><td>${safeHttpUrl(p.video_url)?`<a href="${esc(safeHttpUrl(p.video_url))}" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">Ver vídeo</a>`:'—'}</td><td>${p.estoque_atual??0}</td><td>${Number(p.estoque_atual||0)<=0&&datasPedido.has(String(p.id))?`<strong style="color:var(--accent)">Pedido</strong><div class="muted">${new Date(datasPedido.get(String(p.id))).toLocaleDateString('pt-BR')}</div>`:'—'}</td><td>${money(p.valor_custo)}</td><td>${esc(p.codigo_barras||'—')}</td><td><button type="button" class="btn secondary product-action-toggle" data-toggle-product-actions aria-expanded="false">Ação ▾</button><div class="product-actions hidden"><button type="button" class="btn secondary" data-edit-product="${esc(p.id)}">Editar</button><button type="button" class="btn secondary" data-add-purchase="${esc(p.id)}" ${purchaseIds.has(String(p.id))?'disabled':''}>${purchaseIds.has(String(p.id))?'Na lista':'+ Lista de compra'}</button></div></td></tr>`).join('')}</tbody></table>`:`<div class="empty">${products.length?'Nenhum produto corresponde aos filtros.':'Nenhum produto cadastrado.'}</div>`;
+    $('#productResults').innerHTML=encontrados.length?`<table class="product-table"><thead><tr><th>Produto</th><th>Varejo</th><th>Atacado</th><th>Cor</th><th>Tempo</th><th>Unidade</th><th>Foto</th><th>Ver vídeo</th><th>Estoque</th><th>Custo</th><th>Cód. barras</th><th>Ações</th></tr></thead><tbody>${encontrados.map(p=>`<tr><td class="product-title">${esc(p.nome)}</td><td>${money(p.valor_varejo)}</td><td>${money(p.valor_atacado)}</td><td>${esc(p.cor||'—')}</td><td>${esc(p.tempo||'—')}</td><td>${esc(p.unidade||'—')}</td><td>${p.foto_url?`<img class="thumb" src="${esc(p.foto_url)}" alt="">`:'—'}</td><td>${safeHttpUrl(p.video_url)?`<a href="${esc(safeHttpUrl(p.video_url))}" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">Ver vídeo</a>`:'—'}</td><td>${p.estoque_atual??0}</td><td>${money(p.valor_custo)}</td><td>${esc(p.codigo_barras||'—')}</td><td><button type="button" class="btn secondary product-action-toggle" data-toggle-product-actions aria-expanded="false">Ação ▾</button><div class="product-actions hidden"><button type="button" class="btn secondary" data-edit-product="${esc(p.id)}">Editar</button><button type="button" class="btn secondary" data-add-purchase="${esc(p.id)}" ${purchaseIds.has(String(p.id))?'disabled':''}>${purchaseIds.has(String(p.id))?'Na lista':'+ Lista de compra'}</button></div></td></tr>`).join('')}</tbody></table>`:`<div class="empty">${products.length?'Nenhum produto corresponde aos filtros.':'Nenhum produto cadastrado.'}</div>`;
   }
   filtros.forEach(([id])=>$('#'+id).addEventListener('input',filtrarProdutos));
   $('#productResults').onclick=e=>{
@@ -719,142 +699,74 @@ async function renderProducts(){
   };
   filtrarProdutos();
 }
-async function ensureOpenPurchaseList(){
-  if(activePurchaseListId){
-    const {data}=await db.from('compras_listas').select('id').eq('id',activePurchaseListId).eq('status','aberta').maybeSingle();
-    if(data)return activePurchaseListId;
-  }
-  const {data:aberta,error:erroBusca}=await db.from('compras_listas').select('id').eq('status','aberta').order('criado_em',{ascending:false}).limit(1).maybeSingle();
-  if(erroBusca)throw erroBusca;
-  if(aberta){activePurchaseListId=aberta.id;return aberta.id}
-  const {data:criada,error}=await db.from('compras_listas').insert({}).select('id').single();
-  if(error)throw error;
-  activePurchaseListId=criada.id;return criada.id;
-}
 async function addPurchaseItem(id,btn){
   btn.disabled=true;
-  try{
-    const listaId=await ensureOpenPurchaseList();
-    const {error}=await db.from('compras_itens').insert({lista_id:listaId,produto_id:id});
-    if(error){if(error.code==='23505'){$('#productActionMsg').textContent='Este produto já está na lista aberta.';btn.textContent='Na lista';return}throw error}
-    purchaseIds.add(id);btn.textContent='Na lista';$('#productActionMsg').textContent='Produto adicionado à Lista de compra.';
-    if(Number(products.find(p=>String(p.id)===id)?.estoque_atual||0)<=0)renderProducts();
-  }catch(e){btn.disabled=false;$('#productActionMsg').textContent='Erro ao adicionar à Lista de compra: '+e.message}
+  const {error}=await db.from('lista_compras').insert({produto_id:id});
+  if(error){btn.disabled=false;$('#productActionMsg').textContent=error.code==='23505'?'Este produto já está na Lista de compra.':'Erro ao adicionar à Lista de compra: '+error.message;return}
+  purchaseIds.add(id);btn.textContent='Na lista';$('#productActionMsg').textContent='Produto adicionado à Lista de compra.';
 }
-async function renderShoppingList(requestedId=activePurchaseListId){
-  const {data:listas,error:erroListas}=await db.from('compras_listas').select('*').order('criado_em',{ascending:false});
-  if(erroListas){$('#content').innerHTML=`<div class="msg">Configure as listas de compra no Supabase: ${esc(erroListas.message)}</div>`;return}
-  const lista=(listas||[]).find(l=>l.id===requestedId)||(listas||[]).find(l=>l.status==='aberta')||(listas||[])[0];
-  activePurchaseListId=lista?.id||null;
-  if(!lista){
-    $('#content').innerHTML='<div class="sectionhead"><h2>Lista de compra</h2><button id="purchaseNewList" type="button" class="btn primary">+ Nova lista de compra</button></div><div id="purchaseMsg" class="msg"></div><div class="empty">Nenhuma lista criada ainda.</div>';
-    $('#purchaseNewList').onclick=criarNovaListaCompra;return;
-  }
+async function renderShoppingList(){
   const [compras,cadastro]=await Promise.all([
-    db.from('compras_itens').select('*').eq('lista_id',lista.id).order('criado_em',{ascending:false}),
+    db.from('lista_compras').select('*').order('criado_em',{ascending:false}),
     db.from('produtos').select('id,nome,marca,fornecedor,valor_custo,estoque_atual,estoque_minimo,codigo_barras')
   ]);
   if(compras.error||cadastro.error){$('#content').innerHTML=`<div class="msg">Erro ao carregar Lista de compra: ${esc((compras.error||cadastro.error).message)}</div>`;return}
   const porId=new Map((cadastro.data||[]).map(p=>[String(p.id),p]));
   const linhas=(compras.data||[]).map(item=>({...item,produto:porId.get(String(item.produto_id))}));
-  const aberta=lista.status==='aberta';
-  const pronta=aberta&&linhas.length>0&&linhas.every(item=>Number(item.quantidade_recebida||0)>=Number(item.quantidade));
-  const disabled=aberta?'':'disabled';
-  $('#content').innerHTML=`
-    <div class="sectionhead"><div><h2>Lista de compra</h2><div class="muted">${linhas.length} produto(s) · ${aberta?'Aberta':'Concluída'+(lista.concluida_em?' em '+new Date(lista.concluida_em).toLocaleDateString('pt-BR'):'')}</div></div>
-      <div class="actions"><button id="purchaseNewList" type="button" class="btn secondary">+ Nova lista de compra</button><button id="purchasePdf" type="button" class="btn primary" ${linhas.length?'':'disabled'}>Gerar PDF</button><button id="purchaseComplete" type="button" class="btn primary" ${pronta?'':'disabled'}>Concluir lista</button><button class="btn secondary" onclick="renderModule(5)">Ver Estoque</button></div></div>
-    <div class="row card" style="margin-bottom:16px"><div class="field" style="margin:0"><label>Selecionar lista</label><select id="purchaseListSelect">${(listas||[]).map(l=>`<option value="${esc(l.id)}" ${l.id===lista.id?'selected':''}>${new Date(l.criado_em).toLocaleDateString('pt-BR')} — ${l.status==='concluida'?'Concluída':'Aberta'}</option>`).join('')}</select></div><div class="field" style="margin:0"><label>Prazo de entrega</label><input id="purchaseDeadline" type="date" value="${lista.prazo_entrega||''}" ${disabled}></div></div>
-    ${aberta?`<div class="card" style="margin-bottom:16px"><h3 style="margin:0 0 10px">Adicionar produto novo à lista e ao estoque</h3><div class="row"><div class="field" style="margin:0"><label>Nome do novo produto</label><input id="purchaseNewProductName" placeholder="Digite o nome do produto"></div><div style="display:flex;align-items:end"><button id="purchaseNewProductBtn" type="button" class="btn primary">Preencher cadastro e adicionar</button></div></div><div class="muted" style="font-size:12px;margin-top:8px">Complete os dados na próxima janela e clique em Salvar produto.</div></div>`:''}
-    <div id="purchaseMsg" class="msg" role="status"></div>
-    <div class="tablewrap">${linhas.length?`<table><thead><tr><th>Produto</th><th>Qtd. pedida</th><th>Última compra (un.)</th><th>Novo valor (un.)</th><th>Total</th><th>Marca</th><th>Fornecedor</th><th>Conferência</th><th>Ações</th></tr></thead><tbody>${linhas.map((item,i)=>{const p=item.produto,restante=Math.max(0,Number(item.quantidade)-Number(item.quantidade_recebida||0));return `<tr><td>${esc(p?.nome||'Produto removido do cadastro')}</td><td><input class="purchase-input" data-purchase-qty="${i}" type="number" min="0.01" step="0.01" value="${Number(item.quantidade)}" ${disabled}></td><td>${money(p?.valor_custo)}</td><td><input class="purchase-input" data-purchase-current="${i}" type="number" min="0" step="0.01" value="${item.valor_compra_atual??''}" placeholder="Preencher" ${disabled}></td><td data-current-total="${i}"></td><td>${esc(p?.marca||'—')}</td><td>${esc(p?.fornecedor||'—')}</td><td>${aberta&&restante>0?`<input class="purchase-input" data-receive-qty="${i}" type="number" min="0.01" max="${restante}" step="0.01" placeholder="Qtd."><button type="button" class="btn secondary purchase-action" data-confirm-arrival="${i}" style="margin-left:4px" title="Confirmar chegada">Conf</button>`:'Recebido'}</td><td>${aberta&&Number(item.quantidade_recebida||0)===0?`<button type="button" class="btn danger purchase-action" data-remove-purchase="${esc(item.id)}">Remover</button>`:'—'}</td></tr>`}).join('')}</tbody></table>`:'<div class="empty">Esta lista está vazia. Adicione produtos pelo Estoque.</div>'}</div>
-    <div class="card" style="margin-top:16px"><div>Total pelo último custo: <strong id="purchaseGrandLast">R$ 0,00</strong></div><div style="margin-top:8px">Total da compra atual: <strong id="purchaseGrandCurrent">R$ 0,00</strong> <span id="purchasePending" class="muted"></span></div></div>`;
+  $('#content').innerHTML=`<div class="sectionhead"><div><h2>Lista de compra</h2><div class="muted">${linhas.length} produto(s)</div></div><div class="actions"><button id="purchasePdf" type="button" class="btn primary" ${linhas.length?'':'disabled'}>Gerar PDF</button><button class="btn secondary" onclick="renderModule(5)">Ver Estoque</button></div></div><div id="purchaseMsg" class="msg" role="status"></div><div class="tablewrap">${linhas.length?`<table><thead><tr><th>Produto</th><th>Marca</th><th>Fornecedor</th><th>Qtd. para comprar</th><th>Última compra (un.)</th><th>Total último custo</th><th>Novo valor (un.)</th><th>Total compra atual</th><th>Ações</th></tr></thead><tbody>${linhas.map((item,i)=>{const p=item.produto;return `<tr data-purchase-row="${i}"><td>${esc(p?.nome||'Produto removido do cadastro')}</td><td>${esc(p?.marca||'—')}</td><td>${esc(p?.fornecedor||'—')}</td><td><input class="purchase-input" data-purchase-qty="${i}" type="number" min="0.01" step="0.01" value="${Number(item.quantidade??1)}" aria-label="Quantidade para comprar de ${esc(p?.nome||'produto')}"></td><td>${money(p?.valor_custo)}</td><td data-last-total="${i}"></td><td><input class="purchase-input" data-purchase-current="${i}" type="number" min="0" step="0.01" value="${item.valor_compra_atual??''}" placeholder="Preencher" aria-label="Novo valor unitário de ${esc(p?.nome||'produto')}"></td><td data-current-total="${i}"></td><td><button type="button" class="btn danger" data-remove-purchase="${esc(item.produto_id)}">Remover</button></td></tr>`}).join('')}</tbody></table>`:'<div class="empty">A lista está vazia. Adicione produtos pelo Estoque.</div>'}</div><div class="card" style="margin-top:16px"><div>Total pelo último custo: <strong id="purchaseGrandLast">R$ 0,00</strong></div><div style="margin-top:8px">Total da compra atual: <strong id="purchaseGrandCurrent">R$ 0,00</strong> <span id="purchasePending" class="muted"></span></div></div>`;
   const pendentes=new Set();
   const atualizarTotais=()=>{
     let ultimo=0,atual=0,faltando=0;
     linhas.forEach((item,i)=>{
-      const q=Number($(`[data-purchase-qty="${i}"]`).value),raw=$(`[data-purchase-current="${i}"]`).value;
-      const novo=raw===''?null:Number(raw),quantidade=Number.isFinite(q)&&q>0?q:0,anterior=Number(item.produto?.valor_custo||0);
+      const q=Number($(`[data-purchase-qty="${i}"]`).value);
+      const raw=$(`[data-purchase-current="${i}"]`).value;
+      const novo=raw===''?null:Number(raw);
+      const anterior=Number(item.produto?.valor_custo||0);
+      const quantidade=Number.isFinite(q)&&q>0?q:0;
       ultimo+=quantidade*anterior;
+      $(`[data-last-total="${i}"]`).textContent=money(quantidade*anterior);
       if(novo===null||!Number.isFinite(novo)||novo<0){faltando++;$(`[data-current-total="${i}"]`).textContent='Pendente'}
-      else{atual+=quantidade*novo;$(`[data-current-total="${i}"]`).textContent=money(quantidade*novo)}
+      else {atual+=quantidade*novo;$(`[data-current-total="${i}"]`).textContent=money(quantidade*novo)}
     });
-    $('#purchaseGrandLast').textContent=money(ultimo);$('#purchaseGrandCurrent').textContent=money(atual);
+    $('#purchaseGrandLast').textContent=money(ultimo);
+    $('#purchaseGrandCurrent').textContent=money(atual);
     $('#purchasePending').textContent=faltando?`(${faltando} preço(s) pendente(s))`:'';
   };
-  $('#purchaseNewList').onclick=criarNovaListaCompra;
-  $('#purchaseListSelect').onchange=e=>renderShoppingList(e.target.value);
-  $('#purchaseDeadline').onchange=async e=>{
-    const campo=e.target,valor=campo.value||null;campo.disabled=true;
-    const {error}=await db.from('compras_listas').update({prazo_entrega:valor}).eq('id',lista.id).eq('status','aberta');
-    campo.disabled=false;if(error){campo.value=lista.prazo_entrega||'';$('#purchaseMsg').textContent='Erro ao salvar prazo: '+error.message}
-    else{lista.prazo_entrega=valor;$('#purchaseMsg').textContent='Prazo de entrega salvo.'}
-  };
-  $('#purchaseComplete').onclick=async e=>{
-    const botao=e.target;botao.disabled=true;await Promise.all([...pendentes]);
-    const {error}=await db.rpc('concluir_lista_compra',{p_lista_id:lista.id});
-    if(error){botao.disabled=false;$('#purchaseMsg').textContent='Erro ao concluir: '+error.message;return}
-    renderShoppingList(lista.id);
-  };
-  if(aberta){
-    $('#purchaseNewProductBtn').onclick=()=>{
-      const nome=$('#purchaseNewProductName').value.trim();
-      if(!nome){$('#purchaseMsg').textContent='Digite o nome do novo produto.';$('#purchaseNewProductName').focus();return}
-      openProduct(null,'shopping');$('#productName').value=nome;
-    };
-    $('#purchaseNewProductName').onkeydown=e=>{if(e.key==='Enter')$('#purchaseNewProductBtn').click()};
-  }
-  $('#content').onclick=e=>{
-    const remover=e.target.closest('[data-remove-purchase]');if(remover){removePurchaseItem(remover.dataset.removePurchase,remover,lista.id);return}
-    const chegada=e.target.closest('[data-confirm-arrival]');if(chegada)confirmarChegada(linhas[Number(chegada.dataset.confirmArrival)],chegada,lista.id);
-  };
+  $('#content').onclick=e=>{const btn=e.target.closest('[data-remove-purchase]');if(btn)removePurchaseItem(btn.dataset.removePurchase,btn)};
   $('#content').oninput=e=>{if(e.target.matches('[data-purchase-qty],[data-purchase-current]'))atualizarTotais()};
   $('#content').onchange=e=>{
-    const input=e.target,tipo=input.dataset.purchaseQty!==undefined?'quantidade':input.dataset.purchaseCurrent!==undefined?'valor_compra_atual':null;
-    if(!tipo||!aberta)return;
-    const i=Number(tipo==='quantidade'?input.dataset.purchaseQty:input.dataset.purchaseCurrent),item=linhas[i],raw=input.value;
+    const input=e.target;
+    const tipo=input.dataset.purchaseQty!==undefined?'quantidade':input.dataset.purchaseCurrent!==undefined?'valor_compra_atual':null;
+    if(!tipo)return;
+    const i=Number(tipo==='quantidade'?input.dataset.purchaseQty:input.dataset.purchaseCurrent);
+    const item=linhas[i],raw=input.value;
     const valor=raw===''&&tipo==='valor_compra_atual'?null:Number(raw);
-    if((tipo==='quantidade'&&(!Number.isFinite(valor)||valor<=0||valor<Number(item.quantidade_recebida||0)))||(valor!==null&&(!Number.isFinite(valor)||valor<0))){
-      $('#purchaseMsg').textContent=tipo==='quantidade'?'A quantidade pedida deve ser maior ou igual à já recebida.':'Informe um valor de compra válido.';
+    if((tipo==='quantidade'&&(!Number.isFinite(valor)||valor<=0))||(valor!==null&&(!Number.isFinite(valor)||valor<0))){
+      $('#purchaseMsg').textContent=tipo==='quantidade'?'Informe uma quantidade maior que zero.':'Informe um valor de compra válido.';
       input.value=item[tipo]??'';atualizarTotais();return;
     }
     input.disabled=true;
     const salvar=(async()=>{
-      const {error}=await db.from('compras_itens').update({[tipo]:valor}).eq('id',item.id).eq('lista_id',lista.id);
+      const {error}=await db.from('lista_compras').update({[tipo]:valor}).eq('produto_id',item.produto_id);
       input.disabled=false;
       if(error){$('#purchaseMsg').textContent='Erro ao salvar: '+error.message;input.value=item[tipo]??''}
-      else{item[tipo]=valor;if(tipo==='quantidade'){renderShoppingList(lista.id);return}$('#purchaseMsg').textContent='Lista de compra atualizada.'}
+      else {item[tipo]=valor;$('#purchaseMsg').textContent='Lista de compra atualizada.'}
       atualizarTotais();
     })();
     pendentes.add(salvar);salvar.finally(()=>pendentes.delete(salvar));
   };
-  $('#purchasePdf').onclick=async()=>{await Promise.all([...pendentes]);gerarPdfCompras(linhas,lista)};
+  $('#purchasePdf').onclick=async()=>{await Promise.all([...pendentes]);gerarPdfCompras(linhas)};
   atualizarTotais();
 }
-async function criarNovaListaCompra(){
-  const botao=$('#purchaseNewList');if(botao)botao.disabled=true;
-  const {data,error}=await db.from('compras_listas').insert({}).select('id').single();
-  if(error){if(botao)botao.disabled=false;$('#purchaseMsg').textContent='Erro ao criar lista: '+error.message;return}
-  activePurchaseListId=data.id;renderShoppingList(data.id);
-}
-async function confirmarChegada(item,botao,listaId){
-  const campo=$(`[data-receive-qty="${botao.dataset.confirmArrival}"]`),quantidade=Number(campo.value);
-  const restante=Number(item.quantidade)-Number(item.quantidade_recebida||0);
-  if(!Number.isFinite(quantidade)||quantidade<=0||quantidade>restante){$('#purchaseMsg').textContent=`Informe uma quantidade maior que zero e até ${restante}.`;return}
-  botao.disabled=true;campo.disabled=true;
-  const {error}=await db.rpc('confirmar_recebimento_compra',{p_item_id:item.id,p_quantidade:quantidade});
-  if(error){botao.disabled=false;campo.disabled=false;$('#purchaseMsg').textContent='Erro ao confirmar chegada: '+error.message;return}
-  renderShoppingList(listaId);
-}
-function gerarPdfCompras(linhas,lista){
+function gerarPdfCompras(linhas){
   if(!window.jspdf?.jsPDF){$('#purchaseMsg').textContent='Não foi possível carregar o gerador de PDF. Atualize a página e tente novamente.';return}
   const pdf=new window.jspdf.jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
   const xs=[12,62,90,132,149,183,217,253],larguras=[48,26,40,15,32,32,34,32];
-  const cabecalhos=['Produto','Marca','Fornecedor','Ped./rec.','Último un.','Novo un.','Total último','Total atual'];
+  const cabecalhos=['Produto','Marca','Fornecedor','Qtd.','Último un.','Novo un.','Total último','Total atual'];
   let y=0;
   function cabecalho(){
     pdf.setFillColor(22,31,42);pdf.rect(0,0,297,30,'F');pdf.setTextColor(255,255,255);pdf.setFontSize(16);pdf.text('CZ Efeitos Especiais | Lista de compra',12,15);
     pdf.setFontSize(9);pdf.text(new Date().toLocaleString('pt-BR'),285,15,{align:'right'});
-    pdf.setFontSize(8);pdf.text(`Status: ${lista.status==='concluida'?'Concluída':'Aberta'} | Pedido: ${new Date(lista.criado_em).toLocaleDateString('pt-BR')} | Prazo: ${lista.prazo_entrega?new Date(lista.prazo_entrega+'T00:00:00').toLocaleDateString('pt-BR'):'não informado'}`,12,24);
     pdf.setTextColor(30,35,40);pdf.setFontSize(8);pdf.setFont('helvetica','bold');
     cabecalhos.forEach((h,i)=>pdf.text(h,xs[i],36));pdf.setDrawColor(180);pdf.line(12,39,285,39);pdf.setFont('helvetica','normal');y=42;
   }
@@ -865,7 +777,7 @@ function gerarPdfCompras(linhas,lista){
     const novo=item.valor_compra_atual===null||item.valor_compra_atual===undefined?null:Number(item.valor_compra_atual);
     totalAnterior+=quantidade*anterior;if(novo===null)faltando++;else totalAtual+=quantidade*novo;
     const p=item.produto||{};
-    const valores=[p.nome||'Produto removido',p.marca||'—',p.fornecedor||'—',`${quantidade}/${Number(item.quantidade_recebida||0)}`,money(anterior),novo===null?'Pendente':money(novo),money(quantidade*anterior),novo===null?'Pendente':money(quantidade*novo)];
+    const valores=[p.nome||'Produto removido',p.marca||'—',p.fornecedor||'—',String(quantidade),money(anterior),novo===null?'Pendente':money(novo),money(quantidade*anterior),novo===null?'Pendente':money(quantidade*novo)];
     pdf.setFontSize(8);
     valores.forEach((v,i)=>{const texto=pdf.splitTextToSize(String(v),larguras[i]).slice(0,2);pdf.text(texto,xs[i],y+4)});
     pdf.setDrawColor(225);pdf.line(12,y+11,285,y+11);y+=13;
@@ -876,38 +788,17 @@ function gerarPdfCompras(linhas,lista){
   pdf.text('Total da compra atual: '+money(totalAtual)+(faltando?` (${faltando} preço(s) pendente(s))`:''),12,y+16);
   pdf.save('lista-de-compra-cz-'+new Date().toISOString().slice(0,10)+'.pdf');
 }
-async function removePurchaseItem(id,btn,listaId){
+async function removePurchaseItem(id,btn){
   btn.disabled=true;
-  const {error}=await db.from('compras_itens').delete().eq('id',id).eq('lista_id',listaId).eq('quantidade_recebida',0);
+  const {error}=await db.from('lista_compras').delete().eq('produto_id',id);
   if(error){btn.disabled=false;$('#purchaseMsg').textContent='Erro ao remover: '+error.message;return}
-  renderShoppingList(listaId);
+  purchaseIds.delete(id);renderShoppingList();
 }
-function openProduct(p=null,source='stock'){productSaveSource=source;$('#productModal').classList.remove('hidden');$('#productModalTitle').textContent=p?'Editar produto':source==='shopping'?'Novo produto para Lista de compra':'Novo produto';$('#saveProductBtn').textContent=source==='shopping'?'Salvar produto e adicionar':'Salvar produto';$('#productId').value=p?.id||'';$('#productName').value=p?.nome||'';$('#productBarcode').value=p?.codigo_barras||'';$('#productBrand').value=p?.marca||'';$('#productUnit').value=p?.unidade||'un';$('#productStock').value=p?.estoque_atual??0;$('#productMin').value=p?.estoque_minimo??0;$('#productCost').value=p?.valor_custo??0;$('#productRetail').value=p?.valor_varejo??0;$('#productWholesale').value=p?.valor_atacado??0;atualizarLucroPeloValor('varejo');atualizarLucroPeloValor('atacado');$('#productTime').value=p?.tempo||'';$('#productEffect').value=p?.efeito||'';$('#productSupplier').value=p?.fornecedor||'';$('#productColor').value=p?.cor||'';$('#productNoise').value=p?.ruido||'';$('#productVideoUrl').value=p?.video_url||'';$('#productPhoto').value='';const im=$('#productPreview');if(p?.foto_url){im.src=p.foto_url;im.classList.remove('hidden')}else im.classList.add('hidden');$('#productMsg').textContent=''}
-function closeProduct(){$('#productModal').classList.add('hidden');productSaveSource='stock'}
+function openProduct(p=null){$('#productModal').classList.remove('hidden');$('#productModalTitle').textContent=p?'Editar produto':'Novo produto';$('#productId').value=p?.id||'';$('#productName').value=p?.nome||'';$('#productBarcode').value=p?.codigo_barras||'';$('#productBrand').value=p?.marca||'';$('#productUnit').value=p?.unidade||'un';$('#productStock').value=p?.estoque_atual??0;$('#productMin').value=p?.estoque_minimo??0;$('#productCost').value=p?.valor_custo??0;$('#productRetail').value=p?.valor_varejo??0;$('#productWholesale').value=p?.valor_atacado??0;atualizarLucroPeloValor('varejo');atualizarLucroPeloValor('atacado');$('#productTime').value=p?.tempo||'';$('#productEffect').value=p?.efeito||'';$('#productSupplier').value=p?.fornecedor||'';$('#productColor').value=p?.cor||'';$('#productNoise').value=p?.ruido||'';$('#productVideoUrl').value=p?.video_url||'';$('#productPhoto').value='';const im=$('#productPreview');if(p?.foto_url){im.src=p.foto_url;im.classList.remove('hidden')}else im.classList.add('hidden');$('#productMsg').textContent=''}
+function closeProduct(){$('#productModal').classList.add('hidden')}
 function editProduct(id){openProduct(products.find(p=>p.id===id))}
 $('#productPhoto').onchange=e=>{const f=e.target.files[0];if(f){$('#productPreview').src=URL.createObjectURL(f);$('#productPreview').classList.remove('hidden')}};
-$('#saveProductBtn').onclick=async()=>{
-  const botao=$('#saveProductBtn'),id=$('#productId').value,origem=productSaveSource;
-  botao.disabled=true;$('#productMsg').textContent='Salvando...';
-  try{
-    let foto_url=id?products.find(p=>String(p.id)===id)?.foto_url:null;
-    const arquivo=$('#productPhoto').files[0];if(arquivo)foto_url=await uploadPhoto(arquivo,'produtos');
-    const payload={nome:$('#productName').value.trim(),codigo_barras:$('#productBarcode').value.trim()||null,marca:$('#productBrand').value.trim()||null,unidade:$('#productUnit').value.trim()||'unidade',estoque_atual:+$('#productStock').value||0,estoque_minimo:+$('#productMin').value||0,valor_custo:+$('#productCost').value||0,valor_varejo:+$('#productRetail').value||0,valor_atacado:+$('#productWholesale').value||0,tempo:$('#productTime').value.trim()||null,fornecedor:$('#productSupplier').value.trim()||null,efeito:$('#productEffect').value.trim()||null,cor:$('#productColor').value.trim()||null,ruido:$('#productNoise').value||null,foto_url,video_url:$('#productVideoUrl').value.trim()||null,atualizado_em:new Date().toISOString()};
-    if(!payload.nome)throw new Error('Informe o nome do produto.');
-    if(payload.video_url&&!safeHttpUrl(payload.video_url))throw new Error('Informe um link de vídeo válido começando com https:// ou http://.');
-    const {data,error}=await(id?db.from('produtos').update(payload).eq('id',id):db.from('produtos').insert(payload).select('id').single());
-    if(error)throw error;
-    const produtoId=id||String(data.id);
-    if(!id){$('#productId').value=produtoId;products.push({...payload,id:produtoId})}
-    if(origem==='shopping'){
-      const listaId=await ensureOpenPurchaseList();
-      const {error:listaError}=await db.from('compras_itens').insert({lista_id:listaId,produto_id:produtoId});
-      if(listaError&&listaError.code!=='23505')throw new Error('Produto salvo no Estoque, mas não adicionado à Lista de compra: '+listaError.message+'. Clique em Salvar produto para tentar novamente.');
-      purchaseIds.add(produtoId);closeProduct();renderShoppingList(listaId);
-    }else{closeProduct();renderProducts()}
-  }catch(e){$('#productMsg').textContent='Erro: '+e.message}
-  finally{botao.disabled=false}
-};
+$('#saveProductBtn').onclick=async()=>{const id=$('#productId').value;$('#productMsg').textContent='Salvando...';try{let foto_url=id?products.find(p=>p.id===id)?.foto_url:null;const f=$('#productPhoto').files[0];if(f)foto_url=await uploadPhoto(f,'produtos');const payload={nome:$('#productName').value.trim(),codigo_barras:$('#productBarcode').value.trim()||null,marca:$('#productBrand').value.trim()||null,unidade:$('#productUnit').value.trim()||'unidade',estoque_atual:+$('#productStock').value||0,estoque_minimo:+$('#productMin').value||0,valor_custo:+$('#productCost').value||0,valor_varejo:+$('#productRetail').value||0,valor_atacado:+$('#productWholesale').value||0,tempo:$('#productTime').value.trim()||null,fornecedor:$('#productSupplier').value.trim()||null,efeito:$('#productEffect').value.trim()||null,cor:$('#productColor').value.trim()||null,ruido:$('#productNoise').value||null,foto_url,video_url:$('#productVideoUrl').value.trim()||null,atualizado_em:new Date().toISOString()};if(!payload.nome)throw new Error('Informe o nome do produto.');if(payload.video_url&&!safeHttpUrl(payload.video_url))throw new Error('Informe um link de vídeo válido começando com https:// ou http://.');const {error}=await(id?db.from('produtos').update(payload).eq('id',id):db.from('produtos').insert(payload));if(error)throw error;closeProduct();renderProducts()}catch(e){$('#productMsg').textContent='Erro: '+e.message}};
 async function renderAssets(){const {data,error}=await db.from('ativos').select('*').order('nome');if(error){$('#content').innerHTML=`<div class="msg">Erro ao carregar ativos: ${error.message}</div>`;return}assets=data||[];$('#content').innerHTML=`<div class="sectionhead"><div><h2>Ativos / Equipamentos</h2><div class="muted">${assets.length} ativo(s)</div></div><button class="btn primary" onclick="openAsset()">+ Novo ativo</button></div><div class="tablewrap">${assets.length?`<table><thead><tr><th>Foto</th><th>Equipamento</th><th>Código</th><th>Cód. barras</th><th>Compra</th><th>Valor compra</th><th>Status</th><th>Ações</th></tr></thead><tbody>${assets.map(a=>`<tr><td>${a.foto_url?`<img class="thumb" src="${esc(a.foto_url)}">`:'—'}</td><td>${esc(a.nome)}</td><td>${esc(a.codigo_interno||'')}</td><td>${esc(a.codigo_barras||'')}</td><td>${a.data_compra?new Date(a.data_compra+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${money(a.valor_compra)}</td><td>${esc(a.status||'')}</td><td><button class="btn secondary" onclick="editAsset('${a.id}')">Editar</button></td></tr>`).join('')}</tbody></table>`:`<div class="empty">Nenhum ativo cadastrado.</div>`}</div>`}
 function openAsset(a=null){$('#assetModal').classList.remove('hidden');$('#assetModalTitle').textContent=a?'Editar ativo':'Novo ativo';$('#assetId').value=a?.id||'';$('#assetName').value=a?.nome||'';$('#assetCode').value=a?.codigo_interno||'';$('#assetBarcode').value=a?.codigo_barras||'';$('#assetSupplier').value=a?.fornecedor||'';$('#assetPurchaseDate').value=a?.data_compra||'';$('#assetPurchaseValue').value=a?.valor_compra??0;$('#assetRent1').value=a?.valor_locacao_tabela1??0;$('#assetRent2').value=a?.valor_locacao_tabela2??0;$('#assetWeight').value=a?.peso??'';$('#assetCase').value=String(a?.possui_case??false);$('#assetNotes').value=a?.observacoes||'';$('#assetPhoto').value='';const im=$('#assetPreview');if(a?.foto_url){im.src=a.foto_url;im.classList.remove('hidden')}else im.classList.add('hidden');$('#assetMsg').textContent=''}
 function closeAsset(){$('#assetModal').classList.add('hidden')}
@@ -916,93 +807,50 @@ $('#assetPhoto').onchange=e=>{const f=e.target.files[0];if(f){$('#assetPreview')
 $('#saveAssetBtn').onclick=async()=>{const id=$('#assetId').value;$('#assetMsg').textContent='Salvando...';try{let foto_url=id?assets.find(a=>a.id===id)?.foto_url:null;const f=$('#assetPhoto').files[0];if(f)foto_url=await uploadPhoto(f,'ativos');const payload={nome:$('#assetName').value.trim(),codigo_interno:$('#assetCode').value.trim()||null,codigo_barras:$('#assetBarcode').value.trim()||null,fornecedor:$('#assetSupplier').value.trim()||null,data_compra:$('#assetPurchaseDate').value||null,valor_compra:+$('#assetPurchaseValue').value||0,valor_locacao_tabela1:+$('#assetRent1').value||0,valor_locacao_tabela2:+$('#assetRent2').value||0,peso:$('#assetWeight').value?+$('#assetWeight').value:null,possui_case:$('#assetCase').value==='true',observacoes:$('#assetNotes').value.trim()||null,foto_url,atualizado_em:new Date().toISOString()};if(!payload.nome)throw new Error('Informe o nome do equipamento.');const {error}=await(id?db.from('ativos').update(payload).eq('id',id):db.from('ativos').insert(payload));if(error)throw error;closeAsset();renderAssets()}catch(e){$('#assetMsg').textContent='Erro: '+e.message}};
 
 
-// ===== ATENDIMENTOS / WHATSAPP / LINHA DO TEMPO =====
-async function renderAtendimentos(){
-  const [atRes,clRes]=await Promise.all([
-    db.from('atendimentos').select('*').order('ultima_interacao_em',{ascending:false}),
-    db.from('clientes').select('id,nome,telefone,origem')
-  ]);
-  if(atRes.error){
-    $('#content').innerHTML=`<div class="sectionhead"><h2>Atendimentos / WhatsApp</h2></div><div class="msg">A estrutura de Atendimentos ainda precisa ser criada no Supabase: ${esc(atRes.error.message)}</div>`;
-    return;
-  }
-  const mapaClientes=new Map((clRes.data||[]).map(c=>[String(c.id),c]));
-  const lista=atRes.data||[];
-  const statusLabel={aguardando:'Aguardando atendimento',em_atendimento:'Em atendimento',orcamento_enviado:'Orçamento enviado',proposta_aceita:'Proposta aceita',finalizado:'Finalizado'};
+// ===== MÓDULO EVENTOS / OPERAÇÃO =====
+async function renderEventos(){
+  const {data,error}=await db.from('eventos_operacionais').select('*').order('data_evento',{ascending:true});
+  if(error){$('#content').innerHTML=`<div class="sectionhead"><h2>Eventos</h2></div><div class="msg">Para ativar Eventos, execute primeiro o SQL desta versão no Supabase.<br>${esc(error.message)}</div>`;return}
+  const eventos=data||[];
   $('#content').innerHTML=`
-    <div class="sectionhead">
-      <div><h2>Atendimentos / WhatsApp</h2><div class="muted">${lista.length} atendimento(s)</div></div>
-      <button id="novoAtendimentoManual" class="btn primary" type="button">+ Novo atendimento</button>
+    <div class="sectionhead"><div><h2>📅 Eventos</h2><div class="muted">Agenda operacional — sem valores financeiros</div></div><button class="btn primary" id="novoEventoBtn">+ Novo evento</button></div>
+    <div class="cards" style="margin-bottom:16px">
+      <div class="card"><div class="muted">Próximos eventos</div><div class="n">${eventos.filter(e=>e.status!=='finalizado').length}</div></div>
+      <div class="card"><div class="muted">Em separação</div><div class="n">${eventos.filter(e=>['aguardando_separacao','separando'].includes(e.status)).length}</div></div>
+      <div class="card"><div class="muted">Material pronto</div><div class="n">${eventos.filter(e=>e.status==='material_pronto').length}</div></div>
+      <div class="card"><div class="muted">Aguardando retorno</div><div class="n">${eventos.filter(e=>e.status==='aguardando_retorno').length}</div></div>
     </div>
-    <div class="card" style="margin-bottom:16px">
-      <b>Fluxo CZ</b>
-      <div class="muted" style="margin-top:6px">WhatsApp → pré-cadastro → linha do tempo → orçamento → aceite → contrato</div>
-    </div>
-    <div id="atendimentoMsg" class="msg"></div>
-    <div class="tablewrap">${lista.length?`<table><thead><tr><th>Cliente</th><th>Telefone</th><th>Status</th><th>Última interação</th><th>Ações</th></tr></thead><tbody>${lista.map(a=>{const c=mapaClientes.get(String(a.cliente_id))||{};return `<tr><td>${esc(c.nome||a.nome_whatsapp||'Contato WhatsApp')}</td><td>${esc(c.telefone||a.telefone||'')}</td><td>${esc(statusLabel[a.status]||a.status||'Aguardando atendimento')}</td><td>${a.ultima_interacao_em?new Date(a.ultima_interacao_em).toLocaleString('pt-BR'):'—'}</td><td><button class="btn secondary" data-open-atendimento="${esc(a.id)}">Abrir</button></td></tr>`}).join('')}</tbody></table>`:'<div class="empty">Nenhum atendimento recebido ainda.</div>'}</div>`;
-  $('#content').onclick=e=>{const b=e.target.closest('[data-open-atendimento]');if(b)abrirAtendimento(b.dataset.openAtendimento)};
-  $('#novoAtendimentoManual').onclick=()=>novoAtendimentoManual();
+    <div class="tablewrap">${eventos.length?`<table><thead><tr><th>Data</th><th>Cliente</th><th>Evento</th><th>Local</th><th>Status</th><th>Operação</th></tr></thead><tbody>${eventos.map(e=>`<tr><td>${e.data_evento?new Date(e.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${esc(e.cliente_nome||'')}</td><td>${esc(e.nome_evento||'')}</td><td>${esc(e.local_evento||'')}</td><td>${statusEventoLabel(e.status)}</td><td><button class="btn primary" onclick="abrirEvento('${e.id}')">Abrir evento</button></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhum evento liberado ainda.</div>'}</div>`;
+  $('#novoEventoBtn').onclick=()=>novoEventoManual();
 }
-
-async function novoAtendimentoManual(){
-  const nome=prompt('Nome do contato:'); if(!nome)return;
-  const telefone=prompt('Telefone/WhatsApp com DDD:'); if(!telefone)return;
-  const tel=telefone.replace(/\D/g,'');
-  const {data:existente}=await db.from('clientes').select('*').eq('telefone',tel).maybeSingle();
-  let cliente=existente;
-  if(!cliente){
-    const {data,error}=await db.from('clientes').insert({nome:nome.trim(),telefone:tel,origem:'whatsapp',atualizado_em:new Date().toISOString()}).select().single();
-    if(error){alert('Erro ao criar cliente: '+error.message);return} cliente=data;
-  }
-  const agora=new Date().toISOString();
-  const {data:at,error}=await db.from('atendimentos').insert({cliente_id:cliente.id,nome_whatsapp:nome.trim(),telefone:tel,status:'aguardando',canal:'whatsapp',ultima_interacao_em:agora}).select().single();
-  if(error){alert('Erro ao criar atendimento: '+error.message);return}
-  await db.from('linha_tempo_cliente').insert([
-    {cliente_id:cliente.id,atendimento_id:at.id,tipo:'primeiro_contato',titulo:'Primeiro contato pelo WhatsApp',descricao:'Contato recebido e pré-cadastro criado.'},
-    {cliente_id:cliente.id,atendimento_id:at.id,tipo:'mensagem_automatica',titulo:'Mensagem automática enviada',descricao:'CZ Efeitos Especiais agradece o contato. Em breve um de nossos atendentes dará continuidade ao atendimento.'}
-  ]);
-  renderAtendimentos();
+function statusEventoLabel(s){return ({aguardando_separacao:'⏳ Aguardando separação',separando:'📦 Separando',material_pronto:'✅ Material pronto',liberado:'🚚 Liberado',em_execucao:'🎆 Em execução',aguardando_retorno:'↩️ Aguardando retorno',finalizado:'🏁 Finalizado'})[s]||esc(s||'Aguardando separação')}
+async function novoEventoManual(){
+  const {data:cs}=await db.from('clientes').select('id,nome,telefone').order('nome');
+  $('#content').innerHTML=`<div class="sectionhead"><div><h2>Novo evento</h2><div class="muted">Cadastro operacional. Os valores não aparecem neste módulo.</div></div><button class="btn secondary" onclick="renderEventos()">Voltar</button></div>
+  <div class="card"><div class="row"><div class="field"><label>Cliente *</label><select id="evCliente"><option value="">Selecione</option>${(cs||[]).map(c=>`<option value="${esc(c.id)}" data-nome="${esc(c.nome)}" data-tel="${esc(c.telefone||'')}">${esc(c.nome)}</option>`).join('')}</select></div><div class="field"><label>Evento *</label><input id="evNome"></div></div><div class="row"><div class="field"><label>Data *</label><input id="evData" type="date"></div><div class="field"><label>Local</label><input id="evLocal"></div></div><div class="row"><div class="field"><label>Horário</label><input id="evHora" type="time"></div><div class="field"><label>Horário de montagem</label><input id="evMontagem" type="time"></div></div><div class="field"><label>Técnico responsável</label><input id="evTecnico"></div><div class="actions"><button class="btn primary" id="salvarEvento">Criar evento</button></div><div id="evMsg" class="msg"></div></div>`;
+  $('#salvarEvento').onclick=async()=>{const sel=$('#evCliente'),opt=sel.options[sel.selectedIndex];if(!sel.value||!$('#evNome').value.trim()||!$('#evData').value){$('#evMsg').textContent='Informe cliente, evento e data.';return}const payload={cliente_id:sel.value,cliente_nome:opt.dataset.nome,cliente_telefone:opt.dataset.tel||null,nome_evento:$('#evNome').value.trim(),data_evento:$('#evData').value,local_evento:$('#evLocal').value.trim()||null,horario_evento:$('#evHora').value||null,horario_montagem:$('#evMontagem').value||null,tecnico_responsavel:$('#evTecnico').value.trim()||null,status:'aguardando_separacao'};const {data,error}=await db.from('eventos_operacionais').insert(payload).select().single();if(error){$('#evMsg').textContent='Erro: '+error.message;return}abrirEvento(data.id)};
 }
-
-async function abrirAtendimento(id){
-  const {data:a,error}=await db.from('atendimentos').select('*').eq('id',id).single();
-  if(error){alert(error.message);return}
-  const [{data:c},{data:timeline}]=await Promise.all([
-    db.from('clientes').select('*').eq('id',a.cliente_id).single(),
-    db.from('linha_tempo_cliente').select('*').eq('atendimento_id',id).order('criado_em',{ascending:false})
-  ]);
-  const statusLabel={aguardando:'Aguardando atendimento',em_atendimento:'Em atendimento',orcamento_enviado:'Orçamento enviado',proposta_aceita:'Proposta aceita',finalizado:'Finalizado'};
-  $('#content').innerHTML=`
-    <div class="sectionhead"><div><h2>${esc(c?.nome||a.nome_whatsapp||'Atendimento')}</h2><div class="muted">WhatsApp: ${esc(c?.telefone||a.telefone||'')}</div></div><button class="btn secondary" onclick="renderAtendimentos()">← Voltar</button></div>
-    <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));margin-bottom:16px">
-      <div class="card"><div class="muted">Status</div><div style="font-size:18px;font-weight:800;margin-top:6px">${esc(statusLabel[a.status]||a.status)}</div></div>
-      <div class="card"><div class="muted">Origem</div><div style="font-size:18px;font-weight:800;margin-top:6px">WhatsApp</div></div>
-    </div>
-    <div class="card" style="margin-bottom:16px">
-      <h3 style="margin-top:0">Ações</h3>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn primary" onclick="mudarStatusAtendimento('${esc(id)}','em_atendimento','Atendimento iniciado')">Iniciar atendimento</button>
-        <button class="btn secondary" onclick="criarOrcamentoDoAtendimento('${esc(c?.id||'')}')">Criar orçamento</button>
-        <button class="btn secondary" onclick="mudarStatusAtendimento('${esc(id)}','orcamento_enviado','Orçamento enviado ao cliente')">Marcar orçamento enviado</button>
-        <button class="btn secondary" onclick="mudarStatusAtendimento('${esc(id)}','proposta_aceita','Proposta aceita pelo cliente')">Marcar proposta aceita</button>
-      </div>
-    </div>
-    <div class="card"><h3 style="margin-top:0">Linha do tempo</h3>${(timeline||[]).length?(timeline||[]).map(t=>`<div style="padding:12px 0;border-bottom:1px solid var(--line)"><b>${esc(t.titulo||t.tipo)}</b><div class="muted" style="font-size:12px;margin-top:3px">${new Date(t.criado_em).toLocaleString('pt-BR')}</div>${t.descricao?`<div style="margin-top:5px">${esc(t.descricao)}</div>`:''}</div>`).join(''):'<div class="muted">Nenhum registro.</div>'}</div>`;
+async function abrirEvento(id){
+ const [evr,matr]=await Promise.all([db.from('eventos_operacionais').select('*').eq('id',id).single(),db.from('evento_materiais').select('*').eq('evento_id',id).order('criado_em')]);
+ if(evr.error){alert(evr.error.message);return} const e=evr.data,mats=matr.data||[];
+ const total=mats.reduce((s,m)=>s+Number(m.quantidade_necessaria||0),0),bip=mats.reduce((s,m)=>s+Number(m.quantidade_bipada||0),0),completo=total>0&&bip>=total;
+ $('#content').innerHTML=`<div class="sectionhead"><div><h2>🎪 ${esc(e.nome_evento)}</h2><div class="muted">${esc(e.cliente_nome)} • ${e.data_evento?new Date(e.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):''} • ${esc(e.local_evento||'')}</div></div><button class="btn secondary" onclick="renderEventos()">Voltar à agenda</button></div>
+ <div class="card" style="margin-bottom:16px"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px"><div><span class="muted">Status</span><div><b>${statusEventoLabel(e.status)}</b></div></div><div><span class="muted">Técnico</span><div>${esc(e.tecnico_responsavel||'—')}</div></div><div><span class="muted">Horário</span><div>${esc(e.horario_evento||'—')}</div></div><div><span class="muted">Montagem</span><div>${esc(e.horario_montagem||'—')}</div></div></div></div>
+ <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">📦 Separação e bipagem</h3><div class="muted" style="margin-bottom:10px">Bipe ou digite o código de barras. Esta tela não mostra valores.</div><div style="display:flex;gap:8px;flex-wrap:wrap"><input id="scanEvento" placeholder="Bipe o código de barras" autocomplete="off" style="flex:1;min-width:220px;background:#0b1118;color:#fff;border:1px solid var(--line);border-radius:9px;padding:12px"><button class="btn primary" id="btnBipar">BIPAR</button><button class="btn secondary" id="btnAddMat">+ Material</button></div><div id="scanMsg" class="msg"></div></div>
+ <div class="tablewrap">${mats.length?`<table><thead><tr><th>Tipo</th><th>Produto / Equipamento</th><th>Código</th><th>Qtd.</th><th>Bipado</th><th>Situação</th><th>Ação</th></tr></thead><tbody>${mats.map(m=>`<tr><td>${m.tipo==='ativo'?'Equipamento':'Produto'}</td><td>${esc(m.nome_item)}</td><td>${esc(m.codigo||'—')}</td><td>${m.quantidade_necessaria}</td><td><b>${m.quantidade_bipada}/${m.quantidade_necessaria}</b></td><td>${Number(m.quantidade_bipada)>=Number(m.quantidade_necessaria)?'✅ Conferido':'⏳ Separando'}</td><td><button class="btn danger" onclick="removerMaterialEvento('${m.id}','${id}')">Remover</button></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhum material adicionado ao evento.</div>'}</div>
+ <div class="card" style="margin-top:16px"><div><b>Progresso:</b> ${bip}/${total} unidade(s) conferida(s)</div><div class="actions"><button class="btn secondary" onclick="mudarStatusEvento('${id}','separando')">Iniciar separação</button><button class="btn primary" ${completo?'':'disabled'} onclick="mudarStatusEvento('${id}','material_pronto')">MATERIAL CONFERIDO</button><button class="btn primary" ${e.status==='material_pronto'?'':'disabled'} onclick="mudarStatusEvento('${id}','liberado')">CHECK-OUT / LIBERAR SAÍDA</button><button class="btn secondary" ${['liberado','em_execucao'].includes(e.status)?'':'disabled'} onclick="mudarStatusEvento('${id}','aguardando_retorno')">AGUARDAR RETORNO</button><button class="btn secondary" ${e.status==='aguardando_retorno'?'':'disabled'} onclick="mudarStatusEvento('${id}','finalizado')">FINALIZAR</button></div></div>`;
+ $('#btnBipar').onclick=()=>biparEvento(id);$('#scanEvento').addEventListener('keydown',x=>{if(x.key==='Enter')biparEvento(id)});$('#btnAddMat').onclick=()=>adicionarMaterialEvento(id);
 }
-
-async function mudarStatusAtendimento(id,status,titulo){
-  const agora=new Date().toISOString();
-  const {data:a,error}=await db.from('atendimentos').update({status,ultima_interacao_em:agora}).eq('id',id).select().single();
-  if(error){alert('Erro: '+error.message);return}
-  await db.from('linha_tempo_cliente').insert({cliente_id:a.cliente_id,atendimento_id:id,tipo:status,titulo,descricao:null});
-  abrirAtendimento(id);
+async function adicionarMaterialEvento(eventoId){
+ const [pr,ar]=await Promise.all([db.from('produtos').select('id,nome,codigo_barras').order('nome'),db.from('ativos').select('id,nome,codigo_barras,codigo_interno,status').order('nome')]);
+ const op=[...(pr.data||[]).map(x=>({tipo:'produto',...x,codigo:x.codigo_barras||''})),...(ar.data||[]).map(x=>({tipo:'ativo',...x,codigo:x.codigo_barras||x.codigo_interno||''}))];
+ const escolha=prompt('Digite parte do nome ou código do material:');if(!escolha)return;const q=textoFiltro(escolha);const achados=op.filter(x=>textoFiltro(x.nome).includes(q)||textoFiltro(x.codigo).includes(q));if(!achados.length){alert('Material não encontrado.');return}let item=achados[0];if(achados.length>1){const lista=achados.slice(0,10).map((x,i)=>`${i+1} - ${x.nome} (${x.codigo||'sem código'})`).join('\n');const n=Number(prompt('Escolha o número:\n'+lista));if(!n||!achados[n-1])return;item=achados[n-1]}
+ const qtd=Number(prompt('Quantidade necessária:',1));if(!Number.isFinite(qtd)||qtd<=0)return;
+ const {error}=await db.from('evento_materiais').insert({evento_id:eventoId,tipo:item.tipo,item_id:item.id,nome_item:item.nome,codigo:item.codigo||null,quantidade_necessaria:qtd,quantidade_bipada:0});if(error){alert('Erro: '+error.message);return}abrirEvento(eventoId);
 }
-
-async function criarOrcamentoDoAtendimento(clienteId){
-  const {data:c}=await db.from('clientes').select('*').eq('id',clienteId).single();
-  await renderOrcamentos();
-  if(c){$('#orcCliente').value=c.nome||'';$('#orcTelefone').value=c.telefone||''}
-}
+async function biparEvento(eventoId){const campo=$('#scanEvento'),codigo=campo.value.trim();if(!codigo){$('#scanMsg').textContent='Bipe ou digite um código.';return}const {data,error}=await db.from('evento_materiais').select('*').eq('evento_id',eventoId).eq('codigo',codigo);if(error){$('#scanMsg').textContent=error.message;return}const item=data?.[0];if(!item){$('#scanMsg').textContent='Código não pertence aos materiais deste evento.';return}if(Number(item.quantidade_bipada)>=Number(item.quantidade_necessaria)){ $('#scanMsg').textContent='Quantidade deste item já está completa.';return}const novo=Number(item.quantidade_bipada)+1;const {error:up}=await db.from('evento_materiais').update({quantidade_bipada:novo}).eq('id',item.id);if(up){$('#scanMsg').textContent=up.message;return}campo.value='';abrirEvento(eventoId)}
+async function removerMaterialEvento(id,eventoId){if(!confirm('Remover este material do evento?'))return;const {error}=await db.from('evento_materiais').delete().eq('id',id);if(error){alert(error.message);return}abrirEvento(eventoId)}
+async function mudarStatusEvento(id,status){const {error}=await db.from('eventos_operacionais').update({status,atualizado_em:new Date().toISOString()}).eq('id',id);if(error){alert(error.message);return}abrirEvento(id)}
 
 boot();
 </script></body></html>
