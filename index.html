@@ -671,20 +671,90 @@ atualizarEquipe();
     pdf.text('CZ Efeitos Especiais • Proposta gerada em '+new Date().toLocaleString('pt-BR'),15,y);
     pdf.save('proposta-'+numero.replace(/[^a-zA-Z0-9_-]/g,'-')+'-'+d.cliente.replace(/[^a-zA-Z0-9_-]/g,'-')+'.pdf');
   }
+  async function proximoNumeroProposta(){
+    const {data,error}=await db.from('orcamentos').select('numero').order('criado_em',{ascending:false}).limit(200);
+    if(error)throw error;
+    let maior=0;
+    (data||[]).forEach(x=>{const n=parseInt(String(x.numero||'').replace(/\D/g,''),10);if(Number.isFinite(n)&&n>maior)maior=n});
+    return String(maior+1).padStart(3,'0');
+  }
   async function salvarProposta(status='enviado'){
     const d=dadosProposta(),erro=validarProposta(d);if(erro)throw new Error(erro);
-    const numero='CZ-'+new Date().getFullYear()+'-'+String(Date.now()).slice(-6);
+    const numero=await proximoNumeroProposta();
     const payload={numero,status,cliente_nome:d.cliente,cliente_telefone:d.telefone||null,evento_nome:d.evento,data_evento:d.data_evento,local_evento:d.local_evento||null,valor_total:d.total,dados:d,criado_em:new Date().toISOString()};
     const {data,error}=await db.from('orcamentos').insert(payload).select('*').single();
     if(error)throw error;
     return {registro:data,d,numero};
   }
+  function iconeOlho(){return '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="2.5" fill="currentColor"/></svg>'}
+  function iconeWhats(){return '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M20 11.7a8 8 0 0 1-11.8 7L4 20l1.3-4.1A8 8 0 1 1 20 11.7Z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9 8.5c.4 2.6 2 4.2 4.6 4.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'}
+  function abrirWhatsPreenchimento(p){
+    let tel=String(p.cliente_telefone||p.dados?.telefone||'').replace(/\D/g,'');
+    if(tel.length===10||tel.length===11)tel='55'+tel;
+    if(!tel){alert('Esta proposta não possui telefone do cliente.');return}
+    const msg=`Olá ${p.cliente_nome||''}! Para darmos continuidade à proposta ${p.numero||''} da CZ Efeitos Especiais, preciso que você envie os dados para o preenchimento do cadastro do evento:
+
+• Nome completo / Razão social
+• CPF/CNPJ
+• RG (se pessoa física)
+• Endereço completo
+• Nome do evento
+• Local completo do evento
+• Data e horário
+• Responsável no local
+
+Obrigado!`;
+    window.open('https://wa.me/'+tel+'?text='+encodeURIComponent(msg),'_blank','noopener');
+  }
+  async function excluirProposta(id){
+    if(!confirm('Excluir esta proposta? Esta ação não poderá ser desfeita.'))return;
+    const {error}=await db.from('orcamentos').delete().eq('id',id);
+    if(error){alert('Não foi possível excluir a proposta: '+error.message);return}
+    await carregarPropostasSalvas();
+  }
+  async function propostaVirarEvento(p){
+    const {data:cs,error}=await db.from('clientes').select('id,nome,telefone,endereco').order('nome');
+    if(error){alert('Erro ao carregar clientes: '+error.message);return}
+    const d=p.dados||{};
+    const alvo=(cs||[]).find(c=>String(c.telefone||'').replace(/\D/g,'')===String(p.cliente_telefone||d.telefone||'').replace(/\D/g,''))||(cs||[]).find(c=>String(c.nome||'').toLowerCase()===String(p.cliente_nome||'').toLowerCase());
+    $('#content').innerHTML=`<div class="sectionhead"><div><h2>Novo evento — proposta ${esc(p.numero||'')}</h2><div class="muted">Preencha e confira o cadastro completo. Contrato não é obrigatório para criar o evento.</div></div><button class="btn secondary" id="voltarOrcamentoEvento">Voltar</button></div>
+    <div class="card">
+      <h3 style="margin-top:0">Cadastro do cliente</h3>
+      <div class="row"><div class="field"><label>Cliente cadastrado</label><select id="evCliente"><option value="">Novo cliente / selecionar</option>${(cs||[]).map(c=>`<option value="${esc(c.id)}">${esc(c.nome)}</option>`).join('')}</select></div><div class="field"><label>Nome completo / Razão social *</label><input id="evClienteNome" value="${esc(p.cliente_nome||d.cliente||'')}"></div></div>
+      <div class="row"><div class="field"><label>Telefone *</label><input id="evClienteTelefone" value="${esc(p.cliente_telefone||d.telefone||'')}"></div><div class="field"><label>Endereço completo *</label><input id="evClienteEndereco" value="${esc(alvo?.endereco||'')}"></div></div>
+      <h3>Dados do evento</h3>
+      <div class="row"><div class="field"><label>Evento *</label><input id="evNome" value="${esc(p.evento_nome||d.evento||'')}"></div><div class="field"><label>Data *</label><input id="evData" type="date" value="${esc(p.data_evento||d.data_evento||'')}"></div></div>
+      <div class="row"><div class="field"><label>Local completo do evento *</label><input id="evLocal" value="${esc(d.local_evento||'')}"></div><div class="field"><label>Horário *</label><input id="evHora" type="time" value="${esc(d.horario||'')}"></div></div>
+      <div class="row"><div class="field"><label>Horário de montagem</label><input id="evMontagem" type="time" value="${esc(d.horario_montagem||'')}"></div><div class="field"><label>Técnico responsável</label><input id="evTecnico" value="${esc(d.tecnico_responsavel||'')}"></div></div>
+      <div class="row"><div class="field"><label>Responsável no local</label><input id="evResponsavel" value="${esc(d.responsavel_evento||'')}"></div><div class="field"><label>Telefone do responsável</label><input id="evTelefoneResponsavel" value="${esc(d.telefone_responsavel||'')}"></div></div>
+      <div class="actions"><button class="btn primary" id="salvarEventoProposta">Criar evento</button></div><div id="evMsg" class="msg"></div>
+    </div>`;
+    if(alvo)$('#evCliente').value=alvo.id;
+    $('#evCliente').onchange=()=>{const c=(cs||[]).find(x=>String(x.id)===String($('#evCliente').value));if(!c)return;$('#evClienteNome').value=c.nome||'';$('#evClienteTelefone').value=c.telefone||'';$('#evClienteEndereco').value=c.endereco||''};
+    $('#voltarOrcamentoEvento').onclick=()=>renderOrcamentos();
+    $('#salvarEventoProposta').onclick=async()=>{
+      const nome=$('#evClienteNome').value.trim(),tel=$('#evClienteTelefone').value.trim(),endereco=$('#evClienteEndereco').value.trim(),evento=$('#evNome').value.trim(),dataEv=$('#evData').value,local=$('#evLocal').value.trim(),hora=$('#evHora').value;
+      if(!nome||!tel||!endereco||!evento||!dataEv||!local||!hora){$('#evMsg').textContent='Complete os campos obrigatórios: cliente, telefone, endereço, evento, data, local e horário.';return}
+      const btn=$('#salvarEventoProposta');btn.disabled=true;$('#evMsg').textContent='Salvando cadastro e criando evento...';
+      try{
+        let clienteId=$('#evCliente').value||null;
+        if(clienteId){const {error:ec}=await db.from('clientes').update({nome,telefone:tel,endereco,atualizado_em:new Date().toISOString()}).eq('id',clienteId);if(ec)throw ec}
+        else{const {data:nc,error:ec}=await db.from('clientes').insert({nome,telefone:tel,endereco,origem:'proposta',observacoes:'Cadastro completado pela proposta '+(p.numero||''),atualizado_em:new Date().toISOString()}).select('id').single();if(ec)throw ec;clienteId=nc.id}
+        const payload={cliente_id:clienteId,cliente_nome:nome,cliente_telefone:tel,nome_evento:evento,data_evento:dataEv,local_evento:local,horario_evento:hora,horario_montagem:$('#evMontagem').value||null,tecnico_responsavel:$('#evTecnico').value.trim()||null,status:'aguardando_separacao'};
+        const {data:ev,error:ee}=await db.from('eventos_operacionais').insert(payload).select().single();if(ee)throw ee;
+        $('#evMsg').textContent='Evento criado. Iniciando ciclo operacional...';abrirEvento(ev.id)
+      }catch(e){$('#evMsg').textContent='Erro: '+e.message;btn.disabled=false}
+    };
+  }
   async function carregarPropostasSalvas(){
     const box=$('#orcPropostasSalvas');if(!box)return;
-    const {data,error}=await db.from('orcamentos').select('id,numero,status,cliente_nome,evento_nome,data_evento,valor_total,criado_em,dados').order('criado_em',{ascending:false}).limit(30);
-    if(error){box.innerHTML='<div class="muted">Execute o SQL de Orçamentos para ativar o histórico de propostas.</div>';return}
-    box.innerHTML=data?.length?`<div class="tablewrap"><table><thead><tr><th>Cliente</th><th>Data</th><th>Evento</th><th>Valor</th><th>Status</th><th>Nº Proposta</th><th>Ação</th></tr></thead><tbody>${data.map(x=>`<tr><td>${esc(x.cliente_nome||'')}</td><td>${x.data_evento?new Date(x.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${esc(x.evento_nome||'')}</td><td>${money(x.valor_total)}</td><td>${esc(x.status||'')}</td><td>Proposta ${esc(x.numero||'')}</td><td><button type="button" class="btn secondary btnVisualizarProposta" data-id="${esc(x.id)}" style="font-size:11px;padding:6px 9px;min-height:auto">Visualizar</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="muted">Nenhuma proposta gerada ainda.</div>';
-    box.querySelectorAll('.btnVisualizarProposta').forEach(btn=>{btn.onclick=()=>{const proposta=data.find(x=>String(x.id)===String(btn.dataset.id));if(!proposta)return;if(!proposta.dados||typeof proposta.dados!=='object'){alert('Esta proposta não possui os dados completos salvos para visualização.');return}gerarPdfProposta(proposta.dados,proposta.numero||'sem-numero')}});
+    const {data,error}=await db.from('orcamentos').select('id,numero,status,cliente_nome,cliente_telefone,evento_nome,data_evento,valor_total,criado_em,dados').order('criado_em',{ascending:false}).limit(100);
+    if(error){box.innerHTML='<div class="muted">Erro ao carregar propostas: '+esc(error.message)+'</div>';return}
+    box.innerHTML=data?.length?`<div class="tablewrap"><table><thead><tr><th>Cliente</th><th>Data</th><th>Evento</th><th>Valor</th><th>Status</th><th>Nº Proposta</th><th>Ações</th></tr></thead><tbody>${data.map(x=>`<tr><td>${esc(x.cliente_nome||'')}</td><td>${x.data_evento?new Date(x.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${esc(x.evento_nome||'')}</td><td>${money(x.valor_total)}</td><td>${esc(x.status||'')}</td><td><b>${esc(x.numero||'')}</b></td><td><div style="display:flex;gap:5px;align-items:center;flex-wrap:nowrap"><button type="button" class="btn secondary btnVisualizarProposta" data-id="${esc(x.id)}" title="Visualizar proposta" aria-label="Visualizar proposta" style="padding:5px 7px;min-height:auto">${iconeOlho()}</button><button type="button" class="btn secondary btnEventoProposta" data-id="${esc(x.id)}" title="Virar evento" aria-label="Virar evento" style="font-size:11px;padding:5px 8px;min-height:auto">Evento</button><button type="button" class="btn secondary btnWhatsProposta" data-id="${esc(x.id)}" title="Enviar preenchimento pelo WhatsApp" aria-label="Enviar preenchimento pelo WhatsApp" style="padding:5px 7px;min-height:auto">${iconeWhats()}</button><button type="button" class="btn danger btnExcluirProposta" data-id="${esc(x.id)}" title="Excluir proposta" aria-label="Excluir proposta" style="font-size:14px;padding:4px 8px;min-height:auto">×</button></div></td></tr>`).join('')}</tbody></table></div>`:'<div class="muted">Nenhuma proposta gerada ainda.</div>';
+    box.querySelectorAll('.btnVisualizarProposta').forEach(btn=>{btn.onclick=()=>{const p=data.find(x=>String(x.id)===String(btn.dataset.id));if(!p)return;if(!p.dados||typeof p.dados!=='object'){alert('Esta proposta não possui os dados completos salvos para visualização.');return}gerarPdfProposta(p.dados,p.numero||'sem-numero')}});
+    box.querySelectorAll('.btnEventoProposta').forEach(btn=>{btn.onclick=()=>{const p=data.find(x=>String(x.id)===String(btn.dataset.id));if(p)propostaVirarEvento(p)}});
+    box.querySelectorAll('.btnWhatsProposta').forEach(btn=>{btn.onclick=()=>{const p=data.find(x=>String(x.id)===String(btn.dataset.id));if(p)abrirWhatsPreenchimento(p)}});
+    box.querySelectorAll('.btnExcluirProposta').forEach(btn=>{btn.onclick=()=>excluirProposta(btn.dataset.id)});
   }
   const topo=document.createElement('div');topo.className='card';topo.style.marginBottom='18px';topo.innerHTML='<div class="sectionhead"><div><h3 style="margin:0">Propostas salvas</h3><div class="muted">Histórico das propostas geradas</div></div></div><div id="orcPropostasSalvas"><div class="muted">Carregando...</div></div>';
   $('#content').insertBefore(topo,$('#content').firstChild);carregarPropostasSalvas();
