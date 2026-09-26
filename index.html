@@ -610,10 +610,92 @@ atualizarEquipe();
       mostrarItens(tipo);atualizarEquipe();
     };
   }
+  function dadosProposta(){
+    const equipe=[...document.querySelectorAll('.orc-equipe-linha, .linhaEquipe')].map(l=>({
+      nome:l.querySelector('.equipeNome')?.value?.trim()||'',
+      diarias:Number(l.querySelector('.equipeDiarias')?.value||0),
+      valor_diaria:Number(l.querySelector('.equipeValorDiaria')?.value||0),
+      alimentacao:Number(l.querySelector('.equipeAlimentacao')?.value||0),
+      estadia:Number(l.querySelector('.equipeEstadia')?.value||0)
+    })).filter(x=>x.nome||x.diarias||x.valor_diaria||x.alimentacao||x.estadia);
+    const totalEquipe=equipe.reduce((s,x)=>s+(x.valor_diaria*x.diarias)+(x.alimentacao*x.diarias)+(x.estadia*x.diarias),0);
+    const deslocamento=(Number($('#orcKm').value||0)*Number($('#orcValorKm').value||0))+Number($('#orcPedagio').value||0);
+    const totalItens=[...itensProduto,...itensAtivo].reduce((s,x)=>s+(x.quantidade*x.preco),0);
+    return {
+      cliente:$('#orcCliente').value.trim(), telefone:$('#orcTelefone').value.trim(),
+      evento:$('#orcEvento').value.trim(), data_evento:$('#orcData').value||null,
+      local_evento:$('#orcLocalEvento').value.trim(), horario:$('#orcHorario').value||null,
+      horario_montagem:$('#orcHorarioMontagem').value||null,
+      responsavel_evento:$('#orcResponsavelEvento').value.trim(), telefone_responsavel:$('#orcTelefoneResponsavel').value.trim(),
+      tecnico_responsavel:$('#orcTecnicoResponsavel').value.trim(),
+      produtos:itensProduto.map(x=>({...x})), equipamentos:itensAtivo.map(x=>({...x})), equipe,
+      deslocamento:{veiculo:$('#orcVeiculo')?.value?.trim()||'',km:Number($('#orcKm').value||0),valor_km:Number($('#orcValorKm').value||0),pedagio:Number($('#orcPedagio').value||0)},
+      total:Number((totalEquipe+deslocamento+totalItens).toFixed(2))
+    };
+  }
+  function validarProposta(d){
+    if(!d.cliente)return 'Informe o nome do cliente.';
+    if(!d.evento)return 'Informe o nome do projeto/evento.';
+    if(!d.data_evento)return 'Informe a data do evento.';
+    if(!d.produtos.length&&!d.equipamentos.length)return 'Adicione pelo menos um produto ou equipamento.';
+    return '';
+  }
+  function gerarPdfProposta(d,numero){
+    if(!window.jspdf?.jsPDF)throw new Error('Não foi possível carregar o gerador de PDF.');
+    const pdf=new window.jspdf.jsPDF({unit:'mm',format:'a4'});
+    const W=210; let y=0;
+    const novaPagina=()=>{pdf.addPage();cabecalho(false);y=34};
+    const cabecalho=(capa=true)=>{
+      pdf.setFillColor(18,22,28);pdf.rect(0,0,W,capa?42:25,'F');
+      pdf.setTextColor(212,170,76);pdf.setFont('helvetica','bold');pdf.setFontSize(capa?20:14);pdf.text('CZ EFEITOS ESPECIAIS',15,capa?18:15);
+      pdf.setTextColor(255,255,255);pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.text('PROPOSTA COMERCIAL',15,capa?27:20);
+      pdf.setTextColor(80,80,80);
+    };
+    cabecalho(true); y=52;
+    pdf.setFont('helvetica','bold');pdf.setFontSize(15);pdf.setTextColor(25,25,25);pdf.text('Proposta '+numero,15,y); y+=9;
+    pdf.setFont('helvetica','normal');pdf.setFontSize(10);
+    const dataFmt=d.data_evento?new Date(d.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—';
+    const infos=[['Cliente',d.cliente],['Projeto / Evento',d.evento],['Data do evento',dataFmt],['Local',d.local_evento||'—'],['Horário',d.horario||'—']];
+    infos.forEach(([a,b])=>{pdf.setFont('helvetica','bold');pdf.text(a+':',15,y);pdf.setFont('helvetica','normal');pdf.text(String(b),48,y);y+=7});
+    y+=4;pdf.setDrawColor(212,170,76);pdf.line(15,y,195,y);y+=10;
+    pdf.setFont('helvetica','bold');pdf.setFontSize(12);pdf.text('Serviços, produtos e equipamentos',15,y);y+=8;
+    const linhas=[...d.produtos.map(x=>({nome:x.nome,qtd:x.quantidade,tipo:'Produto / serviço'})),...d.equipamentos.map(x=>({nome:x.nome,qtd:x.quantidade,tipo:'Equipamento'}))];
+    pdf.setFontSize(9);pdf.setFillColor(242,242,242);pdf.rect(15,y-5,180,8,'F');pdf.text('Descrição',18,y);pdf.text('Tipo',135,y);pdf.text('Qtd.',185,y,{align:'right'});y+=8;
+    pdf.setFont('helvetica','normal');
+    linhas.forEach(x=>{if(y>265){novaPagina()} const nome=pdf.splitTextToSize(String(x.nome),108);pdf.text(nome,18,y);pdf.text(x.tipo,135,y);pdf.text(String(x.qtd),185,y,{align:'right'});y+=Math.max(7,nome.length*5);pdf.setDrawColor(230);pdf.line(15,y-3,195,y-3)});
+    if(y>245){novaPagina()}
+    y+=8;pdf.setFillColor(18,22,28);pdf.roundedRect(15,y,180,28,3,3,'F');
+    pdf.setTextColor(255,255,255);pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.text('INVESTIMENTO TOTAL',22,y+9);
+    pdf.setTextColor(212,170,76);pdf.setFont('helvetica','bold');pdf.setFontSize(19);pdf.text(money(d.total),22,y+21);
+    y+=39;pdf.setTextColor(75,75,75);pdf.setFont('helvetica','normal');pdf.setFontSize(8);
+    pdf.text('CZ Efeitos Especiais • Proposta gerada em '+new Date().toLocaleString('pt-BR'),15,y);
+    pdf.save('proposta-'+numero.replace(/[^a-zA-Z0-9_-]/g,'-')+'-'+d.cliente.replace(/[^a-zA-Z0-9_-]/g,'-')+'.pdf');
+  }
+  async function salvarProposta(status='gerada'){
+    const d=dadosProposta(),erro=validarProposta(d);if(erro)throw new Error(erro);
+    const numero='CZ-'+new Date().getFullYear()+'-'+String(Date.now()).slice(-6);
+    const payload={numero,status,cliente_nome:d.cliente,cliente_telefone:d.telefone||null,evento_nome:d.evento,data_evento:d.data_evento,local_evento:d.local_evento||null,valor_total:d.total,dados:d,criado_em:new Date().toISOString()};
+    const {data,error}=await db.from('orcamentos').insert(payload).select('*').single();
+    if(error)throw error;
+    return {registro:data,d,numero};
+  }
+  async function carregarPropostasSalvas(){
+    const box=$('#orcPropostasSalvas');if(!box)return;
+    const {data,error}=await db.from('orcamentos').select('id,numero,status,cliente_nome,evento_nome,data_evento,valor_total,criado_em').order('criado_em',{ascending:false}).limit(30);
+    if(error){box.innerHTML='<div class="muted">Execute o SQL de Orçamentos para ativar o histórico de propostas.</div>';return}
+    box.innerHTML=data?.length?`<div class="tablewrap"><table><thead><tr><th>Proposta</th><th>Cliente</th><th>Evento</th><th>Data</th><th>Total</th><th>Status</th></tr></thead><tbody>${data.map(x=>`<tr><td>${esc(x.numero)}</td><td>${esc(x.cliente_nome)}</td><td>${esc(x.evento_nome||'')}</td><td>${x.data_evento?new Date(x.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${money(x.valor_total)}</td><td>${esc(x.status||'')}</td></tr>`).join('')}</tbody></table></div>`:'<div class="muted">Nenhuma proposta gerada ainda.</div>';
+  }
+  const topo=document.createElement('div');topo.className='card';topo.style.marginBottom='18px';topo.innerHTML='<div class="sectionhead"><div><h3 style="margin:0">Propostas salvas</h3><div class="muted">Histórico das propostas geradas</div></div></div><div id="orcPropostasSalvas"><div class="muted">Carregando...</div></div>';
+  $('#content').insertBefore(topo,$('#content').firstChild);carregarPropostasSalvas();
   prepararProdutos();
   $('#orcAddAsset').onclick=()=>adicionarItem('ativo');
-  $('#orcSave').onclick=()=>{$('#orcMsg').textContent='O salvamento de rascunhos ainda não está disponível nesta versão.'};
-  $('#orcPrint').onclick=()=>{$('#orcMsg').textContent='A proposta para impressão ainda não está disponível nesta versão.'};
+  $('#orcSave').onclick=()=>{$('#orcMsg').textContent='Rascunho não é gerado como proposta. Use GERAR PROPOSTA quando estiver pronto.'};
+  $('#orcPrint').onclick=async()=>{
+    const btn=$('#orcPrint');btn.disabled=true;$('#orcMsg').textContent='Salvando proposta e preparando PDF...';
+    try{const r=await salvarProposta('gerada');gerarPdfProposta(r.d,r.numero);$('#orcMsg').textContent='Proposta '+r.numero+' salva em Orçamentos e PDF gerado.';await carregarPropostasSalvas()}
+    catch(e){$('#orcMsg').textContent='Erro ao gerar proposta: '+e.message}
+    finally{btn.disabled=false}
+  };
 }
   
   async function renderClients(){const {data,error}=await db.from('clientes').select('*').order('criado_em',{ascending:false});if(error){$('#content').innerHTML=`<div class="msg">Erro ao carregar clientes: ${error.message}</div>`;return}clients=data||[];$('#content').innerHTML=`<div class="sectionhead"><div><h2>Clientes</h2><div class="muted">${clients.length} cliente(s) cadastrado(s)</div></div><button class="btn primary" onclick="openClient()">+ Novo cliente</button></div><div class="tablewrap">${clients.length?`<table><thead><tr><th>Nome</th><th>Telefone</th><th>Origem</th><th>Endereço</th><th>Ações</th></tr></thead><tbody>${clients.map(c=>`<tr><td>${esc(c.nome)}</td><td>${esc(c.telefone||'')}</td><td>${esc(c.origem||'')}</td><td>${esc(c.endereco||'')}</td><td><button class="btn secondary" onclick="editClient('${c.id}')">Editar</button> <button class="btn danger" onclick="deleteClient('${c.id}')">Excluir</button></td></tr>`).join('')}</tbody></table>`:`<div class="empty">Nenhum cliente cadastrado.</div>`}</div>`}
