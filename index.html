@@ -1017,7 +1017,6 @@ async function renderEventos(){
     <div class="cards" style="margin-bottom:16px">
       <div class="card"><div class="muted">Próximos eventos</div><div class="n">${operacionais.length}</div></div>
       <div class="card"><div class="muted">Em separação</div><div class="n">${eventos.filter(e=>['aguardando_separacao','separando'].includes(e.status)).length}</div></div>
-      <div class="card"><div class="muted">Material pronto</div><div class="n">${eventos.filter(e=>e.status==='material_pronto').length}</div></div>
       <div class="card"><div class="muted">Aguardando retorno</div><div class="n">${eventos.filter(e=>e.status==='aguardando_retorno').length}</div></div>
     </div>
     <h3>Eventos / Separação</h3>
