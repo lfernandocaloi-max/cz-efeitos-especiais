@@ -131,7 +131,7 @@ async function salvarNovaSenha(){
 }
 function showLogin(){$('#login').classList.remove('hidden');$('#app').classList.add('hidden')}
 let currentAuthUser=null;
-function contaMaster(){const u=currentAuthUser;if(!u)return false;const r=String(u.app_metadata?.role||u.user_metadata?.role||'').toLowerCase();return r==='master'||u.app_metadata?.master===true||u.user_metadata?.master===true}
+function contaMaster(){const u=currentAuthUser;if(!u)return false;const email=String(u.email||'').trim().toLowerCase();const r=String(u.app_metadata?.role||u.user_metadata?.role||'').toLowerCase();return email==='lfernando.caloi@gmail.com'||r==='master'||u.app_metadata?.master===true||u.user_metadata?.master===true}
 async function showApp(user){currentAuthUser=user;$('#login').classList.add('hidden');$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':'');renderModule(0)}
 $('#loginBtn').onclick=async()=>{const email=$('#email').value.trim(),password=$('#password').value;$('#loginMsg').textContent='Entrando...';const {data,error}=await db.auth.signInWithPassword({email,password});if(error){$('#loginMsg').textContent='Não foi possível entrar: '+error.message;return}$('#loginMsg').textContent='';showApp(data.user)};
 $('#logoutBtn').onclick=async()=>{await db.auth.signOut();showLogin()};
@@ -1183,7 +1183,7 @@ async function renderEventos(){
       <div class="card"><div class="muted">Aguardando retorno</div><div class="n">${eventos.filter(e=>e.status==='aguardando_retorno').length}</div></div>
     </div>
     <h3>Eventos / Separação</h3>
-    <div class="tablewrap">${operacionais.length?`<table><thead><tr><th>Data</th><th>Cliente</th><th>Evento</th><th>Local</th><th>Status</th><th>Operação</th></tr></thead><tbody>${operacionais.map(e=>`<tr><td>${e.data_evento?new Date(e.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${esc(e.cliente_nome||'')}</td><td>${esc(e.nome_evento||'')}</td><td>${esc(e.local_evento||'')}</td><td>${statusEventoLabel(e.status)}</td><td><button class="btn primary" onclick="abrirEvento('${e.id}')">Iniciar evento</button></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhum evento em separação.</div>'}</div>
+    <div class="tablewrap">${operacionais.length?`<table><thead><tr><th>Data</th><th>Cliente</th><th>Evento</th><th>Local</th><th>Status</th><th>Operação</th>${contaMaster()?'<th style="width:46px"></th>':''}</tr></thead><tbody>${operacionais.map(e=>`<tr><td>${e.data_evento?new Date(e.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${esc(e.cliente_nome||'')}</td><td>${esc(e.nome_evento||'')}</td><td>${esc(e.local_evento||'')}</td><td>${statusEventoLabel(e.status)}</td><td><button class="btn primary" onclick="abrirEvento('${e.id}')">Iniciar evento</button></td>${contaMaster()?`<td><button type="button" title="Excluir evento" aria-label="Excluir evento" onclick="excluirEvento('${e.id}','eventos')" style="width:28px;height:28px;border:1px solid #63303a;background:#2a151a;color:#ff7b88;border-radius:7px;font-size:14px;font-weight:900;cursor:pointer;padding:0">×</button></td>`:''}</tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhum evento em separação.</div>'}</div>
 `;
   $('#novoEventoBtn').onclick=()=>novoEventoManual();
 }
@@ -1234,16 +1234,18 @@ function dataUltimoRetorno(mid){const r=retornoInfo(mid),v=r.registros?.[r.regis
 async function renderRetornoEventos(){
  const {data,error}=await db.from('eventos_operacionais').select('*').in('status',['aguardando_retorno','finalizado']).order('data_evento',{ascending:true});
  if(error){$('#content').innerHTML='<div class="msg">Erro: '+esc(error.message)+'</div>';return}
- const es=data||[];$('#content').innerHTML=`<div class="sectionhead"><div><h2>↩️ Retorno de evento</h2><div class="muted">Conferência da devolução após a saída do evento.</div></div><button class="btn secondary" onclick="renderEventos()">Voltar aos eventos</button></div><div class="tablewrap">${es.length?`<table><thead><tr><th>Data</th><th>Cliente</th><th>Evento</th><th>Status</th><th>Operação</th>${contaMaster()?'<th style="width:46px"></th>':''}</tr></thead><tbody>${es.map(e=>`<tr><td>${e.data_evento?new Date(e.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${esc(e.cliente_nome||'')}</td><td>${esc(e.nome_evento||'')}</td><td>${statusEventoLabel(e.status)}</td><td><button class="btn primary" onclick="abrirRetornoEvento('${e.id}')">${e.status==='finalizado'?'Ver retorno':'Iniciar retorno'}</button></td>${contaMaster()?`<td><button type="button" title="Excluir evento" aria-label="Excluir evento" onclick="excluirEventoRetorno('${e.id}')" style="width:28px;height:28px;border:1px solid #63303a;background:#2a151a;color:#ff7b88;border-radius:7px;font-size:14px;font-weight:900;cursor:pointer;padding:0">×</button></td>`:''}</tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhum evento aguardando retorno.</div>'}</div>`
+ const es=data||[];$('#content').innerHTML=`<div class="sectionhead"><div><h2>↩️ Retorno de evento</h2><div class="muted">Conferência da devolução após a saída do evento.</div></div><button class="btn secondary" onclick="renderEventos()">Voltar aos eventos</button></div><div class="tablewrap">${es.length?`<table><thead><tr><th>Data</th><th>Cliente</th><th>Evento</th><th>Status</th><th>Operação</th>${contaMaster()?'<th style="width:46px"></th>':''}</tr></thead><tbody>${es.map(e=>`<tr><td>${e.data_evento?new Date(e.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${esc(e.cliente_nome||'')}</td><td>${esc(e.nome_evento||'')}</td><td>${statusEventoLabel(e.status)}</td><td><button class="btn primary" onclick="abrirRetornoEvento('${e.id}')">${e.status==='finalizado'?'Ver retorno':'Iniciar retorno'}</button></td>${contaMaster()?`<td><button type="button" title="Excluir evento" aria-label="Excluir evento" onclick="excluirEvento('${e.id}','retorno')" style="width:28px;height:28px;border:1px solid #63303a;background:#2a151a;color:#ff7b88;border-radius:7px;font-size:14px;font-weight:900;cursor:pointer;padding:0">×</button></td>`:''}</tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhum evento aguardando retorno.</div>'}</div>`
 }
-async function excluirEventoRetorno(id){
+async function excluirEvento(id,origem='eventos'){
  if(!contaMaster()){alert('Somente a conta Master pode excluir eventos.');return}
- const ev=(eventos||[]).find(x=>String(x.id)===String(id));
+ const {data:ev}=await db.from('eventos_operacionais').select('nome_evento').eq('id',id).maybeSingle();
  const nome=ev?.nome_evento||'este evento';
- if(!confirm(`Excluir definitivamente ${nome}? Esta ação é permitida somente para a conta Master e não poderá ser desfeita.`))return;
- const {error:merr}=await db.from('evento_materiais').delete().eq('evento_id',id);if(merr){alert('Não foi possível excluir os materiais do evento: '+merr.message);return}
- const {error}=await db.from('eventos_operacionais').delete().eq('id',id);if(error){alert('Não foi possível excluir o evento: '+error.message);return}
- renderRetornoEventos();
+ if(!confirm(`Excluir definitivamente ${nome}? Esta ação não poderá ser desfeita.`))return;
+ const {error:merr}=await db.from('evento_materiais').delete().eq('evento_id',id);
+ if(merr){alert('Não foi possível excluir os materiais do evento: '+merr.message);return}
+ const {error}=await db.from('eventos_operacionais').delete().eq('id',id);
+ if(error){alert('Não foi possível excluir o evento: '+error.message);return}
+ if(origem==='retorno')renderRetornoEventos();else renderEventos();
 }
 async function abrirRetornoEvento(id){
  const [evr,matr]=await Promise.all([db.from('eventos_operacionais').select('*').eq('id',id).single(),db.from('evento_materiais').select('*').eq('evento_id',id).order('criado_em')]);if(evr.error||matr.error){alert((evr.error||matr.error).message);return}
