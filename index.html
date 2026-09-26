@@ -19,13 +19,40 @@
 .orcamentos-lista td:last-child > div{
   justify-content:center;
 }
+.client-switch{display:flex!important;align-items:center;gap:9px;color:var(--text)!important;cursor:pointer}
+.client-switch input{width:auto!important;min-height:0!important;accent-color:var(--accent)}
+.client-status{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:5px;font-size:17px;font-weight:800}
+.client-status-incomplete{background:#8e2626;color:#fff}
+.client-status-complete{background:#155e39;color:#fff}
+.orc-travel-grid{display:grid;grid-template-columns:repeat(4,minmax(120px,180px));gap:10px}
+.orc-travel-grid .field,.orc-team-row .field{margin-top:4px;min-width:0}
+.orc-travel-grid input,.orc-team-row input{padding:7px 9px!important;font-size:13px!important;min-height:35px}
+.orc-travel-grid label,.orc-team-row label{text-align:center}
+.orc-team-row{display:grid;grid-template-columns:minmax(145px,1.5fr) repeat(5,minmax(95px,1fr)) auto;gap:8px;align-items:end}
+.orc-equipe-linha.orc-team-row{grid-template-columns:minmax(145px,1.5fr) repeat(5,minmax(95px,1fr))}
+.orc-team-total{display:flex;justify-content:flex-end;margin-top:14px}
+.orc-team-total strong{display:inline-block;background:#155e39;border:1px solid #38b86b;color:#fff;border-radius:9px;padding:10px 16px;text-align:center}
+@media(max-width:900px){.orc-travel-grid{grid-template-columns:repeat(2,minmax(120px,180px))}.orc-team-row{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.orc-travel-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style>
 </head><body>
 <section id="login" class="login"><div class="loginbox"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><h3>Acesso ao sistema</h3><div class="field"><label>E-mail</label><input id="email" type="email"></div><div class="field"><label>Senha</label><input id="password" type="password"></div><button id="loginBtn" class="btn primary full" style="margin-top:18px">ENTRAR</button><button type="button" class="btn secondary full" style="margin-top:8px" onclick="recuperarSenha()">Esqueci minha senha</button><div id="loginMsg" class="msg"></div></div></section>
 <div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><div class="muted" style="font-size:12px">Sistema de gestão CZ</div></div><div><span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
-<div id="clientModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="modalTitle">Novo cliente</h2><button class="btn secondary" onclick="closeClient()">Fechar</button></div><input id="clientId" type="hidden"><div class="row"><div class="field"><label>Nome *</label><input id="clientName"></div><div class="field"><label>Telefone</label><input id="clientPhone"></div></div><div class="field"><label>Endereço completo</label><input id="clientAddress"></div><div class="row"><div class="field"><label>Origem</label><input id="clientOrigin" value="manual"></div><div></div></div><div class="field"><label>Observações</label><textarea id="clientNotes"></textarea></div><div class="actions"><button class="btn secondary" onclick="closeClient()">Cancelar</button><button id="deleteClientBtn" class="btn danger hidden" type="button">Excluir cliente</button><button id="clientHistoryBtn" class="btn secondary hidden" type="button">Histórico</button><button id="saveClientBtn" class="btn primary">Salvar cliente</button></div><div id="clientHistory" class="hidden" style="margin-top:14px"></div><div id="clientMsg" class="msg"></div></div></div>
+<div id="clientModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="modalTitle">Novo cliente</h2><button class="btn secondary" onclick="closeClient()">Fechar</button></div>
+  <input id="clientId" type="hidden"><div class="muted" id="clientOpenedAt" style="font-size:13px">Data de abertura: será definida ao salvar</div>
+  <div class="row"><div class="field"><label>Nome / Razão social *</label><input id="clientName" autocomplete="name"></div><div class="field"><label>Telefone *</label><input id="clientPhone" type="tel" inputmode="tel" autocomplete="tel"></div></div>
+  <div class="field"><label class="client-switch"><input id="clientIsCompany" type="checkbox"> Cadastro com CNPJ (empresa)</label></div>
+  <div class="row"><div class="field"><label>E-mail</label><input id="clientEmail" type="email" autocomplete="email"></div><div class="field"><label>Profissão</label><input id="clientProfession"></div></div>
+  <div class="row" id="clientPfFields"><div class="field"><label>CPF</label><input id="clientCpf" inputmode="numeric"></div><div class="field"><label>RG</label><input id="clientRg"></div></div>
+  <div class="row hidden" id="clientPjFields"><div class="field"><label>CNPJ</label><input id="clientCnpj" inputmode="numeric"></div><div class="field"><label>IE (Inscrição Estadual)</label><input id="clientIe"></div></div>
+  <div class="field"><label>Endereço</label><input id="clientAddress" autocomplete="street-address"></div>
+  <div class="row"><div class="field"><label>Número</label><input id="clientNumber"></div><div class="field"><label>Complemento</label><input id="clientComplement"></div></div>
+  <div class="row"><div class="field"><label>Cidade</label><input id="clientCity" autocomplete="address-level2"></div><div class="field"><label>CEP</label><input id="clientZip" inputmode="numeric" autocomplete="postal-code"></div></div>
+  <div class="field"><label>Origem</label><input id="clientOrigin" value="manual"></div><div class="field"><label>Observações</label><textarea id="clientNotes"></textarea></div>
+  <div class="actions"><button class="btn secondary" onclick="closeClient()">Cancelar</button><button id="deleteClientBtn" class="btn danger hidden" type="button">Excluir cliente</button><button id="clientHistoryBtn" class="btn secondary hidden" type="button">Histórico</button><button id="saveClientBtn" class="btn primary">Salvar cliente</button></div><div id="clientHistory" class="hidden" style="margin-top:14px"></div><div id="clientMsg" class="msg"></div></div></div>
 
 <div id="productModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="productModalTitle">Novo produto</h2><button class="btn secondary" onclick="closeProduct()">Fechar</button></div><input id="productId" type="hidden"><div class="row"><div class="field"><label>Nome *</label><input id="productName"></div><div class="field"><label>Unidade *</label><select id="productUnit"><option value="">Selecione</option><option value="un">UN</option><option value="monotiro">Monotiro</option><option value="torta">Torta</option><option value="placa">Placa</option><option value="kg">Kg</option><option value="litro">Litro</option><option value="caixa">Caixa</option></select></div></div>
+<div class="field"><label class="client-switch"><input id="productConsumable" type="checkbox" checked> Consumível</label></div>
 <div class="field"><label>Marca do produto</label><input id="productBrand" type="text" placeholder="Informe a marca"></div>
 <div class="field"><label>Código de barras</label><input id="productBarcode" type="text" inputmode="numeric" autocomplete="off" placeholder="Digite ou leia o código"></div>
 <div class="row"><div class="field"><label>Estoque atual</label><input id="productStock" type="number" step="0.01"></div><div class="field"><label>Estoque mínimo</label><input id="productMin" type="number" step="0.01"></div></div>
@@ -131,7 +158,12 @@ async function salvarNovaSenha(){
 }
 function showLogin(){$('#login').classList.remove('hidden');$('#app').classList.add('hidden')}
 let currentAuthUser=null;
-function contaMaster(){const u=currentAuthUser;if(!u)return false;const email=String(u.email||'').trim().toLowerCase();const r=String(u.app_metadata?.role||u.user_metadata?.role||'').toLowerCase();return email==='lfernando.caloi@gmail.com'||r==='master'||u.app_metadata?.master===true||u.user_metadata?.master===true}
+function contaMaster(){
+ const u=currentAuthUser;
+ const email=String(u?.email||localStorage.getItem('cz_auth_email')||'').trim().toLowerCase();
+ const r=String(u?.app_metadata?.role||u?.user_metadata?.role||'').toLowerCase();
+ return email==='lfernando.caloi@gmail.com'||r==='master'||u?.app_metadata?.master===true||u?.user_metadata?.master===true
+}
 async function showApp(user){currentAuthUser=user;$('#login').classList.add('hidden');$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':'');renderModule(0)}
 $('#loginBtn').onclick=async()=>{const email=$('#email').value.trim(),password=$('#password').value;$('#loginMsg').textContent='Entrando...';const {data,error}=await db.auth.signInWithPassword({email,password});if(error){$('#loginMsg').textContent='Não foi possível entrar: '+error.message;return}$('#loginMsg').textContent='';showApp(data.user)};
 $('#logoutBtn').onclick=async()=>{await db.auth.signOut();showLogin()};
@@ -411,19 +443,20 @@ async function renderOrcamentos(novo=false){
 
     <!-- 1 PROJETO / EVENTO -->
     <div class="card" style="margin-bottom:18px">
-      <h3 style="margin-top:0">📋 1. Projeto / Evento</h3>
+      <h3 style="margin-top:0">📋 1. Orçamento</h3>
 
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px">
 
       
 <div class="field">
-  <label>Cliente</label>
-  <input id="orcCliente" placeholder="Buscar cliente cadastrado">
+  <label>Cliente cadastrado *</label>
+  <select id="orcClienteSelect"><option value="">Carregando clientes...</option></select>
+  <input id="orcCliente" type="hidden">
 </div>
 
 <div class="field">
-  <label>Telefone</label>
-  <input id="orcTelefone" placeholder="Telefone">
+  <label>Telefone do cliente</label>
+  <input id="orcTelefone" type="tel" readonly placeholder="Selecione um cliente">
 </div>
 
 <div class="field">
@@ -440,15 +473,11 @@ async function renderOrcamentos(novo=false){
   <label>Local do evento</label>
   <input id="orcLocalEvento" placeholder="Local do evento">
 </div>
+<div class="field"><label>Cidade do evento</label><input id="orcCidadeEvento" placeholder="Cidade"></div>
 
 <div class="field">
   <label>Horário inicial</label>
   <input id="orcHorario" type="time">
-</div>
-
-<div class="field">
-  <label>Horário de montagem</label>
-  <input id="orcHorarioMontagem" type="time">
 </div>
 
 <div class="field">
@@ -460,123 +489,45 @@ async function renderOrcamentos(novo=false){
   <label>Telefone do responsável</label>
   <input id="orcTelefoneResponsavel" placeholder="Telefone">
 </div>
-<div class="field">
-  <label>Téc. responsável</label>
-  <input id="orcTecnicoResponsavel" placeholder="Nome do técnico responsável">
-</div>
 
 
 </div>
 </div>
 
-   <!-- CUSTO INICIAL DO EVENTO -->
-<div class="card" style="margin-bottom:18px">
-
-  <h3 style="margin-top:0">💰 Custo inicial do evento</h3>
-
-  <!-- DESLOCAMENTO -->
-  <h4 style="margin:18px 0 10px">🚗 Deslocamento</h4>
-
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
-
-    <div class="field">
-      <label>Veículo</label>
-      <input id="orcVeiculo" placeholder="Veículo">
-    </div>
-
-    <div class="field">
-      <label>Km rodado</label>
-      <input id="orcKm" type="number" min="0" value="0">
-    </div>
-</div>
-
-<div class="field">
-  <label>Valor do km</label>
-  <input id="orcValorKm" type="number" min="0" step="0.01" value="0" readonly>
-</div>
-
-
-    <div class="field">
-      <label>Pedágio</label>
-      <input id="orcPedagio" type="number" min="0" step="0.01" value="0">
-    </div>
-
-  </div>
-
-  <!-- EQUIPE -->
-<h4 style="margin:22px 0 10px">👷 Equipe</h4>
-
-<div id="orcEquipeLista">
-
-  <div class="orc-equipe-linha"
-     style="display:grid;grid-template-columns:1.5fr .7fr .8fr .9fr .8fr .9fr;gap:8px;align-items:end;">
-    <div class="field">
-      <label>Nome do colaborador</label>
-      <input class="equipeNome" placeholder="Nome">
-    </div>
-
-    <div class="field">
-  <label>Qtd. diária</label>
-  <input class="equipeDiarias" type="number" min="0" value="0">
-</div>
-
-<div class="field">
-  <label>Valor diária</label>
-  <input class="equipeValorDiaria" type="number" min="0" step="0.01" value="0">
-</div>
-<div class="field">
-  <label>Valor alimentação</label>
-  <input class="equipeAlimentacao" type="number" min="0" step="0.01" value="0">
-</div>
-    <div class="field">
-      <label>Estadia</label>
-      <input class="equipeEstadia" type="number" min="0" step="0.01" value="0">
-    </div>
-
-    <div class="field">
-      <label>Total</label>
-      <input class="equipeTotal" value="R$ 0,00" readonly>
-    </div>
-
-  </div>
-
-</div>
-
-<button type="button"
-        id="btnAdicionarColaborador"
-        class="btn secondary"
-        style="padding:6px 10px;font-size:12px;margin-top:4px">
-  + Adicionar colaborador
-</button>
-<div style="margin-top:14px;text-align:right;font-weight:700;font-size:16px;">Total da Equipe: <span id="orcTotalEquipe">R$ 0,00</span></div>
-</div>
-    <!-- 2 PRODUTOS -->
     <div class="card" style="margin-bottom:18px">
-      <div class="sectionhead">
-        <div>
-          <h3 style="margin:0">📦 2. Produtos de Consumo</h3>
-          <div class="muted">Tabela 1 aplicada automaticamente</div>
-        </div>
-
+      <h3 style="margin:0 0 10px">🚗 Deslocamento</h3>
+      <div class="orc-travel-grid">
+        <div class="field"><label>Veículo</label><input id="orcVeiculo" placeholder="Veículo"></div>
+        <div class="field"><label>Km rodado</label><input id="orcKm" type="number" min="0" value="0"></div>
+        <div class="field"><label>Valor do km</label><input id="orcValorKm" type="number" min="0" step="0.01" value="0" readonly></div>
+        <div class="field"><label>Pedágio</label><input id="orcPedagio" type="number" min="0" step="0.01" value="0"></div>
       </div>
+    </div>
 
-      <div id="orcProdutoPicker" style="margin-top:16px" class="muted">Carregando produtos cadastrados...</div>
+    <div class="card orc-team-card" style="margin-bottom:18px">
+      <h3 style="margin:0 0 12px">👷 Equipe</h3>
+      <div id="orcEquipeLista"><div class="orc-equipe-linha orc-team-row">
+        <div class="field"><label>Nome do colaborador</label><input class="equipeNome" placeholder="Nome"></div>
+        <div class="field"><label>Qtd. diária</label><input class="equipeDiarias" type="number" min="0" value="0"></div>
+        <div class="field"><label>Valor diária</label><input class="equipeValorDiaria" type="number" min="0" step="0.01" value="0"></div>
+        <div class="field"><label>Valor alimentação</label><input class="equipeAlimentacao" type="number" min="0" step="0.01" value="0"></div>
+        <div class="field"><label>Estadia</label><input class="equipeEstadia" type="number" min="0" step="0.01" value="0"></div>
+        <div class="field"><label>Total</label><input class="equipeTotal" value="R$ 0,00" readonly></div>
+      </div></div>
+      <button type="button" id="btnAdicionarColaborador" class="btn secondary" style="padding:6px 10px;font-size:12px;margin-top:10px">+ Adicionar colaborador</button>
+      <div class="orc-team-total"><strong>Total da Equipe: <span id="orcTotalEquipe">R$ 0,00</span></strong></div>
+    </div>
+
+    <div class="card" style="margin-bottom:18px">
+      <h3 style="margin:0 0 12px">Adicionar item ao orçamento</h3>
+      <div id="orcItemPicker" class="muted">Carregando produtos e equipamentos...</div>
+    </div>
+    <div class="card" style="margin-bottom:18px">
+      <h3 style="margin:0">📦 2. Produtos</h3>
       <div id="orcProdutosLista" style="margin-top:16px" class="muted">Nenhum produto adicionado.</div>
     </div>
-
-    <!-- 3 EQUIPAMENTOS -->
     <div class="card" style="margin-bottom:18px">
-      <div class="sectionhead">
-        <div>
-          <h3 style="margin:0">⚙️ 3. Equipamentos</h3>
-          <div class="muted">Tabela 1 aplicada automaticamente</div>
-        </div>
-
-        <button id="orcAddAsset" class="btn primary" type="button">
-          + Adicionar Equipamento
-        </button>
-      </div>
-
+      <h3 style="margin:0">⚙️ 3. Equipamentos</h3>
       <div id="orcAtivosLista" style="margin-top:16px" class="muted">Nenhum equipamento adicionado.</div>
     </div>
 
@@ -670,8 +621,8 @@ $('#btnAdicionarColaborador').onclick = () => {
   const container = $('#orcEquipeLista');
 
   const novaLinha = document.createElement('div');
-  novaLinha.className = 'linhaEquipe';
-novaLinha.style = 'display:grid;grid-template-columns:1.5fr .7fr .8fr .9fr .8fr .9fr auto;gap:8px;margin-top:10px;align-items:end';
+  novaLinha.className = 'linhaEquipe orc-team-row';
+  novaLinha.style.marginTop='10px';
   novaLinha.innerHTML = `
     <div class="field">
       <label>Nome do colaborador</label>
@@ -725,63 +676,51 @@ atualizarEquipe();
     destino.innerHTML=lista.length?`<div class="tablewrap"><table><thead><tr><th>${tipo==='produto'?'Produto':'Equipamento'}</th><th>Quantidade</th><th>Valor unitário</th><th>Tabela de preço</th><th>Valor total</th><th>Ação</th></tr></thead><tbody>${lista.map((item,i)=>`<tr><td>${esc(item.nome)}</td><td>${item.quantidade}</td><td>${money(item.preco)}</td><td>Tabela ${item.tabela}</td><td>${money(item.quantidade*item.preco)}</td><td><button type="button" class="btn danger" data-remover="${i}">Remover</button></td></tr>`).join('')}</tbody></table></div><div style="text-align:right;margin-top:12px;font-weight:700;color:var(--text)">Total ${tipo==='produto'?'dos produtos':'dos equipamentos'}: ${money(lista.reduce((total,item)=>total+item.quantidade*item.preco,0))}</div>`:'Nenhum item adicionado.';
     destino.querySelectorAll('[data-remover]').forEach(btn=>btn.onclick=()=>{lista.splice(Number(btn.dataset.remover),1);mostrarItens(tipo);atualizarEquipe()});
   }
-  async function prepararProdutos(){
-    const destino=$('#orcProdutoPicker');
-    const {data,error}=await db.from('produtos').select('*').order('nome');
-    if(!destino || !destino.isConnected)return;
-    if(error){destino.textContent='Erro ao carregar produtos: '+error.message;return}
-    if(!data?.length){destino.innerHTML='<p>Nenhum produto cadastrado. Cadastre um produto no menu Estoque antes de adicioná-lo ao orçamento.</p>';return}
-    destino.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;align-items:start">
-      <div class="field"><label>Produto</label><select id="orcProdutoSelect"><option value="">Selecione o produto</option>${data.map((item,i)=>`<option value="${i}">${esc(item.nome)}</option>`).join('')}</select><button id="orcConfirmarProduto" type="button" class="btn primary" style="margin-top:10px">+ Adicionar Produto</button></div>
-      <div class="field"><label>Quantidade</label><input id="orcProdutoQtd" type="number" min="1" step="1" value="1"></div>
-      <div class="field"><label>Valor unitário</label><input id="orcProdutoUnitario" readonly></div>
-      <div class="field"><label>Tabela de preço</label><select id="orcProdutoTabela"><option value="1">Tabela 1 (varejo)</option><option value="2">Tabela 2 (atacado)</option></select></div>
-      <div class="field"><label>Valor total da linha</label><input id="orcProdutoTotal" readonly></div>
-    </div><div id="orcProdutoMsg" class="msg" role="status"></div>`;
+  async function prepararItensOrcamento(){
+    const destino=$('#orcItemPicker');
+    const [rp,ra]=await Promise.all([db.from('produtos').select('*').order('nome'),db.from('ativos').select('*').order('nome')]);
+    if(!destino?.isConnected)return;
+    if(rp.error||ra.error){destino.textContent='Erro ao carregar itens: '+(rp.error||ra.error).message;return}
+    const opcoes=[...(rp.data||[]).map(p=>({tipo:'produto',item:p})),...(ra.data||[]).map(a=>({tipo:'ativo',item:a}))];
+    if(!opcoes.length){destino.innerHTML='<div>Nenhum produto ou equipamento cadastrado. Cadastre itens no Estoque ou em Ativos / Equipamentos.</div>';return}
+    const opcoesTipo=tipo=>opcoes.map((o,i)=>o.tipo===tipo?`<option value="${i}">${esc(o.item.nome)}</option>`:'').join('');
+    destino.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;align-items:end">
+      <div class="field"><label>Produto ou equipamento</label><select id="orcItemSelect"><option value="">Selecione</option><optgroup label="Produtos">${opcoesTipo('produto')}</optgroup><optgroup label="Equipamentos">${opcoesTipo('ativo')}</optgroup></select></div>
+      <div class="field"><label>Quantidade</label><input id="orcItemQtd" type="number" min="1" step="1" value="1"></div>
+      <div class="field"><label>Tabela de preço</label><select id="orcItemTabela"><option value="1">Tabela 1</option><option value="2">Tabela 2</option></select></div>
+      <div class="field"><label>Valor unitário</label><input id="orcItemUnitario" readonly></div>
+      <div class="field"><label>Valor total</label><input id="orcItemTotal" readonly></div>
+    </div><button id="orcConfirmarItem" type="button" class="btn primary" style="margin-top:10px">+ Adicionar</button><div id="orcItemMsg" class="msg" role="status"></div>`;
     const precoSelecionado=()=>{
-      const item=data[Number($('#orcProdutoSelect').value)];
-      if($('#orcProdutoSelect').value===''||!item)return null;
-      const valor=$('#orcProdutoTabela').value==='1'?item.valor_varejo:item.valor_atacado;
+      const indice=$('#orcItemSelect').value,op=opcoes[Number(indice)];if(indice===''||!op)return null;
+      const t=$('#orcItemTabela').value==='1',item=op.item;
+      const valor=op.tipo==='produto'?(t?item.valor_varejo:item.valor_atacado):(t?item.valor_locacao_tabela1:item.valor_locacao_tabela2);
       return valor===null||valor===undefined||valor===''?null:Number(valor);
     };
-    const atualizarPreview=()=>{
-      const preco=precoSelecionado(),quantidade=Number($('#orcProdutoQtd').value);
-      $('#orcProdutoUnitario').value=preco===null||!Number.isFinite(preco)?'Preço não cadastrado':money(preco);
-      $('#orcProdutoTotal').value=preco===null||!Number.isFinite(preco)||!Number.isInteger(quantidade)||quantidade<1?'—':money(preco*quantidade);
-    };
-    ['orcProdutoSelect','orcProdutoTabela','orcProdutoQtd'].forEach(id=>$('#'+id).addEventListener('input',atualizarPreview));
-    $('#orcConfirmarProduto').onclick=()=>{
-      const indice=$('#orcProdutoSelect').value,quantidade=Number($('#orcProdutoQtd').value),preco=precoSelecionado();
-      if(indice===''){$('#orcProdutoMsg').textContent='Selecione um produto.';return}
-      if(!Number.isInteger(quantidade)||quantidade<1){$('#orcProdutoMsg').textContent='Informe uma quantidade inteira maior que zero.';return}
-      if(preco===null||!Number.isFinite(preco)||preco<0){$('#orcProdutoMsg').textContent='Cadastre o preço desta tabela no produto antes de adicioná-lo.';return}
-      const item=data[Number(indice)];
-      itensProduto.push({id:item.id,nome:item.nome,quantidade,preco,tabela:Number($('#orcProdutoTabela').value)});
-      $('#orcProdutoMsg').textContent='Produto adicionado.';
-      $('#orcProdutoSelect').value='';$('#orcProdutoQtd').value='1';atualizarPreview();
-      mostrarItens('produto');atualizarEquipe();
+    const atualizarPreview=()=>{const preco=precoSelecionado(),q=Number($('#orcItemQtd').value);
+      $('#orcItemUnitario').value=preco===null||!Number.isFinite(preco)?'Preço não cadastrado':money(preco);
+      $('#orcItemTotal').value=preco===null||!Number.isFinite(preco)||!Number.isInteger(q)||q<1?'—':money(preco*q)};
+    ['orcItemSelect','orcItemTabela','orcItemQtd'].forEach(id=>$('#'+id).addEventListener('input',atualizarPreview));
+    $('#orcConfirmarItem').onclick=()=>{
+      const indice=$('#orcItemSelect').value,q=Number($('#orcItemQtd').value),preco=precoSelecionado();
+      if(indice===''){$('#orcItemMsg').textContent='Selecione um produto ou equipamento.';return}
+      if(!Number.isInteger(q)||q<1){$('#orcItemMsg').textContent='Informe uma quantidade inteira maior que zero.';return}
+      if(preco===null||!Number.isFinite(preco)||preco<0){$('#orcItemMsg').textContent='Cadastre o preço desta tabela antes de adicionar.';return}
+      const op=opcoes[Number(indice)],tipo=op.tipo,item=op.item;
+      (tipo==='produto'?itensProduto:itensAtivo).push({id:item.id,nome:item.nome,quantidade:q,preco,tabela:Number($('#orcItemTabela').value)});
+      $('#orcItemMsg').textContent=(tipo==='produto'?'Produto':'Equipamento')+' adicionado.';
+      $('#orcItemSelect').value='';$('#orcItemQtd').value='1';atualizarPreview();mostrarItens(tipo);atualizarEquipe();
     };
     atualizarPreview();
   }
-  async function adicionarItem(tipo){
-    const destino=$(tipo==='produto'?'#orcProdutosLista':'#orcAtivosLista');
-    const tabela=tipo==='produto'?'produtos':'ativos';
-    destino.innerHTML='<div class="muted">Carregando itens cadastrados...</div>';
-    const {data,error}=await db.from(tabela).select('*').order('nome');
-    if(error){destino.textContent='Erro ao carregar '+tabela+': '+error.message;return}
-    if(!data?.length){destino.innerHTML=`<p>Nenhum ${tipo==='produto'?'produto':'equipamento'} cadastrado.</p><button type="button" class="btn secondary" id="irCadastro">Abrir cadastro</button>`;$('#irCadastro').onclick=()=>renderModule(tipo==='produto'?5:6);return}
-    destino.innerHTML=`<div class="row"><div class="field"><label>${tipo==='produto'?'Produto':'Equipamento'}</label><select id="orcItemSelect">${data.map((item,i)=>`<option value="${i}">${esc(item.nome)}</option>`).join('')}</select></div><div class="field"><label>Quantidade</label><input id="orcItemQtd" type="number" min="1" step="1" value="1"></div><div class="field"><label>Tabela de preço</label><select id="orcItemTabela"><option value="1">Tabela 1</option><option value="2">Tabela 2</option></select></div></div><div class="actions"><button type="button" id="orcCancelarItem" class="btn secondary">Cancelar</button><button type="button" id="orcConfirmarItem" class="btn primary">Adicionar ao orçamento</button></div><div id="orcItemMsg" class="msg"></div>`;
-    $('#orcCancelarItem').onclick=()=>mostrarItens(tipo);
-    $('#orcConfirmarItem').onclick=()=>{
-      const item=data[Number($('#orcItemSelect').value)];
-      const quantidade=Number($('#orcItemQtd').value);
-      if(!Number.isInteger(quantidade)||quantidade<1){$('#orcItemMsg').textContent='Informe uma quantidade inteira maior que zero.';return}
-      const tab=Number($('#orcItemTabela').value);
-      const preco=Number(tipo==='produto'?(tab===1?item.valor_varejo:item.valor_atacado):(tab===1?item.valor_locacao_tabela1:item.valor_locacao_tabela2));
-      if(!Number.isFinite(preco)||preco<0){$('#orcItemMsg').textContent='Cadastre o valor desta tabela antes de adicionar.';return}
-      (tipo==='produto'?itensProduto:itensAtivo).push({id:item.id,nome:item.nome,quantidade,preco,tabela:tab});
-      mostrarItens(tipo);atualizarEquipe();
-    };
+  const clienteSelect=$('#orcClienteSelect');
+  const {data:clientesOrc,error:erroClientesOrc}=await db.from('clientes').select('id,nome,telefone').order('nome');
+  if(erroClientesOrc){$('#orcMsg').textContent='Erro ao carregar clientes: '+erroClientesOrc.message;clienteSelect.innerHTML='<option value="">Erro ao carregar clientes</option>'}
+  else{
+    const cadastrados=(clientesOrc||[]).filter(c=>c.nome&&c.telefone);
+    clienteSelect.innerHTML='<option value="">Selecione um cliente com nome e telefone</option>'+cadastrados.map(c=>`<option value="${esc(c.id)}">${esc(c.nome)} — ${esc(c.telefone)}</option>`).join('');
+    clienteSelect.onchange=()=>{const cliente=cadastrados.find(c=>String(c.id)===clienteSelect.value);$('#orcCliente').value=cliente?.nome||'';$('#orcTelefone').value=cliente?.telefone||''};
+    if(!cadastrados.length)$('#orcMsg').textContent='Cadastre primeiro um cliente com nome e telefone na página Clientes.';
   }
   function dadosProposta(){
     const equipe=[...document.querySelectorAll('.orc-equipe-linha, .linhaEquipe')].map(l=>({
@@ -795,12 +734,12 @@ atualizarEquipe();
     const deslocamento=(Number($('#orcKm').value||0)*Number($('#orcValorKm').value||0))+Number($('#orcPedagio').value||0);
     const totalItens=[...itensProduto,...itensAtivo].reduce((s,x)=>s+(x.quantidade*x.preco),0);
     return {
-      cliente:$('#orcCliente').value.trim(), telefone:$('#orcTelefone').value.trim(),
+      cliente_id:$('#orcClienteSelect').value, cliente:$('#orcCliente').value.trim(), telefone:$('#orcTelefone').value.trim(),
       evento:$('#orcEvento').value.trim(), data_evento:$('#orcData').value||null,
-      local_evento:$('#orcLocalEvento').value.trim(), horario:$('#orcHorario').value||null,
-      horario_montagem:$('#orcHorarioMontagem').value||null,
+      local_evento:$('#orcLocalEvento').value.trim(), cidade_evento:$('#orcCidadeEvento').value.trim(), horario:$('#orcHorario').value||null,
+      horario_montagem:null,
       responsavel_evento:$('#orcResponsavelEvento').value.trim(), telefone_responsavel:$('#orcTelefoneResponsavel').value.trim(),
-      tecnico_responsavel:$('#orcTecnicoResponsavel').value.trim(),
+      tecnico_responsavel:'',
       produtos:itensProduto.map(x=>({...x})), equipamentos:itensAtivo.map(x=>({...x})), equipe,
       deslocamento:{veiculo:$('#orcVeiculo')?.value?.trim()||'',km:Number($('#orcKm').value||0),valor_km:Number($('#orcValorKm').value||0),pedagio:Number($('#orcPedagio').value||0)},
       pagamento:{forma:$('#orcFormaPagamento')?.value||'PIX',parcelas:$('#orcFormaPagamento')?.value==='Cartão de crédito'?Math.max(1,Math.min(10,Number($('#orcParcelas')?.value||1))):1,entrada_percentual:40,saldo_percentual:60,vencimento_saldo:$('#orcVencimentoSaldo')?.value||null},
@@ -808,7 +747,7 @@ atualizarEquipe();
     };
   }
   function validarProposta(d){
-    if(!d.cliente)return 'Informe o nome do cliente.';
+    if(!d.cliente_id||!d.cliente||!d.telefone)return 'Selecione um cliente cadastrado com nome e telefone.';
     if(!d.evento)return 'Informe o nome do projeto/evento.';
     if(!d.data_evento)return 'Informe a data do evento.';
     if(!d.produtos.length&&!d.equipamentos.length)return 'Adicione pelo menos um produto ou equipamento.';
@@ -829,7 +768,7 @@ atualizarEquipe();
     pdf.setFont('helvetica','bold');pdf.setFontSize(15);pdf.setTextColor(25,25,25);pdf.text('Proposta '+numero,15,y); y+=9;
     pdf.setFont('helvetica','normal');pdf.setFontSize(10);
     const dataFmt=d.data_evento?new Date(d.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—';
-    const infos=[['Cliente',d.cliente],['Projeto / Evento',d.evento],['Data do evento',dataFmt],['Local',d.local_evento||'—'],['Horário',d.horario||'—']];
+    const infos=[['Cliente',d.cliente],['Orçamento',d.evento],['Data do evento',dataFmt],['Cidade',d.cidade_evento||'—'],['Local',d.local_evento||'—'],['Horário',d.horario||'—']];
     infos.forEach(([a,b])=>{pdf.setFont('helvetica','bold');pdf.text(a+':',15,y);pdf.setFont('helvetica','normal');pdf.text(String(b),48,y);y+=7});
     y+=4;pdf.setDrawColor(212,170,76);pdf.line(15,y,195,y);y+=10;
     pdf.setFont('helvetica','bold');pdf.setFontSize(12);pdf.text('Serviços, produtos e equipamentos',15,y);y+=8;
@@ -962,8 +901,7 @@ Obrigado!`;
     box.querySelectorAll('.btnWhatsProposta').forEach(btn=>{btn.onclick=()=>{const p=data.find(x=>String(x.id)===String(btn.dataset.id));if(p)abrirWhatsPreenchimento(p)}});
     box.querySelectorAll('.btnExcluirProposta').forEach(btn=>{btn.onclick=()=>excluirProposta(btn.dataset.id)});
   }
-  prepararProdutos();
-  $('#orcAddAsset').onclick=()=>adicionarItem('ativo');
+  prepararItensOrcamento();
   $('#orcSave').onclick=()=>{$('#orcMsg').textContent='Rascunho não é gerado como proposta. Use GERAR PROPOSTA quando estiver pronto.'};
   $('#orcPrint').onclick=async()=>{
     const btn=$('#orcPrint');btn.disabled=true;$('#orcMsg').textContent='Salvando proposta e preparando PDF...';
@@ -973,16 +911,41 @@ Obrigado!`;
   };
 }
   
-  async function renderClients(){const {data,error}=await db.from('clientes').select('*').order('criado_em',{ascending:false});if(error){$('#content').innerHTML=`<div class="msg">Erro ao carregar clientes: ${error.message}</div>`;return}clients=data||[];$('#content').innerHTML=`<div class="sectionhead"><div><h2>Clientes</h2><div class="muted">${clients.length} cliente(s) cadastrado(s)</div></div><button class="btn primary" onclick="openClient()">+ Novo cliente</button></div><div class="tablewrap">${clients.length?`<table><thead><tr><th>Nome</th><th>Telefone</th><th>Origem</th><th>Endereço</th><th>Ações</th></tr></thead><tbody>${clients.map(c=>`<tr><td>${esc(c.nome)}</td><td>${esc(c.telefone||'')}</td><td>${esc(c.origem||'')}</td><td>${esc(c.endereco||'')}</td><td><div class="actions"><button class="btn secondary" onclick="editClient('${c.id}')">Editar</button><button class="btn secondary" onclick="historicoCliente('${c.id}')">Histórico</button></div></td></tr>`).join('')}</tbody></table>`:`<div class="empty">Nenhum cliente cadastrado.</div>`}</div>`}
+  function pendenciasCadastroCliente(c){
+    const campos={nome:'Nome',telefone:'Telefone',email:'E-mail',endereco:'Endereço',numero:'Número',complemento:'Complemento',cidade:'Cidade',cep:'CEP',profissao:'Profissão'};
+    if(c.tipo_pessoa==='pj'||c.cnpj){campos.cnpj='CNPJ';campos.ie='IE'}else{campos.cpf='CPF';campos.rg='RG'}
+    return Object.entries(campos).filter(([chave])=>!String(c[chave]??'').trim()).map(([,rotulo])=>rotulo);
+  }
+  function indicadorCadastroCliente(c){const faltando=pendenciasCadastroCliente(c);return faltando.length
+    ?`<span class="client-status client-status-incomplete" title="Faltam: ${esc(faltando.join(', '))}" aria-label="Cadastro incompleto: faltam ${esc(faltando.join(', '))}">■</span>`
+    :'<span class="client-status client-status-complete" title="Cadastro completo" aria-label="Cadastro completo">✅</span>'}
+  function numeroCadastroCliente(c){return c.numero_cliente==null?'—':String(c.numero_cliente).padStart(3,'0')}
+  async function renderClients(){const {data,error}=await db.from('clientes').select('*').order('criado_em',{ascending:false});if(error){$('#content').innerHTML=`<div class="msg">Erro ao carregar clientes: ${error.message}</div>`;return}clients=data||[];$('#content').innerHTML=`<div class="sectionhead"><div><h2>Clientes</h2><div class="muted">${clients.length} cliente(s) cadastrado(s)</div></div><button class="btn primary" onclick="openClient()">+ Novo cliente</button></div><div class="tablewrap">${clients.length?`<table><thead><tr><th>Nº</th><th>Data de abertura</th><th>Nome</th><th>Telefone</th><th>Endereço</th><th>Cadastro</th><th>Ações</th></tr></thead><tbody>${clients.map(c=>`<tr><td><b>${numeroCadastroCliente(c)}</b></td><td>${c.criado_em?new Date(c.criado_em).toLocaleDateString('pt-BR'):'—'}</td><td>${esc(c.nome)}</td><td>${esc(c.telefone||'')}</td><td>${esc([c.endereco,c.numero,c.complemento,c.cidade,c.cep].filter(Boolean).join(', ')||'—')}</td><td>${indicadorCadastroCliente(c)}</td><td><div class="actions"><button class="btn secondary" onclick="editClient('${c.id}')">Editar</button><button class="btn secondary" onclick="historicoCliente('${c.id}')">Histórico</button></div></td></tr>`).join('')}</tbody></table>`:`<div class="empty">Nenhum cliente cadastrado.</div>`}</div>`}
 function esc(v){return String(v).replace(/[&<>'"]/g,a=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[a]))}
-function openClient(c=null){$('#clientModal').classList.remove('hidden');$('#modalTitle').textContent=c?'Cadastro completo do cliente':'Novo cliente';$('#clientId').value=c?.id||'';$('#clientName').value=c?.nome||'';$('#clientPhone').value=c?.telefone||'';$('#clientAddress').value=c?.endereco||'';$('#clientOrigin').value=c?.origem||'manual';$('#clientNotes').value=c?.observacoes||'';$('#clientMsg').textContent='';const hb=$('#clientHistoryBtn'),dbtn=$('#deleteClientBtn'),hh=$('#clientHistory');if(hb)hb.classList.toggle('hidden',!c);if(dbtn)dbtn.classList.toggle('hidden',!c);if(hh){hh.classList.add('hidden');hh.innerHTML=''}}
+function atualizarTipoCliente(){const pj=$('#clientIsCompany').checked;$('#clientPfFields').classList.toggle('hidden',pj);$('#clientPjFields').classList.toggle('hidden',!pj)}
+$('#clientIsCompany').onchange=atualizarTipoCliente;
+function openClient(c=null){
+  $('#clientModal').classList.remove('hidden');$('#modalTitle').textContent=c?'Cliente Nº '+numeroCadastroCliente(c):'Novo cliente';
+  const campos={clientId:c?.id,clientName:c?.nome,clientPhone:c?.telefone,clientEmail:c?.email,clientAddress:c?.endereco,clientCpf:c?.cpf,clientRg:c?.rg,clientCnpj:c?.cnpj,clientIe:c?.ie,clientProfession:c?.profissao,clientCity:c?.cidade,clientZip:c?.cep,clientNumber:c?.numero,clientComplement:c?.complemento,clientOrigin:c?.origem||'manual',clientNotes:c?.observacoes};
+  for(const [id,valor] of Object.entries(campos))$('#'+id).value=valor||'';
+  $('#clientIsCompany').checked=c?.tipo_pessoa==='pj'||!!c?.cnpj;atualizarTipoCliente();$('#clientOpenedAt').textContent='Data de abertura: '+(c?.criado_em?new Date(c.criado_em).toLocaleDateString('pt-BR'):'será definida ao salvar');
+  $('#clientMsg').textContent='';const hb=$('#clientHistoryBtn'),dbtn=$('#deleteClientBtn'),hh=$('#clientHistory');if(hb)hb.classList.toggle('hidden',!c);if(dbtn)dbtn.classList.toggle('hidden',!c);if(hh){hh.classList.add('hidden');hh.innerHTML=''}
+}
 function closeClient(){$('#clientModal').classList.add('hidden')}
 async function editClient(id){const {data,error}=await db.from('clientes').select('*').eq('id',id).single();if(error){alert('Erro ao carregar o cadastro completo do cliente: '+error.message);return}openClient(data)}
 async function historicoCliente(id){await editClient(id);setTimeout(()=>mostrarHistoricoCliente(),0)}
 async function mostrarHistoricoCliente(){const id=$('#clientId').value;if(!id)return;const nome=$('#clientName').value.trim(),tel=$('#clientPhone').value.trim();const hh=$('#clientHistory');hh.classList.remove('hidden');hh.innerHTML='<div class=\"muted\">Carregando histórico...</div>';const {data,error}=await db.from('orcamentos').select('id,numero,status,cliente_nome,cliente_telefone,evento_nome,data_evento,valor_total,criado_em').order('criado_em',{ascending:false}).limit(500);if(error){hh.innerHTML='<div class=\"msg\">Erro: '+esc(error.message)+'</div>';return}const nt=tel.replace(/\D/g,'');const relacionados=(data||[]).filter(o=>(nt&&String(o.cliente_telefone||'').replace(/\D/g,'')===nt)||String(o.cliente_nome||'').trim().toLowerCase()===nome.toLowerCase());const fechados=relacionados.filter(o=>['fechado','aprovado','aceito','contrato','contratado','finalizado'].includes(String(o.status||'').toLowerCase()));const lista=fechados.length?fechados:relacionados;hh.innerHTML='<h3 style=\"margin:0 0 10px\">Histórico de orçamentos '+(fechados.length?'fechados':'do cliente')+'</h3>'+(lista.length?'<div class=\"tablewrap\"><table><thead><tr><th>Nº</th><th>Evento</th><th>Data</th><th>Valor</th><th>Status</th></tr></thead><tbody>'+lista.map(o=>'<tr><td><b>'+esc(o.numero||'—')+'</b></td><td>'+esc(o.evento_nome||'—')+'</td><td>'+(o.data_evento?new Date(o.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—')+'</td><td>'+money(o.valor_total)+'</td><td>'+esc(o.status||'—')+'</td></tr>').join('')+'</tbody></table></div>':'<div class=\"empty\">Nenhum orçamento encontrado para este cliente.</div>')}
 $('#clientHistoryBtn').onclick=mostrarHistoricoCliente;
 $('#deleteClientBtn').onclick=()=>{const id=$('#clientId').value;if(id)deleteClient(id)};
-$('#saveClientBtn').onclick=async()=>{const id=$('#clientId').value,payload={nome:$('#clientName').value.trim(),telefone:$('#clientPhone').value.trim()||null,endereco:$('#clientAddress').value.trim()||null,origem:$('#clientOrigin').value.trim()||'manual',observacoes:$('#clientNotes').value.trim()||null,atualizado_em:new Date().toISOString()};if(!payload.nome){$('#clientMsg').textContent='Informe o nome do cliente.';return}const q=id?db.from('clientes').update(payload).eq('id',id):db.from('clientes').insert(payload);const {error}=await q;if(error){$('#clientMsg').textContent='Erro: '+error.message;return}closeClient();renderClients()};
+$('#saveClientBtn').onclick=async()=>{
+  const id=$('#clientId').value,pj=$('#clientIsCompany').checked;
+  const val=x=>$('#'+x).value.trim()||null;
+  const payload={nome:val('clientName'),telefone:val('clientPhone'),tipo_pessoa:pj?'pj':'pf',email:val('clientEmail'),endereco:val('clientAddress'),numero:val('clientNumber'),complemento:val('clientComplement'),cidade:val('clientCity'),cep:val('clientZip'),profissao:val('clientProfession'),cpf:pj?null:val('clientCpf'),rg:pj?null:val('clientRg'),cnpj:pj?val('clientCnpj'):null,ie:pj?val('clientIe'):null,origem:val('clientOrigin')||'manual',observacoes:val('clientNotes'),atualizado_em:new Date().toISOString()};
+  if(!payload.nome||!payload.telefone){$('#clientMsg').textContent='Informe nome e telefone para cadastrar o cliente.';return}
+  const botao=$('#saveClientBtn');botao.disabled=true;$('#clientMsg').textContent='Salvando...';
+  const {error}=await(id?db.from('clientes').update(payload).eq('id',id):db.from('clientes').insert({...payload,criado_em:new Date().toISOString()}));
+  botao.disabled=false;if(error){$('#clientMsg').textContent='Erro ao salvar: '+error.message;return}closeClient();renderClients()
+};
 async function deleteClient(id){if(!confirm('Excluir este cliente?'))return;const {error}=await db.from('clientes').delete().eq('id',id);if(error){alert('Não foi possível excluir: '+error.message);return}closeClient();renderClients()}
 function safeHttpUrl(v){try{const u=new URL(v);return ['http:','https:'].includes(u.protocol)?u.href:null}catch{return null}}
 function money(v){return Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
@@ -1155,12 +1118,21 @@ async function removePurchaseItem(id,btn){
   if(error){btn.disabled=false;$('#purchaseMsg').textContent='Erro ao remover: '+error.message;return}
   purchaseIds.delete(id);renderShoppingList();
 }
-function openProduct(p=null){$('#productModal').classList.remove('hidden');$('#productModalTitle').textContent=p?'Editar produto':'Novo produto';$('#productId').value=p?.id||'';$('#productName').value=p?.nome||'';$('#productBarcode').value=p?.codigo_barras||'';$('#productBrand').value=p?.marca||'';$('#productUnit').value=p?.unidade||'un';$('#productStock').value=p?.estoque_atual??0;$('#productMin').value=p?.estoque_minimo??0;$('#productCost').value=p?.valor_custo??0;$('#productRetail').value=p?.valor_varejo??0;$('#productWholesale').value=p?.valor_atacado??0;atualizarLucroPeloValor('varejo');atualizarLucroPeloValor('atacado');$('#productTime').value=p?.tempo||'';$('#productEffect').value=p?.efeito||'';$('#productSupplier').value=p?.fornecedor||'';$('#productColor').value=p?.cor||'';$('#productNoise').value=p?.ruido||'';$('#productVideoUrl').value=p?.video_url||'';$('#productPhoto').value='';const im=$('#productPreview');if(p?.foto_url){im.src=p.foto_url;im.classList.remove('hidden')}else im.classList.add('hidden');$('#productMsg').textContent=''}
+function openProduct(p=null){$('#productModal').classList.remove('hidden');$('#productModalTitle').textContent=p?'Editar produto':'Novo produto';$('#productId').value=p?.id||'';$('#productName').value=p?.nome||'';$('#productBarcode').value=p?.codigo_barras||'';$('#productBrand').value=p?.marca||'';$('#productConsumable').checked=p?.consumivel!==false;$('#productUnit').value=p?.unidade||'un';$('#productStock').value=p?.estoque_atual??0;$('#productMin').value=p?.estoque_minimo??0;$('#productCost').value=p?.valor_custo??0;$('#productRetail').value=p?.valor_varejo??0;$('#productWholesale').value=p?.valor_atacado??0;atualizarLucroPeloValor('varejo');atualizarLucroPeloValor('atacado');$('#productTime').value=p?.tempo||'';$('#productEffect').value=p?.efeito||'';$('#productSupplier').value=p?.fornecedor||'';$('#productColor').value=p?.cor||'';$('#productNoise').value=p?.ruido||'';$('#productVideoUrl').value=p?.video_url||'';$('#productPhoto').value='';const im=$('#productPreview');if(p?.foto_url){im.src=p.foto_url;im.classList.remove('hidden')}else im.classList.add('hidden');$('#productMsg').textContent=''}
 function closeProduct(){$('#productModal').classList.add('hidden')}
 function editProduct(id){openProduct(products.find(p=>p.id===id))}
 $('#productPhoto').onchange=e=>{const f=e.target.files[0];if(f){$('#productPreview').src=URL.createObjectURL(f);$('#productPreview').classList.remove('hidden')}};
-$('#saveProductBtn').onclick=async()=>{const id=$('#productId').value;$('#productMsg').textContent='Salvando...';try{let foto_url=id?products.find(p=>p.id===id)?.foto_url:null;const f=$('#productPhoto').files[0];if(f)foto_url=await uploadPhoto(f,'produtos');const payload={nome:$('#productName').value.trim(),codigo_barras:$('#productBarcode').value.trim()||null,marca:$('#productBrand').value.trim()||null,unidade:$('#productUnit').value.trim()||'unidade',estoque_atual:+$('#productStock').value||0,estoque_minimo:+$('#productMin').value||0,valor_custo:+$('#productCost').value||0,valor_varejo:+$('#productRetail').value||0,valor_atacado:+$('#productWholesale').value||0,tempo:$('#productTime').value.trim()||null,fornecedor:$('#productSupplier').value.trim()||null,efeito:$('#productEffect').value.trim()||null,cor:$('#productColor').value.trim()||null,ruido:$('#productNoise').value||null,foto_url,video_url:$('#productVideoUrl').value.trim()||null,atualizado_em:new Date().toISOString()};if(!payload.nome)throw new Error('Informe o nome do produto.');if(payload.video_url&&!safeHttpUrl(payload.video_url))throw new Error('Informe um link de vídeo válido começando com https:// ou http://.');const {error}=await(id?db.from('produtos').update(payload).eq('id',id):db.from('produtos').insert(payload));if(error)throw error;closeProduct();renderProducts()}catch(e){$('#productMsg').textContent='Erro: '+e.message}};
-async function renderAssets(){const {data,error}=await db.from('ativos').select('*').order('nome');if(error){$('#content').innerHTML=`<div class="msg">Erro ao carregar ativos: ${error.message}</div>`;return}assets=data||[];$('#content').innerHTML=`<div class="sectionhead"><div><h2>Ativos / Equipamentos</h2><div class="muted">${assets.length} ativo(s)</div></div><button class="btn primary" onclick="openAsset()">+ Novo ativo</button></div><div class="tablewrap">${assets.length?`<table><thead><tr><th>Foto</th><th>Equipamento</th><th>Código</th><th>Cód. barras</th><th>Compra</th><th>Valor compra</th><th>Status</th><th>Ações</th></tr></thead><tbody>${assets.map(a=>`<tr><td>${a.foto_url?`<img class="thumb" src="${esc(a.foto_url)}">`:'—'}</td><td>${esc(a.nome)}</td><td>${esc(a.codigo_interno||'')}</td><td>${esc(a.codigo_barras||'')}</td><td>${a.data_compra?new Date(a.data_compra+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${money(a.valor_compra)}</td><td>${esc(a.status||'')}</td><td><button class="btn secondary" onclick="editAsset('${a.id}')">Editar</button></td></tr>`).join('')}</tbody></table>`:`<div class="empty">Nenhum ativo cadastrado.</div>`}</div>`}
+$('#saveProductBtn').onclick=async()=>{const id=$('#productId').value;$('#productMsg').textContent='Salvando...';try{let foto_url=id?products.find(p=>p.id===id)?.foto_url:null;const f=$('#productPhoto').files[0];if(f)foto_url=await uploadPhoto(f,'produtos');const payload={nome:$('#productName').value.trim(),codigo_barras:$('#productBarcode').value.trim()||null,marca:$('#productBrand').value.trim()||null,consumivel:$('#productConsumable').checked,unidade:$('#productUnit').value.trim()||'unidade',estoque_atual:+$('#productStock').value||0,estoque_minimo:+$('#productMin').value||0,valor_custo:+$('#productCost').value||0,valor_varejo:+$('#productRetail').value||0,valor_atacado:+$('#productWholesale').value||0,tempo:$('#productTime').value.trim()||null,fornecedor:$('#productSupplier').value.trim()||null,efeito:$('#productEffect').value.trim()||null,cor:$('#productColor').value.trim()||null,ruido:$('#productNoise').value||null,foto_url,video_url:$('#productVideoUrl').value.trim()||null,atualizado_em:new Date().toISOString()};if(!payload.nome)throw new Error('Informe o nome do produto.');if(payload.video_url&&!safeHttpUrl(payload.video_url))throw new Error('Informe um link de vídeo válido começando com https:// ou http://.');const {error}=await(id?db.from('produtos').update(payload).eq('id',id):db.from('produtos').insert(payload));if(error)throw error;closeProduct();renderProducts()}catch(e){$('#productMsg').textContent='Erro: '+e.message}};
+async function renderAssets(){await atualizarContaMaster();const {data,error}=await db.from('ativos').select('*').order('nome');if(error){$('#content').innerHTML=`<div class="msg">Erro ao carregar ativos: ${error.message}</div>`;return}assets=data||[];$('#content').innerHTML=`<div class="sectionhead"><div><h2>Ativos / Equipamentos</h2><div class="muted">${assets.length} ativo(s)</div></div><button class="btn primary" onclick="openAsset()">+ Novo ativo</button></div><div class="tablewrap">${assets.length?`<table><thead><tr><th>Foto</th><th>Equipamento</th><th>Código</th><th>Cód. barras</th><th>Compra</th><th>Valor compra</th><th>Status</th><th>Ações</th></tr></thead><tbody>${assets.map(a=>`<tr><td>${a.foto_url?`<img class="thumb" src="${esc(a.foto_url)}">`:'—'}</td><td>${esc(a.nome)}</td><td>${esc(a.codigo_interno||'')}</td><td>${esc(a.codigo_barras||'')}</td><td>${a.data_compra?new Date(a.data_compra+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${money(a.valor_compra)}</td><td>${esc(a.status||'')}</td><td><div class="actions"><button class="btn secondary" onclick="editAsset('${a.id}')">Editar</button>${contaMaster()?`<button type="button" title="Excluir equipamento" aria-label="Excluir equipamento" onclick="excluirAtivo('${a.id}')" style="width:28px;height:28px;border:1px solid #63303a;background:#2a151a;color:#ff7b88;border-radius:7px;font-size:14px;font-weight:900;cursor:pointer;padding:0">×</button>`:''}</div></td></tr>`).join('')}</tbody></table>`:`<div class="empty">Nenhum ativo cadastrado.</div>`}</div>`}
+async function excluirAtivo(id){
+ if(!contaMaster()){alert('Somente a conta Master pode excluir equipamentos.');return}
+ const ativo=assets.find(a=>String(a.id)===String(id));
+ const nome=ativo?.nome||'este equipamento';
+ if(!confirm(`Excluir definitivamente ${nome}? Esta ação não poderá ser desfeita.`))return;
+ const {error}=await db.from('ativos').delete().eq('id',id);
+ if(error){alert('Não foi possível excluir o equipamento: '+error.message);return}
+ renderAssets();
+}
 function openAsset(a=null){$('#assetModal').classList.remove('hidden');$('#assetModalTitle').textContent=a?'Editar ativo':'Novo ativo';$('#assetId').value=a?.id||'';$('#assetName').value=a?.nome||'';$('#assetCode').value=a?.codigo_interno||'';$('#assetBarcode').value=a?.codigo_barras||'';$('#assetSupplier').value=a?.fornecedor||'';$('#assetPurchaseDate').value=a?.data_compra||'';$('#assetPurchaseValue').value=a?.valor_compra??0;$('#assetRent1').value=a?.valor_locacao_tabela1??0;$('#assetRent2').value=a?.valor_locacao_tabela2??0;$('#assetWeight').value=a?.peso??'';$('#assetCase').value=String(a?.possui_case??false);$('#assetNotes').value=a?.observacoes||'';$('#assetPhoto').value='';const im=$('#assetPreview');if(a?.foto_url){im.src=a.foto_url;im.classList.remove('hidden')}else im.classList.add('hidden');$('#assetMsg').textContent=''}
 function closeAsset(){$('#assetModal').classList.add('hidden')}
 function editAsset(id){openAsset(assets.find(a=>a.id===id))}
@@ -1168,8 +1140,21 @@ $('#assetPhoto').onchange=e=>{const f=e.target.files[0];if(f){$('#assetPreview')
 $('#saveAssetBtn').onclick=async()=>{const id=$('#assetId').value;$('#assetMsg').textContent='Salvando...';try{let foto_url=id?assets.find(a=>a.id===id)?.foto_url:null;const f=$('#assetPhoto').files[0];if(f)foto_url=await uploadPhoto(f,'ativos');const payload={nome:$('#assetName').value.trim(),codigo_interno:$('#assetCode').value.trim()||null,codigo_barras:$('#assetBarcode').value.trim()||null,fornecedor:$('#assetSupplier').value.trim()||null,data_compra:$('#assetPurchaseDate').value||null,valor_compra:+$('#assetPurchaseValue').value||0,valor_locacao_tabela1:+$('#assetRent1').value||0,valor_locacao_tabela2:+$('#assetRent2').value||0,peso:$('#assetWeight').value?+$('#assetWeight').value:null,possui_case:$('#assetCase').value==='true',observacoes:$('#assetNotes').value.trim()||null,foto_url,atualizado_em:new Date().toISOString()};if(!payload.nome)throw new Error('Informe o nome do equipamento.');const {error}=await(id?db.from('ativos').update(payload).eq('id',id):db.from('ativos').insert(payload));if(error)throw error;closeAsset();renderAssets()}catch(e){$('#assetMsg').textContent='Erro: '+e.message}};
 
 
+
+async function atualizarContaMaster(){
+ try{
+   const {data}=await db.auth.getUser();
+   if(data?.user){
+     currentAuthUser=data.user;
+     if(data.user.email)localStorage.setItem('cz_auth_email',String(data.user.email).trim().toLowerCase());
+   }
+ }catch(_){}
+ return contaMaster();
+}
+
 // ===== MÓDULO EVENTOS / OPERAÇÃO =====
 async function renderEventos(){
+  await atualizarContaMaster();
   const {data,error}=await db.from('eventos_operacionais').select('*').order('data_evento',{ascending:true});
   if(error){$('#content').innerHTML=`<div class="sectionhead"><h2>Eventos</h2></div><div class="msg">Para ativar Eventos, execute primeiro o SQL desta versão no Supabase.<br>${esc(error.message)}</div>`;return}
   const eventos=data||[];
@@ -1232,6 +1217,7 @@ function retornoInfo(mid){try{return JSON.parse(localStorage.getItem(retornoKey(
 function salvarRetorno(mid,obj){try{localStorage.setItem(retornoKey(mid),JSON.stringify(obj))}catch(_){}}
 function dataUltimoRetorno(mid){const r=retornoInfo(mid),v=r.registros?.[r.registros.length-1];return v?new Date(v).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}):'—'}
 async function renderRetornoEventos(){
+ await atualizarContaMaster();
  const {data,error}=await db.from('eventos_operacionais').select('*').in('status',['aguardando_retorno','finalizado']).order('data_evento',{ascending:true});
  if(error){$('#content').innerHTML='<div class="msg">Erro: '+esc(error.message)+'</div>';return}
  const es=data||[];$('#content').innerHTML=`<div class="sectionhead"><div><h2>↩️ Retorno de evento</h2><div class="muted">Conferência da devolução após a saída do evento.</div></div><button class="btn secondary" onclick="renderEventos()">Voltar aos eventos</button></div><div class="tablewrap">${es.length?`<table><thead><tr><th>Data</th><th>Cliente</th><th>Evento</th><th>Status</th><th>Operação</th>${contaMaster()?'<th style="width:46px"></th>':''}</tr></thead><tbody>${es.map(e=>`<tr><td>${e.data_evento?new Date(e.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${esc(e.cliente_nome||'')}</td><td>${esc(e.nome_evento||'')}</td><td>${statusEventoLabel(e.status)}</td><td><button class="btn primary" onclick="abrirRetornoEvento('${e.id}')">${e.status==='finalizado'?'Ver retorno':'Iniciar retorno'}</button></td>${contaMaster()?`<td><button type="button" title="Excluir evento" aria-label="Excluir evento" onclick="excluirEvento('${e.id}','retorno')" style="width:28px;height:28px;border:1px solid #63303a;background:#2a151a;color:#ff7b88;border-radius:7px;font-size:14px;font-weight:900;cursor:pointer;padding:0">×</button></td>`:''}</tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhum evento aguardando retorno.</div>'}</div>`
