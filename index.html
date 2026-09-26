@@ -671,7 +671,7 @@ atualizarEquipe();
     pdf.text('CZ Efeitos Especiais • Proposta gerada em '+new Date().toLocaleString('pt-BR'),15,y);
     pdf.save('proposta-'+numero.replace(/[^a-zA-Z0-9_-]/g,'-')+'-'+d.cliente.replace(/[^a-zA-Z0-9_-]/g,'-')+'.pdf');
   }
-  async function salvarProposta(status='gerada'){
+  async function salvarProposta(status='enviado'){
     const d=dadosProposta(),erro=validarProposta(d);if(erro)throw new Error(erro);
     const numero='CZ-'+new Date().getFullYear()+'-'+String(Date.now()).slice(-6);
     const payload={numero,status,cliente_nome:d.cliente,cliente_telefone:d.telefone||null,evento_nome:d.evento,data_evento:d.data_evento,local_evento:d.local_evento||null,valor_total:d.total,dados:d,criado_em:new Date().toISOString()};
