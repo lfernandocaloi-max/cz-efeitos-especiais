@@ -46,6 +46,15 @@
 .orc-equipe-linha.orc-team-row{grid-template-columns:minmax(145px,1.5fr) repeat(5,minmax(95px,1fr))}
 .orc-team-total{display:flex;justify-content:flex-end;margin-top:14px}
 .orc-team-total strong{display:inline-block;background:#155e39;border:1px solid #38b86b;color:#fff;border-radius:9px;padding:10px 16px;text-align:center}
+.payment-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px;align-items:end}
+.payment-grid .field{min-width:0}
+.payment-grid input,.payment-grid select{min-height:36px;padding:7px 9px;font-size:14px}
+.payment-grid input[type="number"]{max-width:115px}
+.payment-wide{grid-column:1/-1}
+.contract-installment{display:grid;grid-template-columns:80px minmax(110px,1fr) minmax(155px,1fr) minmax(145px,1fr);gap:10px;align-items:end;padding:10px 0;border-bottom:1px solid var(--line)}
+.contract-installment .field{margin-top:0;min-width:0}
+.contract-installment input,.contract-installment select{min-width:0;width:100%;padding:7px 9px;font-size:14px}
+@media(max-width:620px){.contract-installment{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:900px){.orc-travel-grid{grid-template-columns:repeat(2,minmax(120px,180px))}.orc-team-row{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.orc-travel-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style>
@@ -209,7 +218,7 @@ function finPagoOrc(orcId){return finPagamentos(orcId).reduce((s,x)=>s+Number(x.
 function finStatus(total,pago,venc){const saldo=Math.max(0,total-pago),hoje=finISODate();if(saldo<=.009)return '✅ Quitado';if(pago>0&&venc<hoje)return '🔴 Parcial / vencido';if(venc<hoje)return '🔴 Vencido';if(pago>0)return '🟡 Parcial';return '⏳ Pendente'}
 async function finRecebiveis(){
  const {data,error}=await db.from('orcamentos').select('id,numero,cliente_nome,cliente_telefone,evento_nome,data_evento,valor_total,criado_em,dados').order('criado_em',{ascending:false}).limit(300);if(error)return [];
- return (data||[]).map(o=>{const total=Number(o.valor_total||0),pago=finPagoOrc(o.id),venc=o.data_evento?finAddDays(o.data_evento,-5):String(o.criado_em||'').slice(0,10),entrada=total*.4;return {...o,total,pago,saldo:Math.max(0,total-pago),entrada,vencimento:venc,status_fin:finStatus(total,pago,venc)}}).filter(x=>x.total>0);
+ return (data||[]).map(o=>{const total=Number(o.valor_total||0),pago=finPagoOrc(o.id),venc=o.data_evento?finAddDays(o.data_evento,-5):String(o.criado_em||'').slice(0,10),entrada=o.dados?.pagamento?.modo==='contratual'?Number(o.dados.pagamento.entrada_valor||0):o.dados?.pagamento?.modo==='avista'?total:total*.4;return {...o,total,pago,saldo:Math.max(0,total-pago),entrada,vencimento:venc,status_fin:finStatus(total,pago,venc)}}).filter(x=>x.total>0);
 }
 function finDespesas(){return finLoad(FIN_MOV_KEY).filter(x=>x.tipo==='saida')}
 function finResumoMes(receb,desp){const hoje=finISODate(),ym=hoje.slice(0,7);return {hoje,receberHoje:receb.filter(x=>x.saldo>0&&x.vencimento===hoje).reduce((s,x)=>s+x.saldo,0),receberMes:receb.filter(x=>x.saldo>0&&x.vencimento>hoje&&x.vencimento.startsWith(ym)).reduce((s,x)=>s+x.saldo,0),pagarHoje:desp.filter(x=>x.status!=='pago'&&x.vencimento===hoje).reduce((s,x)=>s+Number(x.valor||0),0),pagarMes:desp.filter(x=>x.status!=='pago'&&x.vencimento>hoje&&String(x.vencimento||'').startsWith(ym)).reduce((s,x)=>s+Number(x.valor||0),0),vencidos:receb.filter(x=>x.saldo>0&&x.vencimento<hoje).reduce((s,x)=>s+x.saldo,0),cobrancas:finLoad(FIN_COB_KEY).filter(x=>x.proxima_data===hoje)}}
@@ -537,12 +546,8 @@ async function renderOrcamentos(novo=false){
       <div id="orcItemPicker" class="muted">Carregando produtos e equipamentos...</div>
     </div>
     <div class="card" style="margin-bottom:18px">
-      <h3 style="margin:0">📦 2. Produtos</h3>
-      <div id="orcProdutosLista" style="margin-top:16px" class="muted">Nenhum produto adicionado.</div>
-    </div>
-    <div class="card" style="margin-bottom:18px">
-      <h3 style="margin:0">⚙️ 3. Equipamentos</h3>
-      <div id="orcAtivosLista" style="margin-top:16px" class="muted">Nenhum equipamento adicionado.</div>
+      <h3 style="margin:0">📦 Orçamento</h3>
+      <div id="orcProdutosLista" style="margin-top:16px" class="muted">Nenhum item adicionado.</div>
     </div>
 
     <!-- RESUMO -->
@@ -560,6 +565,11 @@ async function renderOrcamentos(novo=false){
         Composição interna do orçamento
       </div>
 
+      <div class="payment-grid" style="margin-top:12px">
+        <div class="field"><label style="color:#fff">Desconto %</label><input id="orcDescontoPercentual" type="number" min="0" max="100" step="0.01" value="0" inputmode="decimal"></div>
+        <div class="field"><label style="color:#fff">Desconto em R$</label><input id="orcDescontoValor" readonly value="R$ 0,00"></div>
+      </div>
+
       <div style="margin-top:18px;font-size:14px">
         INVESTIMENTO DO CLIENTE
       </div>
@@ -572,14 +582,24 @@ async function renderOrcamentos(novo=false){
 
     <div class="card" style="margin-bottom:18px">
       <h3 style="margin-top:0">💳 Forma e condição de pagamento</h3>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
-        <div class="field"><label>Forma de pagamento</label><select id="orcFormaPagamento"><option>PIX</option><option>Dinheiro</option><option>Cartão de débito</option><option>Cartão de crédito</option></select></div>
-        <div class="field" id="orcParcelasBox" style="display:none"><label>Parcelas do cartão</label><input id="orcParcelas" type="number" min="1" max="10" value="1" list="parcelasOp"><datalist id="parcelasOp">${Array.from({length:10},(_,i)=>`<option value="${i+1}">${i+1}x</option>`).join('')}</datalist></div>
-        <div class="field"><label>Entrada prevista (40%)</label><input id="orcEntradaPrevista" readonly value="R$ 0,00"></div>
-        <div class="field"><label>Saldo previsto (60%)</label><input id="orcSaldoPrevisto" readonly value="R$ 0,00"></div>
-        <div class="field"><label>Vencimento do saldo</label><input id="orcVencimentoSaldo" type="date" readonly></div>
+      <div class="field"><label>Condição</label><select id="orcCondicaoPagamento"><option value="avista">À vista</option><option value="contratual">Parcelamento contratual</option></select></div>
+      <div id="orcPagamentoVista" class="payment-grid">
+        <div class="field"><label>Forma de pagamento</label><select id="orcFormaPagamento"><option>PIX</option><option>Dinheiro</option><option>Cartão de débito</option><option>Cartão de crédito</option><option>Transferência</option></select></div>
+        <div class="field"><label>Valor total</label><input id="orcValorVista" readonly value="R$ 0,00"></div>
+        <div class="field hidden" id="orcCartaoBox"><label>Parcelas do cartão</label><select id="orcParcelasCartao">${Array.from({length:10},(_,i)=>`<option value="${i+1}">${i+1}x</option>`).join('')}</select></div>
+        <div id="orcCartaoValores" class="payment-wide hidden"></div>
       </div>
-      <div class="muted" style="margin-top:8px">A entrada é uma condição prevista. O valor só entra como pago quando for dada baixa no Financeiro. O saldo vence 5 dias antes do evento e pode receber baixas parciais.</div>
+      <div id="orcPagamentoContratual" class="hidden">
+        <div class="payment-grid">
+          <div class="field"><label>Entrada %</label><input id="orcEntradaPercentual" type="number" min="0" max="100" step="0.01" value="40" inputmode="decimal"></div>
+          <div class="field"><label>Valor da entrada</label><input id="orcEntradaValor" readonly value="R$ 0,00"></div>
+          <div class="field"><label>Forma de pagamento da entrada</label><select id="orcFormaEntrada"><option>PIX</option><option>Dinheiro</option><option>Cartão de débito</option><option>Cartão de crédito</option><option>Transferência</option></select></div>
+          <div class="field"><label>Restante a pagar</label><input id="orcRestante" readonly value="R$ 0,00"></div>
+          <div class="field"><label>Parcelas do restante</label><select id="orcParcelasContrato">${Array.from({length:10},(_,i)=>`<option value="${i+1}">${i+1}x</option>`).join('')}</select></div>
+        </div>
+        <div id="orcParcelasContratoLista"></div>
+        <div id="orcPagamentoMsg" class="msg" role="status"></div>
+      </div>
     </div>
 
     <div style="display:flex;gap:10px;flex-wrap:wrap">
@@ -594,6 +614,7 @@ async function renderOrcamentos(novo=false){
     <div id="orcMsg" class="msg" role="status"></div>
   `;
 
+ let parcelasRestanteBase=-1,parcelasRestanteQtd=0;
  const atualizarEquipe = () => {
   let totalEquipe = 0;
 
@@ -622,14 +643,75 @@ if (campoTotalEquipe) {
 }
   const deslocamento = (Number($('#orcKm').value||0) * Number($('#orcValorKm').value||0)) + Number($('#orcPedagio').value||0);
   const itens = [...itensProduto,...itensAtivo].reduce((s,item)=>s+item.quantidade*item.preco,0);
-  const totalGeral=totalEquipe+deslocamento+itens; $('#orcInvestimento').textContent = money(totalGeral); if($('#orcEntradaPrevista'))$('#orcEntradaPrevista').value=money(totalGeral*.4);if($('#orcSaldoPrevisto'))$('#orcSaldoPrevisto').value=money(totalGeral*.6);
+  const subtotal=Number((totalEquipe+deslocamento+itens).toFixed(2));
+  const percentual=Number($('#orcDescontoPercentual').value||0);
+  const desconto=Number((subtotal*Math.min(100,Math.max(0,Number.isFinite(percentual)?percentual:0))/100).toFixed(2));
+  const totalGeral=Number((subtotal-desconto).toFixed(2));
+  $('#orcDescontoValor').value=money(desconto);
+  $('#orcInvestimento').textContent=money(totalGeral);
+  $('#orcInvestimento').dataset.valor=String(totalGeral);
+  atualizarPagamento();
 };
 
 document.querySelectorAll('.orc-equipe-linha input, .linhaEquipe input').forEach(input => {
   input.addEventListener('input', atualizarEquipe);
 });
 ['orcKm','orcValorKm','orcPedagio'].forEach(id=>$('#'+id).addEventListener('input',atualizarEquipe));
-$('#orcFormaPagamento').onchange=()=>{$('#orcParcelasBox').style.display=$('#orcFormaPagamento').value==='Cartão de crédito'?'block':'none'};$('#orcData').addEventListener('change',()=>{$('#orcVencimentoSaldo').value=$('#orcData').value?finAddDays($('#orcData').value,-5):''});
+$('#orcDescontoPercentual').addEventListener('input',atualizarEquipe);
+$('#orcCondicaoPagamento').onchange=()=>atualizarPagamento();
+$('#orcFormaPagamento').onchange=()=>atualizarPagamento();
+$('#orcParcelasCartao').onchange=()=>atualizarPagamento();
+$('#orcEntradaPercentual').addEventListener('input',()=>atualizarPagamento());
+$('#orcParcelasContrato').onchange=()=>atualizarPagamento();
+$('#orcData').addEventListener('change',()=>atualizarPagamento(true));
+
+function atualizarPagamento(forcarData=false){
+  const totalCent=Math.round(Number($('#orcInvestimento').dataset.valor||0)*100);
+  const modo=$('#orcCondicaoPagamento').value;
+  $('#orcPagamentoVista').classList.toggle('hidden',modo!=='avista');
+  $('#orcPagamentoContratual').classList.toggle('hidden',modo!=='contratual');
+  $('#orcValorVista').value=money(totalCent/100);
+  const credito=modo==='avista'&&$('#orcFormaPagamento').value==='Cartão de crédito';
+  $('#orcCartaoBox').classList.toggle('hidden',!credito);
+  $('#orcCartaoValores').classList.toggle('hidden',!credito);
+  if(credito){
+    const n=Number($('#orcParcelasCartao').value),base=Math.floor(totalCent/n);
+    $('#orcCartaoValores').innerHTML='<div class="muted" style="margin-top:8px">'+Array.from({length:n},(_,i)=>`${i+1}ª parcela: ${money((i===n-1?totalCent-base*(n-1):base)/100)}`).join(' · ')+'</div>';
+  }
+  if(modo!=='contratual')return;
+  const percent=Number($('#orcEntradaPercentual').value||0);
+  const entradaCent=Math.round(totalCent*Math.min(100,Math.max(0,Number.isFinite(percent)?percent:0))/100);
+  const restanteCent=totalCent-entradaCent,n=Number($('#orcParcelasContrato').value);
+  $('#orcEntradaValor').value=money(entradaCent/100);
+  $('#orcRestante').value=money(restanteCent/100);
+  const limite=$('#orcData').value?finAddDays($('#orcData').value,-5):'';
+  if(parcelasRestanteBase!==restanteCent||parcelasRestanteQtd!==n||forcarData){
+    const anteriores=[...document.querySelectorAll('.contract-installment')].map(l=>({data:l.querySelector('[data-parcela-data]')?.value,forma:l.querySelector('[data-parcela-forma]')?.value}));
+    const base=Math.floor(restanteCent/n);
+    $('#orcParcelasContratoLista').innerHTML=Array.from({length:n},(_,i)=>{
+      const valor=(i===n-1?restanteCent-base*(n-1):base)/100;
+      const data=i===n-1?(limite||''):(anteriores[i]?.data||'');
+      const forma=anteriores[i]?.forma||'PIX';
+      const formas=['PIX','Dinheiro','Cartão de débito','Cartão de crédito','Transferência'];
+      return `<div class="contract-installment"><b>${i+1}ª parcela</b><div class="field"><label>Valor (R$)</label><input data-parcela-valor type="number" min="0" step="0.01" value="${valor.toFixed(2)}" inputmode="decimal"></div><div class="field"><label>Data</label><input data-parcela-data type="date" value="${esc(data)}" ${i===n-1&&limite?`max="${limite}"`:''}></div><div class="field"><label>Forma de pagamento</label><select data-parcela-forma>${formas.map(f=>`<option ${forma===f?'selected':''}>${f}</option>`).join('')}</select></div></div>`;
+    }).join('');
+    parcelasRestanteBase=restanteCent;parcelasRestanteQtd=n;
+  }
+  atualizarSomaParcelas();
+}
+function atualizarSomaParcelas(){
+  const restanteCent=Math.round(Number($('#orcInvestimento').dataset.valor||0)*100)-Math.round(Number($('#orcEntradaPercentual').value||0)*Number($('#orcInvestimento').dataset.valor||0));
+  const somaCent=[...document.querySelectorAll('[data-parcela-valor]')].reduce((s,c)=>s+Math.round(Number(c.value||0)*100),0);
+  const diferenca=restanteCent-somaCent;
+  $('#orcPagamentoMsg').textContent=diferenca===0?'':`Ajuste os valores das parcelas: diferença de ${money(Math.abs(diferenca)/100)} ${diferenca>0?'a distribuir':'acima do restante'}.`;
+}
+$('#orcParcelasContratoLista').addEventListener('input',e=>{if(e.target.matches('[data-parcela-valor]'))atualizarSomaParcelas()});
+$('#orcParcelasContratoLista').addEventListener('change',e=>{
+  if(!e.target.matches('[data-parcela-data]'))return;
+  const ultima=$('#orcParcelasContratoLista .contract-installment:last-child [data-parcela-data]');
+  const limite=$('#orcData').value?finAddDays($('#orcData').value,-5):'';
+  if(e.target===ultima&&limite&&ultima.value>limite){ultima.value=limite;$('#orcPagamentoMsg').textContent='A última parcela não pode vencer depois de 5 dias antes do evento.'}
+});
 
 $('#btnAdicionarColaborador').onclick = () => {
   const container = $('#orcEquipeLista');
@@ -684,11 +766,14 @@ $('#btnAdicionarColaborador').onclick = () => {
 };
 
 atualizarEquipe();
-  function mostrarItens(tipo){
-    const lista=tipo==='produto'?itensProduto:itensAtivo;
-    const destino=$(tipo==='produto'?'#orcProdutosLista':'#orcAtivosLista');
-    destino.innerHTML=lista.length?`<div class="tablewrap"><table><thead><tr><th>${tipo==='produto'?'Produto':'Equipamento'}</th><th>Quantidade</th><th>Valor unitário</th><th>Tabela de preço</th><th>Valor total</th><th>Ação</th></tr></thead><tbody>${lista.map((item,i)=>`<tr><td>${esc(item.nome)}</td><td>${item.quantidade}</td><td>${money(item.preco)}</td><td>Tabela ${item.tabela}</td><td>${money(item.quantidade*item.preco)}</td><td><button type="button" class="btn danger" data-remover="${i}">Remover</button></td></tr>`).join('')}</tbody></table></div><div style="text-align:right;margin-top:12px;font-weight:700;color:var(--text)">Total ${tipo==='produto'?'dos produtos':'dos equipamentos'}: ${money(lista.reduce((total,item)=>total+item.quantidade*item.preco,0))}</div>`:'Nenhum item adicionado.';
-    destino.querySelectorAll('[data-remover]').forEach(btn=>btn.onclick=()=>{lista.splice(Number(btn.dataset.remover),1);mostrarItens(tipo);atualizarEquipe()});
+  function mostrarItens(){
+    const destino=$('#orcProdutosLista');
+    const linhas=[...itensProduto.map((item,i)=>({item,tipo:'produto',indice:i})),...itensAtivo.map((item,i)=>({item,tipo:'ativo',indice:i}))];
+    destino.innerHTML=linhas.length?`<div class="tablewrap"><table><thead><tr><th>Item</th><th>Tipo</th><th>Quantidade</th><th>Tabela de preço</th><th>Valor unitário</th><th>Valor total</th><th>Ação</th></tr></thead><tbody>${linhas.map(({item,tipo,indice})=>`<tr><td>${esc(item.nome)}</td><td>${tipo==='produto'?'Produto':'Equipamento'}</td><td>${item.quantidade}</td><td>Tabela ${item.tabela}</td><td>${money(item.preco)}</td><td>${money(item.quantidade*item.preco)}</td><td><button type="button" class="btn danger" data-remover-tipo="${tipo}" data-remover-indice="${indice}" style="padding:6px 8px;font-size:11px">Remover</button></td></tr>`).join('')}</tbody></table></div><div class="orc-team-total"><strong>Total dos itens: ${money(linhas.reduce((s,{item})=>s+item.quantidade*item.preco,0))}</strong></div>`:'Nenhum item adicionado.';
+    destino.querySelectorAll('[data-remover-tipo]').forEach(btn=>btn.onclick=()=>{
+      const lista=btn.dataset.removerTipo==='produto'?itensProduto:itensAtivo;
+      lista.splice(Number(btn.dataset.removerIndice),1);mostrarItens();atualizarEquipe();
+    });
   }
   async function prepararItensOrcamento(){
     const destino=$('#orcItemPicker');
@@ -747,6 +832,14 @@ atualizarEquipe();
     const totalEquipe=equipe.reduce((s,x)=>s+(x.valor_diaria*x.diarias)+(x.alimentacao*x.diarias)+(x.estadia*x.diarias),0);
     const deslocamento=(Number($('#orcKm').value||0)*Number($('#orcValorKm').value||0))+Number($('#orcPedagio').value||0);
     const totalItens=[...itensProduto,...itensAtivo].reduce((s,x)=>s+(x.quantidade*x.preco),0);
+    const subtotal=Number((totalEquipe+deslocamento+totalItens).toFixed(2));
+    const descontoPercentual=Number($('#orcDescontoPercentual').value||0);
+    const descontoValor=Number((subtotal*Math.min(100,Math.max(0,descontoPercentual))/100).toFixed(2));
+    const total=Number((subtotal-descontoValor).toFixed(2));
+    const modo=$('#orcCondicaoPagamento').value;
+    const entradaPercentual=modo==='contratual'?Number($('#orcEntradaPercentual').value||0):0;
+    const entradaValor=modo==='contratual'?Math.round(Math.round(total*100)*Math.min(100,Math.max(0,entradaPercentual))/100)/100:0;
+    const parcelasDetalhes=modo==='contratual'?[...document.querySelectorAll('.contract-installment')].map((l,i)=>{const valor=l.querySelector('[data-parcela-valor]').value;return {numero:i+1,valor:valor===''?null:Number(valor),data:l.querySelector('[data-parcela-data]').value,forma:l.querySelector('[data-parcela-forma]').value}}):[];
     return {
       cliente_id:$('#orcClienteSelect').value, cliente:$('#orcCliente').value.trim(), telefone:$('#orcTelefone').value.trim(),
       evento:$('#orcEvento').value.trim(), data_evento:$('#orcData').value||null,
@@ -756,8 +849,8 @@ atualizarEquipe();
       tecnico_responsavel:'',
       produtos:itensProduto.map(x=>({...x})), equipamentos:itensAtivo.map(x=>({...x})), equipe,
       deslocamento:{veiculo:$('#orcVeiculo')?.value?.trim()||'',km:Number($('#orcKm').value||0),valor_km:Number($('#orcValorKm').value||0),pedagio:Number($('#orcPedagio').value||0)},
-      pagamento:{forma:$('#orcFormaPagamento')?.value||'PIX',parcelas:$('#orcFormaPagamento')?.value==='Cartão de crédito'?Math.max(1,Math.min(10,Number($('#orcParcelas')?.value||1))):1,entrada_percentual:40,saldo_percentual:60,vencimento_saldo:$('#orcVencimentoSaldo')?.value||null},
-      total:Number((totalEquipe+deslocamento+totalItens).toFixed(2))
+      pagamento:{modo,forma:modo==='avista'?$('#orcFormaPagamento').value:null,parcelas:modo==='avista'&&$('#orcFormaPagamento').value==='Cartão de crédito'?Number($('#orcParcelasCartao').value):1,entrada_percentual:entradaPercentual,entrada_valor:entradaValor,forma_entrada:modo==='contratual'?$('#orcFormaEntrada').value:null,restante:Number((total-entradaValor).toFixed(2)),parcelas_detalhes:parcelasDetalhes,vencimento_saldo:parcelasDetalhes.at(-1)?.data||null},
+      subtotal,desconto_percentual:descontoPercentual,desconto_valor:descontoValor,total
     };
   }
   function validarProposta(d){
@@ -765,6 +858,17 @@ atualizarEquipe();
     if(!d.evento)return 'Informe o nome do projeto/evento.';
     if(!d.data_evento)return 'Informe a data do evento.';
     if(!d.produtos.length&&!d.equipamentos.length)return 'Adicione pelo menos um produto ou equipamento.';
+    if(!Number.isFinite(d.desconto_percentual)||d.desconto_percentual<0||d.desconto_percentual>100)return 'Informe um desconto entre 0% e 100%.';
+    if(d.pagamento.modo==='contratual'){
+      const p=d.pagamento,limite=finAddDays(d.data_evento,-5);
+      if(!Number.isFinite(p.entrada_percentual)||p.entrada_percentual<0||p.entrada_percentual>100)return 'Informe a entrada entre 0% e 100%.';
+      if(!p.parcelas_detalhes.length)return 'Selecione as parcelas do restante.';
+      if(p.parcelas_detalhes.some(x=>!Number.isFinite(x.valor)||x.valor<0||!x.data||!x.forma))return 'Preencha valor, data e forma de pagamento de cada parcela.';
+      if(p.parcelas_detalhes.at(-1).data>limite)return 'A última parcela deve vencer até 5 dias antes do evento.';
+      if(p.parcelas_detalhes.some((x,i)=>i>0&&x.data<p.parcelas_detalhes[i-1].data))return 'As datas das parcelas devem ficar em ordem.';
+      const somaCent=p.parcelas_detalhes.reduce((v,x)=>v+Math.round(x.valor*100),0);
+      if(somaCent!==Math.round(p.restante*100))return 'A soma das parcelas deve ser igual ao restante a pagar.';
+    }
     return '';
   }
   function gerarPdfProposta(d,numero){
@@ -794,7 +898,35 @@ atualizarEquipe();
     y+=8;pdf.setFillColor(18,22,28);pdf.roundedRect(15,y,180,28,3,3,'F');
     pdf.setTextColor(255,255,255);pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.text('INVESTIMENTO TOTAL',22,y+9);
     pdf.setTextColor(212,170,76);pdf.setFont('helvetica','bold');pdf.setFontSize(19);pdf.text(money(d.total),22,y+21);
-    y+=39;if(d.pagamento){pdf.setTextColor(45,45,45);pdf.setFont('helvetica','bold');pdf.setFontSize(10);pdf.text('Condição de pagamento',15,y);y+=6;pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.text('Forma: '+String(d.pagamento.forma||'—')+(d.pagamento.forma==='Cartão de crédito'?' • '+String(d.pagamento.parcelas||1)+'x':''),15,y);y+=5;pdf.text('Entrada prevista (40%): '+money(d.total*.4),15,y);y+=5;pdf.text('Saldo (60%): '+money(d.total*.6)+' • vencimento: '+(d.pagamento.vencimento_saldo?finDate(d.pagamento.vencimento_saldo):'—'),15,y);y+=8;}pdf.setTextColor(75,75,75);pdf.setFont('helvetica','normal');pdf.setFontSize(8);
+    y+=39;
+    const linhaPagamentoPDF=(texto,destaque=false)=>{
+      if(y>270)novaPagina();
+      pdf.setTextColor(45,45,45);pdf.setFont('helvetica',destaque?'bold':'normal');pdf.setFontSize(destaque?10:9);
+      const partes=pdf.splitTextToSize(String(texto),180);
+      for(const parte of partes){if(y>275)novaPagina();pdf.text(parte,15,y);y+=5.5}
+    };
+    linhaPagamentoPDF('Subtotal: '+money(d.subtotal??d.total));
+    linhaPagamentoPDF('Desconto ('+Number(d.desconto_percentual||0).toLocaleString('pt-BR')+'%): '+money(d.desconto_valor||0));
+    y+=2;linhaPagamentoPDF('Forma e condição de pagamento',true);
+    const pg=d.pagamento||{};
+    if(pg.modo==='contratual'){
+      linhaPagamentoPDF('Parcelamento contratual');
+      linhaPagamentoPDF('Entrada ('+Number(pg.entrada_percentual||0).toLocaleString('pt-BR')+'%): '+money(pg.entrada_valor)+' • '+(pg.forma_entrada||'—'));
+      linhaPagamentoPDF('Restante a pagar: '+money(pg.restante));
+      (pg.parcelas_detalhes||[]).forEach(parcela=>linhaPagamentoPDF(String(parcela.numero)+'ª parcela: '+money(parcela.valor)+' • '+finDate(parcela.data)+' • '+(parcela.forma||'—')));
+    }else if(pg.modo==='avista'){
+      linhaPagamentoPDF('À vista • '+(pg.forma||'—')+' • '+money(d.total));
+      if(pg.forma==='Cartão de crédito'){
+        const n=Math.max(1,Math.min(10,Number(pg.parcelas||1))),cent=Math.round(Number(d.total||0)*100),base=Math.floor(cent/n);
+        Array.from({length:n},(_,i)=>i).forEach(i=>linhaPagamentoPDF(String(i+1)+'ª parcela do cartão: '+money((i===n-1?cent-base*(n-1):base)/100)));
+      }
+    }else{
+      linhaPagamentoPDF('Forma: '+(pg.forma||'—'));
+      linhaPagamentoPDF('Entrada prevista (40%): '+money(d.total*.4));
+      linhaPagamentoPDF('Saldo previsto (60%): '+money(d.total*.6)+' • vencimento: '+finDate(pg.vencimento_saldo));
+    }
+    y+=4;if(y>275)novaPagina();
+    pdf.setTextColor(75,75,75);pdf.setFont('helvetica','normal');pdf.setFontSize(8);
     pdf.text('CZ Efeitos Especiais • Proposta gerada em '+new Date().toLocaleString('pt-BR'),15,y);
     pdf.save('proposta-'+numero.replace(/[^a-zA-Z0-9_-]/g,'-')+'-'+d.cliente.replace(/[^a-zA-Z0-9_-]/g,'-')+'.pdf');
   }
@@ -1299,4 +1431,3 @@ function isMaster(){
   return email===CZ_MASTER_EMAIL || perfil==='master';
 }
 </script></body></html>
-Editar produto
