@@ -38,9 +38,10 @@
 .client-table td:nth-child(4){font-size:13px;line-height:1.35}
 .client-table .actions{margin:0;justify-content:center;gap:5px;flex-wrap:nowrap}
 .client-table .actions .btn{padding:6px 8px;font-size:11px;white-space:nowrap}
-.orc-travel-grid{display:grid;grid-template-columns:repeat(4,minmax(120px,180px));gap:10px}
+.orc-travel-grid{display:grid;grid-template-columns:repeat(5,minmax(115px,180px));gap:10px}
 .orc-travel-grid .field,.orc-team-row .field{margin-top:4px;min-width:0}
-.orc-travel-grid input,.orc-team-row input{padding:7px 9px!important;font-size:13px!important;min-height:35px}
+.orc-travel-grid input,.orc-travel-grid select,.orc-team-row input{padding:7px 9px!important;font-size:13px!important;min-height:35px}
+.orc-travel-grid input,.orc-travel-grid select{min-width:0;width:100%;box-sizing:border-box}
 .orc-travel-grid label,.orc-team-row label{text-align:center}
 .orc-team-row{display:grid;grid-template-columns:minmax(145px,1.5fr) repeat(5,minmax(95px,1fr)) auto;gap:8px;align-items:end}
 .orc-equipe-linha.orc-team-row{grid-template-columns:minmax(145px,1.5fr) repeat(5,minmax(95px,1fr))}
@@ -582,8 +583,10 @@ async function renderOrcamentos(novo=false){
         <div class="field"><label for="orcVeiculo">Veículo</label><select id="orcVeiculo"><option value="">Carregando veículos...</option></select></div>
         <div class="field"><label>Km rodado</label><input id="orcKm" type="number" min="0" value="0"></div>
         <div class="field"><label>Valor do km</label><input id="orcValorKm" type="number" min="0" step="0.01" value="0" readonly></div>
+        <div class="field"><label>Total dos km</label><input id="orcTotalKm" value="R$ 0,00" readonly></div>
         <div class="field"><label>Pedágio</label><input id="orcPedagio" type="number" min="0" step="0.01" value="0"></div>
       </div>
+      <div class="orc-team-total"><strong>Total do Deslocamento: <span id="orcTotalDeslocamento">R$ 0,00</span></strong></div>
     </div>
 
     <div class="card orc-team-card" style="margin-bottom:18px">
@@ -704,7 +707,10 @@ if (campoTotalEquipe) {
     currency: 'BRL'
   });
 }
-  const deslocamento = (Number($('#orcKm').value||0) * Number($('#orcValorKm').value||0)) + Number($('#orcPedagio').value||0);
+  const totalKm=Number($('#orcKm').value||0)*Number($('#orcValorKm').value||0);
+  const deslocamento=totalKm+Number($('#orcPedagio').value||0);
+  $('#orcTotalKm').value=money(totalKm);
+  $('#orcTotalDeslocamento').textContent=money(deslocamento);
   const itens = [...itensProduto,...itensAtivo].reduce((s,item)=>s+item.quantidade*item.preco,0);
   const subtotal=Number((totalEquipe+deslocamento+itens).toFixed(2));
   const percentual=Number($('#orcDescontoPercentual').value||0);
