@@ -503,6 +503,11 @@ async function renderOrcamentos(novo=false){
 </div>
 
 <div class="field">
+  <label for="orcValidade">Validade do orçamento</label>
+  <input id="orcValidade" type="date" value="${finAddDays(finISODate(),5)}">
+</div>
+
+<div class="field">
   <label>Local do evento</label>
   <input id="orcLocalEvento" placeholder="Local do evento">
 </div>
@@ -864,7 +869,7 @@ atualizarEquipe();
     const parcelasDetalhes=modo==='contratual'?[...document.querySelectorAll('.contract-installment')].map((l,i)=>{const valor=l.querySelector('[data-parcela-valor]').value;return {numero:i+1,valor:valor===''?null:Number(valor),data:l.querySelector('[data-parcela-data]').value,forma:l.querySelector('[data-parcela-forma]').value}}):[];
     return {
       cliente_id:$('#orcClienteSelect').value, cliente:$('#orcCliente').value.trim(), telefone:$('#orcTelefone').value.trim(),
-      evento:$('#orcEvento').value.trim(), data_evento:$('#orcData').value||null,
+      evento:$('#orcEvento').value.trim(), data_evento:$('#orcData').value||null, validade_orcamento:$('#orcValidade').value||null,
       local_evento:$('#orcLocalEvento').value.trim(), cidade_evento:$('#orcCidadeEvento').value.trim(), horario:$('#orcHorario').value||null,
       horario_montagem:null,
       responsavel_evento:$('#orcResponsavelEvento').value.trim(), telefone_responsavel:$('#orcTelefoneResponsavel').value.trim(),
@@ -879,6 +884,7 @@ atualizarEquipe();
     if(!d.cliente_id||!d.cliente||!d.telefone)return 'Selecione um cliente cadastrado com nome e telefone.';
     if(!d.evento)return 'Informe o nome do projeto/evento.';
     if(!d.data_evento)return 'Informe a data do evento.';
+    if(!d.validade_orcamento)return 'Informe a validade do orçamento.';
     if(!d.produtos.length&&!d.equipamentos.length)return 'Adicione pelo menos um produto ou equipamento.';
     if(!Number.isFinite(d.desconto_percentual)||d.desconto_percentual<0||d.desconto_percentual>100)return 'Informe um desconto entre 0% e 100%.';
     if(d.pagamento.modo==='contratual'){
@@ -912,7 +918,7 @@ atualizarEquipe();
     pdf.setFont('helvetica','bold');pdf.setFontSize(15);pdf.setTextColor(25,25,25);pdf.text('Proposta '+numero,15,y); y+=9;
     pdf.setFont('helvetica','normal');pdf.setFontSize(10);
     const dataFmt=d.data_evento?new Date(d.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—';
-    const infos=[['Cliente',d.cliente],['Orçamento',d.evento],['Data do evento',dataFmt],['Cidade',d.cidade_evento||'—'],['Local',d.local_evento||'—'],['Horário',d.horario||'—']];
+    const infos=[['Cliente',d.cliente],['Orçamento',d.evento],['Validade',finDate(d.validade_orcamento)],['Data do evento',dataFmt],['Cidade',d.cidade_evento||'—'],['Local',d.local_evento||'—'],['Horário',d.horario||'—']];
     infos.forEach(([a,b])=>{pdf.setFont('helvetica','bold');pdf.text(a+':',15,y);pdf.setFont('helvetica','normal');pdf.text(String(b),48,y);y+=7});
     y+=4;pdf.setDrawColor(212,170,76);pdf.line(15,y,195,y);y+=10;
     pdf.setFont('helvetica','bold');pdf.setFontSize(12);pdf.text('Serviços, produtos e equipamentos',15,y);y+=8;
