@@ -1495,29 +1495,75 @@ async function visualizarProjetoEvento(id){
   const e=er.data,materiais=mr.data||[];
   const campos=[['Cliente',e.cliente_nome],['Telefone do cliente',e.cliente_telefone],['Projeto / Evento',e.nome_evento],['Data do evento',finDate(e.data_evento)],['Local do evento',e.local_evento],['Cidade do evento',e.cidade_evento],['Horário inicial',e.horario_evento],['Responsável pelo evento',e.responsavel_evento],['Telefone do responsável',e.telefone_responsavel],['Veículo',e.veiculo],['Colaboradores',(e.colaboradores||[]).join(', ')]];
   $('#content').innerHTML=`<div class="sectionhead"><div><h2>👁 Projeto — ${esc(e.nome_evento||'Evento')}</h2><div class="muted">${statusEventoLabel(e.status)} • visualização técnica</div></div><div class="actions"><button type="button" class="btn primary" onclick="editarProjetoEvento('${id}')">Editar projeto</button><button type="button" class="btn secondary" onclick="renderEventos()">Voltar aos eventos</button></div></div>
-    <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">Dados do evento</h3><div class="tecnica-grid">${campos.map(([titulo,valor])=>`<div class="field"><label>${titulo}</label><div>${esc(valor||'—')}</div></div>`).join('')}</div></div>
+    <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">Dados do orçamento</h3><div class="tecnica-grid">${campos.map(([titulo,valor])=>`<div class="field"><label>${titulo}</label><div>${esc(valor||'—')}</div></div>`).join('')}</div></div>
+    <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">Dados técnicos</h3><div class="tecnica-grid"><div class="field"><label>Horário de montagem</label><div>${esc(e.horario_montagem||'—')}</div></div><div class="field"><label>Técnico responsável</label><div>${esc(e.tecnico_responsavel||'—')}</div></div></div></div>
     <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">Projeto de execução</h3><svg class="projeto-canvas" viewBox="0 0 900 500" xmlns="http://www.w3.org/2000/svg">${projetoExecucaoMarkup(e.projeto_execucao)}</svg></div>
     <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">Anotação técnica</h3><div style="white-space:pre-wrap">${esc(e.anotacao_tecnica||'—')}</div></div>
     <div class="card"><h3 style="margin-top:0">Materiais do evento</h3><div class="tablewrap"><table><thead><tr><th>Item</th><th>Tipo</th><th>Qtd.</th><th>Cód. de barras</th></tr></thead><tbody>${materiais.map(m=>`<tr><td>${esc(m.nome_item)}</td><td>${m.origem==='montagem'?'Material técnico':m.origem==='extra'?'Material extra':m.tipo==='ativo'?'Equipamento':'Produto'}</td><td>${esc(m.quantidade_necessaria)}</td><td>${esc(m.codigo||'—')}</td></tr>`).join('')||'<tr><td colspan="4">Nenhum material cadastrado.</td></tr>'}</tbody></table></div></div>`;
 }
 async function editarProjetoEvento(id){
-  const {data:e,error}=await db.from('eventos_operacionais').select('id,nome_evento,status,projeto_execucao,anotacao_tecnica,relatorio_impresso_em').eq('id',id).single();
-  if(error){alert('Erro ao abrir edição do projeto: '+error.message);return}
-  const shapes=Array.isArray(e.projeto_execucao)?structuredClone(e.projeto_execucao):[];
-  $('#content').innerHTML=`<div class="sectionhead"><div><h2>Editar projeto — ${esc(e.nome_evento||'Evento')}</h2><div class="muted">Desenho e anotação técnica do evento</div></div><button type="button" class="btn secondary" onclick="visualizarProjetoEvento('${id}')">Cancelar</button></div>
+  const [er,mr,ar]=await Promise.all([
+    db.from('eventos_operacionais').select('*').eq('id',id).single(),
+    db.from('evento_materiais').select('*').eq('evento_id',id).order('criado_em'),
+    db.from('ativos').select('id,nome,codigo_barras,status,material_montagem').eq('material_montagem',true).order('nome')
+  ]);
+  if(er.error||mr.error||ar.error){alert('Erro ao abrir edição do projeto: '+(er.error||mr.error||ar.error).message);return}
+  const e=er.data,materiais=mr.data||[],shapes=Array.isArray(e.projeto_execucao)?structuredClone(e.projeto_execucao):[];
+  const materialFechado=['aguardando_retorno','finalizado'].includes(e.status);
+  const originais=materiais.filter(m=>m.origem==='montagem'||m.origem==='extra');
+  const montagem=originais.map(m=>({registro_id:m.id,id:m.item_id,nome:m.nome_item,codigo:m.codigo||'',origem:m.origem,quantidade:Number(m.quantidade_necessaria||1),conferida:Number(m.quantidade_bipada||0)}));
+  const idsOrc=new Set(materiais.filter(m=>m.origem==='orcamento'&&m.tipo==='ativo').map(m=>String(m.item_id)));
+  const disponiveis=(ar.data||[]).filter(a=>!idsOrc.has(String(a.id))&&!['manutencao','perdido','indisponivel','locado','reservado'].includes(String(a.status||'').toLowerCase()));
+  const campos=[['Cliente',e.cliente_nome],['Telefone do cliente',e.cliente_telefone],['Projeto / Evento',e.nome_evento],['Data do evento',finDate(e.data_evento)],['Local do evento',e.local_evento],['Cidade',e.cidade_evento],['Horário inicial',e.horario_evento],['Responsável pelo evento',e.responsavel_evento],['Telefone do responsável',e.telefone_responsavel],['Veículo',e.veiculo],['Colaboradores',(e.colaboradores||[]).join(', ')]];
+  $('#content').innerHTML=`<div class="sectionhead"><div><h2>Editar projeto — ${esc(e.nome_evento||'Evento')}</h2><div class="muted">Dados do orçamento em leitura • dados técnicos editáveis</div></div><button type="button" class="btn secondary" onclick="visualizarProjetoEvento('${id}')">Cancelar</button></div>
+    <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">Dados do orçamento</h3><div class="tecnica-grid">${campos.map(([titulo,valor])=>`<div class="field"><label>${titulo}</label><div>${esc(valor||'—')}</div></div>`).join('')}</div><h4>Itens do orçamento</h4><div class="tablewrap"><table><thead><tr><th>Item</th><th>Qtd.</th><th>Cód. de barras</th></tr></thead><tbody>${materiais.filter(m=>m.origem==='orcamento').map(m=>`<tr><td>${esc(m.nome_item)}</td><td>${esc(m.quantidade_necessaria)}</td><td>${esc(m.codigo||'—')}</td></tr>`).join('')||'<tr><td colspan="3">Nenhum item.</td></tr>'}</tbody></table></div></div>
+    <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">Dados técnicos</h3><div class="payment-grid"><div class="field"><label for="projMontagem">Horário de montagem</label><input id="projMontagem" type="time" value="${esc((e.horario_montagem||'').slice(0,5))}"></div><div class="field"><label for="projTecnico">Técnico responsável</label><input id="projTecnico" value="${esc(e.tecnico_responsavel||'')}"></div></div></div>
     <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">Projeto de execução</h3><div class="muted">Escolha uma forma e arraste. Em Texto, clique no lugar e escreva a identificação. Use Selecionar e Apagar seleção para remover.</div>
       <div class="projeto-toolbar"><button type="button" class="btn secondary active" data-tec-tool="selecionar">Selecionar</button><button type="button" class="btn secondary" data-tec-tool="retangulo">Quadrado</button><button type="button" class="btn secondary" data-tec-tool="linha">Linha</button><button type="button" class="btn secondary" data-tec-tool="circulo">Bolinha</button><button type="button" class="btn secondary" data-tec-tool="texto">Texto</button><button type="button" class="btn secondary" id="tecApagar">Apagar seleção</button></div>
       <svg id="tecProjeto" class="projeto-canvas" viewBox="0 0 900 500" xmlns="http://www.w3.org/2000/svg" aria-label="Editar desenho do projeto"></svg></div>
     <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">Anotação técnica</h3><textarea id="tecAnotacao" rows="6" placeholder="Orientações para montagem e operação">${esc(e.anotacao_tecnica||'')}</textarea></div>
-    <div class="actions"><button type="button" id="projetoSalvar" class="btn primary">Salvar projeto</button><button type="button" class="btn secondary" onclick="visualizarProjetoEvento('${id}')">Cancelar</button></div><div id="projetoMsg" class="msg" role="status"></div>`;
+    <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">Materiais adicionados ao evento</h3>${materialFechado?'<div class="muted">A lista de materiais fica preservada após a saída do evento.</div>':`<div class="payment-grid"><div class="field"><label>Material de montagem</label><select id="projMaterial"><option value="">Selecione</option>${disponiveis.map(a=>`<option value="${esc(a.id)}" ${a.codigo_barras?'':'disabled'}>${esc(a.nome)}${a.codigo_barras?' — '+esc(a.codigo_barras):' — cadastre o código de barras'}</option>`).join('')}</select></div><div class="field"><label>Quantidade</label><input id="projMaterialQtd" type="number" min="1" step="1" value="1"></div><button type="button" class="btn secondary" id="projAdicionar">+ Adicionar material</button></div>`}<div id="projMateriaisLista" style="margin-top:12px"></div></div>
+    <div class="actions"><button type="button" id="projetoSalvar" class="btn primary">Salvar alterações</button><button type="button" class="btn secondary" onclick="visualizarProjetoEvento('${id}')">Cancelar</button></div><div id="projetoMsg" class="msg" role="status"></div>`;
   configurarEditorProjeto(shapes);
+  const lerQuantidades=()=>document.querySelectorAll('[data-proj-qtd]').forEach(c=>{const m=montagem[Number(c.dataset.projQtd)];if(m)m.quantidade=Number(c.value)});
+  const listar=()=>{
+    $('#projMateriaisLista').innerHTML=montagem.length?`<div class="tablewrap"><table><thead><tr><th>Material</th><th>Cód. de barras</th><th>Qtd.</th><th>Conferida</th><th>Ação</th></tr></thead><tbody>${montagem.map((m,i)=>`<tr><td>${esc(m.nome)}</td><td>${esc(m.codigo||'—')}</td><td><input data-proj-qtd="${i}" type="number" min="${Math.max(1,m.conferida)}" step="1" value="${m.quantidade}" ${materialFechado?'readonly':''} style="width:85px"></td><td>${m.conferida}</td><td>${materialFechado||m.conferida>0?'—':`<button type="button" class="btn secondary" data-proj-remover="${i}">Remover</button>`}</td></tr>`).join('')}</tbody></table></div>`:'Nenhum material técnico adicionado.';
+    document.querySelectorAll('[data-proj-remover]').forEach(b=>b.onclick=()=>{lerQuantidades();montagem.splice(Number(b.dataset.projRemover),1);listar()});
+  };
+  if(!materialFechado)$('#projAdicionar').onclick=()=>{
+    const a=disponiveis.find(x=>String(x.id)===$('#projMaterial').value),q=Number($('#projMaterialQtd').value);
+    if(!a||!a.codigo_barras){$('#projetoMsg').textContent='Selecione material de montagem com código de barras.';return}
+    if(!Number.isInteger(q)||q<1){$('#projetoMsg').textContent='Informe uma quantidade inteira maior que zero.';return}
+    if(montagem.some(m=>String(m.id)===String(a.id))){$('#projetoMsg').textContent='Material já está na lista.';return}
+    lerQuantidades();montagem.push({registro_id:null,id:a.id,nome:a.nome,codigo:a.codigo_barras,quantidade:q,conferida:0});$('#projMaterial').value='';$('#projetoMsg').textContent='';listar();
+  };
+  listar();
   $('#projetoSalvar').onclick=async()=>{
-    const btn=$('#projetoSalvar');btn.disabled=true;$('#projetoMsg').textContent='Salvando...';
-    const payload={projeto_execucao:shapes,anotacao_tecnica:$('#tecAnotacao').value.trim()||null,atualizado_em:new Date().toISOString()};
-    if(e.status==='material_pronto'&&e.relatorio_impresso_em)payload.relatorio_impresso_em=null;
-    const {error:up}=await db.from('eventos_operacionais').update(payload).eq('id',id);
-    if(up){$('#projetoMsg').textContent='Erro: '+up.message;btn.disabled=false;return}
-    await visualizarProjetoEvento(id);
+    lerQuantidades();const msg=$('#projetoMsg');
+    if(montagem.some(m=>!Number.isInteger(m.quantidade)||m.quantidade<1||m.quantidade<m.conferida)){msg.textContent='A quantidade de cada material deve ser inteira e não pode ser menor que a já conferida.';return}
+    const ids=new Set();if(montagem.some(m=>{const duplicado=ids.has(String(m.id));ids.add(String(m.id));return duplicado})){msg.textContent='Há material técnico repetido.';return}
+    const removidos=originais.filter(m=>!montagem.some(x=>String(x.registro_id)===String(m.id)));
+    const mudouMaterial=!materialFechado&&(removidos.length>0||montagem.some(m=>!m.registro_id||Number(originais.find(x=>String(x.id)===String(m.registro_id))?.quantidade_necessaria)!==m.quantidade));
+    const btn=$('#projetoSalvar');btn.disabled=true;msg.textContent='Salvando alterações...';
+    try{
+      if(mudouMaterial){
+        for(const m of montagem.filter(x=>x.registro_id)){
+          const original=originais.find(x=>String(x.id)===String(m.registro_id));
+          if(Number(original?.quantidade_necessaria)===m.quantidade)continue;
+          const {data,error}=await db.from('evento_materiais').update({quantidade_necessaria:m.quantidade}).eq('id',m.registro_id).eq('evento_id',id).eq('quantidade_bipada',m.conferida).select('id');
+          if(error)throw error;if(!data?.length)throw new Error('A conferência deste material mudou. Reabra o projeto antes de editar a quantidade.');
+        }
+        const novos=montagem.filter(m=>!m.registro_id).map(m=>({evento_id:id,tipo:'ativo',item_id:m.id,nome_item:m.nome,codigo:m.codigo,quantidade_necessaria:m.quantidade,quantidade_bipada:0,origem:'montagem'}));
+        if(novos.length){const {error}=await db.from('evento_materiais').insert(novos);if(error)throw error}
+        for(const m of removidos){const {data,error}=await db.from('evento_materiais').delete().eq('id',m.id).eq('evento_id',id).eq('quantidade_bipada',0).select('id');if(error)throw error;if(!data?.length)throw new Error('Este material já foi conferido. Reabra o projeto antes de removê-lo.')}
+      }
+      const payload={horario_montagem:$('#projMontagem').value||null,tecnico_responsavel:$('#projTecnico').value.trim()||null,projeto_execucao:shapes,anotacao_tecnica:$('#tecAnotacao').value.trim()||null,atualizado_em:new Date().toISOString()};
+      const mudouProjeto=JSON.stringify(shapes)!==JSON.stringify(e.projeto_execucao||[])||payload.anotacao_tecnica!==(e.anotacao_tecnica||null)||payload.horario_montagem!==((e.horario_montagem||'').slice(0,5)||null)||payload.tecnico_responsavel!==(e.tecnico_responsavel||null);
+      if(e.status==='material_pronto'&&mudouMaterial){payload.status='separando';payload.relatorio_impresso_em=null}
+      else if(e.status==='material_pronto'&&e.relatorio_impresso_em&&mudouProjeto)payload.relatorio_impresso_em=null;
+      const {error}=await db.from('eventos_operacionais').update(payload).eq('id',id);if(error)throw error;
+      await visualizarProjetoEvento(id);
+    }catch(err){msg.textContent='Erro ao salvar: '+err.message+' Atualize o projeto antes de tentar novamente.';btn.disabled=false}
   };
 }
 async function renderEventos(){
@@ -1598,7 +1644,7 @@ async function imprimirRelatorioCampo(id){
   if(er.error||mr.error){janela.document.body.textContent='Erro ao carregar relatório: '+(er.error||mr.error).message;return}
   const e=er.data,mats=mr.data||[],campo=(rotulo,valor)=>`<div class="dado"><b>${rotulo}:</b> ${esc(valor||'—')}</div>`;
   const itens=mats.map(m=>`<tr><td>${esc(m.nome_item)}</td><td>${m.origem==='montagem'?'Material técnico':m.origem==='extra'?'Material extra':m.tipo==='ativo'?'Equipamento':'Produto'}</td><td>${esc(m.codigo||'—')}</td><td>${esc(m.quantidade_necessaria)}</td><td>${esc(m.quantidade_bipada)}</td></tr>`).join('');
-  const html=`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Relatório de campo — ${esc(e.nome_evento)}</title><style>@page{size:A4;margin:14mm}body{font:12px Arial,sans-serif;color:#222}h1{font-size:20px}h2{font-size:15px;margin-top:22px;border-bottom:1px solid #aaa;padding-bottom:5px}.cabecalho{display:grid;grid-template-columns:1fr 1fr;gap:7px}.dado{break-inside:avoid}table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:6px;text-align:left}svg{width:100%;height:auto;border:1px solid #aaa;break-inside:avoid}.anotacao{white-space:pre-wrap;min-height:55px}</style></head><body><h1>CZ EFEITOS ESPECIAIS — Relatório de campo</h1><div class="cabecalho">${campo('Cliente',e.cliente_nome)}${campo('Telefone do cliente',e.cliente_telefone)}${campo('Projeto / Evento',e.nome_evento)}${campo('Data do evento',finDate(e.data_evento))}${campo('Local',e.local_evento)}${campo('Cidade',e.cidade_evento)}${campo('Horário inicial',e.horario_evento)}${campo('Responsável pelo evento',e.responsavel_evento)}${campo('Telefone do responsável',e.telefone_responsavel)}${campo('Veículo',e.veiculo)}${campo('Colaboradores',(e.colaboradores||[]).join(', '))}</div><h2>Materiais e conferência</h2><table><thead><tr><th>Item</th><th>Tipo</th><th>Cód. de barras</th><th>Qtd.</th><th>Conferida</th></tr></thead><tbody>${itens}</tbody></table><h2>Projeto de execução</h2><svg viewBox="0 0 900 500" xmlns="http://www.w3.org/2000/svg">${projetoExecucaoMarkup(e.projeto_execucao)}</svg><h2>Anotação técnica</h2><div class="anotacao">${esc(e.anotacao_tecnica||'—')}</div><p>Relatório gerado em: ${esc(new Date().toLocaleString('pt-BR'))}</p></body></html>`;
+  const html=`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Relatório de campo — ${esc(e.nome_evento)}</title><style>@page{size:A4;margin:14mm}body{font:12px Arial,sans-serif;color:#222}h1{font-size:20px}h2{font-size:15px;margin-top:22px;border-bottom:1px solid #aaa;padding-bottom:5px}.cabecalho{display:grid;grid-template-columns:1fr 1fr;gap:7px}.dado{break-inside:avoid}table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:6px;text-align:left}svg{width:100%;height:auto;border:1px solid #aaa;break-inside:avoid}.anotacao{white-space:pre-wrap;min-height:55px}</style></head><body><h1>CZ EFEITOS ESPECIAIS — Relatório de campo</h1><div class="cabecalho">${campo('Cliente',e.cliente_nome)}${campo('Telefone do cliente',e.cliente_telefone)}${campo('Projeto / Evento',e.nome_evento)}${campo('Data do evento',finDate(e.data_evento))}${campo('Local',e.local_evento)}${campo('Cidade',e.cidade_evento)}${campo('Horário inicial',e.horario_evento)}${campo('Responsável pelo evento',e.responsavel_evento)}${campo('Telefone do responsável',e.telefone_responsavel)}${campo('Veículo',e.veiculo)}${campo('Colaboradores',(e.colaboradores||[]).join(', '))}${campo('Horário de montagem',e.horario_montagem)}${campo('Técnico responsável',e.tecnico_responsavel)}</div><h2>Materiais e conferência</h2><table><thead><tr><th>Item</th><th>Tipo</th><th>Cód. de barras</th><th>Qtd.</th><th>Conferida</th></tr></thead><tbody>${itens}</tbody></table><h2>Projeto de execução</h2><svg viewBox="0 0 900 500" xmlns="http://www.w3.org/2000/svg">${projetoExecucaoMarkup(e.projeto_execucao)}</svg><h2>Anotação técnica</h2><div class="anotacao">${esc(e.anotacao_tecnica||'—')}</div><p>Relatório gerado em: ${esc(new Date().toLocaleString('pt-BR'))}</p></body></html>`;
   janela.document.open();janela.document.write(html);janela.document.close();janela.focus();janela.print();
 }
 async function confirmarImpressaoEvento(id){
