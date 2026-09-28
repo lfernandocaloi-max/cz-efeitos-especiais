@@ -47,6 +47,13 @@
 .orc-team-total{display:flex;justify-content:flex-end;margin-top:14px}
 .orc-team-total strong{display:inline-block;background:#155e39;border:1px solid #38b86b;color:#fff;border-radius:9px;padding:10px 16px;text-align:center}
 .payment-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px;align-items:end}
+.payment-options{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0 18px}
+.payment-option{display:inline-flex;align-items:center;gap:9px;border:1px solid var(--line);border-radius:9px;padding:10px 14px;cursor:pointer;font-weight:600}
+.payment-option:has(input:checked){border-color:#d4aa4c;background:rgba(212,170,76,.12)}
+.payment-option input{appearance:none;width:18px;height:18px;min-width:18px;margin:0;border:2px solid #a68a4e;border-radius:3px;cursor:pointer;display:grid;place-content:center}
+.payment-option input:checked{background:#d4aa4c;border-color:#d4aa4c}
+.payment-option input:checked::after{content:'✓';color:#171717;font-size:14px;font-weight:bold;line-height:1}
+.payment-option input:focus-visible{outline:2px solid #d4aa4c;outline-offset:3px}
 .payment-grid .field{min-width:0}
 .payment-grid input,.payment-grid select{min-height:36px;padding:7px 9px;font-size:14px}
 .payment-grid input[type="number"]{max-width:115px}
@@ -582,7 +589,10 @@ async function renderOrcamentos(novo=false){
 
     <div class="card" style="margin-bottom:18px">
       <h3 style="margin-top:0">💳 Forma e condição de pagamento</h3>
-      <div class="field"><label>Condição</label><select id="orcCondicaoPagamento"><option value="avista">À vista</option><option value="contratual">Parcelamento contratual</option></select></div>
+      <div class="payment-options" role="radiogroup" aria-label="Condição de pagamento">
+        <label class="payment-option"><input type="radio" name="orcCondicaoPagamento" value="avista" checked> À vista</label>
+        <label class="payment-option"><input type="radio" name="orcCondicaoPagamento" value="contratual"> Parcelamento contratual</label>
+      </div>
       <div id="orcPagamentoVista" class="payment-grid">
         <div class="field"><label>Forma de pagamento</label><select id="orcFormaPagamento"><option>PIX</option><option>Dinheiro</option><option>Cartão de débito</option><option>Cartão de crédito</option><option>Transferência</option></select></div>
         <div class="field"><label>Valor total</label><input id="orcValorVista" readonly value="R$ 0,00"></div>
@@ -593,6 +603,7 @@ async function renderOrcamentos(novo=false){
         <div class="payment-grid">
           <div class="field"><label>Entrada %</label><input id="orcEntradaPercentual" type="number" min="0" max="100" step="0.01" value="40" inputmode="decimal"></div>
           <div class="field"><label>Valor da entrada</label><input id="orcEntradaValor" readonly value="R$ 0,00"></div>
+          <div class="field"><label for="orcDataEntrada">Data de pagamento da entrada</label><input id="orcDataEntrada" type="date"></div>
           <div class="field"><label>Forma de pagamento da entrada</label><select id="orcFormaEntrada"><option>PIX</option><option>Dinheiro</option><option>Cartão de débito</option><option>Cartão de crédito</option><option>Transferência</option></select></div>
           <div class="field"><label>Restante a pagar</label><input id="orcRestante" readonly value="R$ 0,00"></div>
           <div class="field"><label>Parcelas do restante</label><select id="orcParcelasContrato">${Array.from({length:10},(_,i)=>`<option value="${i+1}">${i+1}x</option>`).join('')}</select></div>
@@ -658,16 +669,17 @@ document.querySelectorAll('.orc-equipe-linha input, .linhaEquipe input').forEach
 });
 ['orcKm','orcValorKm','orcPedagio'].forEach(id=>$('#'+id).addEventListener('input',atualizarEquipe));
 $('#orcDescontoPercentual').addEventListener('input',atualizarEquipe);
-$('#orcCondicaoPagamento').onchange=()=>atualizarPagamento();
+document.querySelectorAll('input[name="orcCondicaoPagamento"]').forEach(r=>r.addEventListener('change',()=>atualizarPagamento()));
 $('#orcFormaPagamento').onchange=()=>atualizarPagamento();
 $('#orcParcelasCartao').onchange=()=>atualizarPagamento();
 $('#orcEntradaPercentual').addEventListener('input',()=>atualizarPagamento());
+$('#orcDataEntrada').addEventListener('change',()=>atualizarPagamento(true));
 $('#orcParcelasContrato').onchange=()=>atualizarPagamento();
-$('#orcData').addEventListener('change',()=>atualizarPagamento(true));
+$('#orcData').addEventListener('change',()=>atualizarPagamento());
 
 function atualizarPagamento(forcarData=false){
   const totalCent=Math.round(Number($('#orcInvestimento').dataset.valor||0)*100);
-  const modo=$('#orcCondicaoPagamento').value;
+  const modo=document.querySelector('input[name="orcCondicaoPagamento"]:checked')?.value||'avista';
   $('#orcPagamentoVista').classList.toggle('hidden',modo!=='avista');
   $('#orcPagamentoContratual').classList.toggle('hidden',modo!=='contratual');
   $('#orcValorVista').value=money(totalCent/100);
@@ -684,33 +696,41 @@ function atualizarPagamento(forcarData=false){
   const restanteCent=totalCent-entradaCent,n=Number($('#orcParcelasContrato').value);
   $('#orcEntradaValor').value=money(entradaCent/100);
   $('#orcRestante').value=money(restanteCent/100);
-  const limite=$('#orcData').value?finAddDays($('#orcData').value,-5):'';
+  const limite=$('#orcData').value;
+  const dataEntrada=$('#orcDataEntrada').value;
   if(parcelasRestanteBase!==restanteCent||parcelasRestanteQtd!==n||forcarData){
     const anteriores=[...document.querySelectorAll('.contract-installment')].map(l=>({data:l.querySelector('[data-parcela-data]')?.value,forma:l.querySelector('[data-parcela-forma]')?.value}));
     const base=Math.floor(restanteCent/n);
     $('#orcParcelasContratoLista').innerHTML=Array.from({length:n},(_,i)=>{
       const valor=(i===n-1?restanteCent-base*(n-1):base)/100;
-      const data=i===n-1?(limite||''):(anteriores[i]?.data||'');
+      const data=dataEntrada?(forcarData||!anteriores[i]?.data?finAddMonths(dataEntrada,i+1):anteriores[i].data):'';
       const forma=anteriores[i]?.forma||'PIX';
       const formas=['PIX','Dinheiro','Cartão de débito','Cartão de crédito','Transferência'];
-      return `<div class="contract-installment"><b>${i+1}ª parcela</b><div class="field"><label>Valor (R$)</label><input data-parcela-valor type="number" min="0" step="0.01" value="${valor.toFixed(2)}" inputmode="decimal"></div><div class="field"><label>Data</label><input data-parcela-data type="date" value="${esc(data)}" ${i===n-1&&limite?`max="${limite}"`:''}></div><div class="field"><label>Forma de pagamento</label><select data-parcela-forma>${formas.map(f=>`<option ${forma===f?'selected':''}>${f}</option>`).join('')}</select></div></div>`;
+      return `<div class="contract-installment"><b>${i+1}ª parcela</b><div class="field"><label>Valor (R$)</label><input data-parcela-valor type="number" min="0" step="0.01" value="${valor.toFixed(2)}" inputmode="decimal"></div><div class="field"><label>Data</label><input data-parcela-data type="date" value="${esc(data)}" ${limite?`max="${limite}"`:''}></div><div class="field"><label>Forma de pagamento</label><select data-parcela-forma>${formas.map(f=>`<option ${forma===f?'selected':''}>${f}</option>`).join('')}</select></div></div>`;
     }).join('');
     parcelasRestanteBase=restanteCent;parcelasRestanteQtd=n;
   }
+  document.querySelectorAll('[data-parcela-data]').forEach(c=>{if(limite)c.max=limite;else c.removeAttribute('max')});
+  if(limite)$('#orcDataEntrada').max=limite;else $('#orcDataEntrada').removeAttribute('max');
   atualizarSomaParcelas();
 }
 function atualizarSomaParcelas(){
   const restanteCent=Math.round(Number($('#orcInvestimento').dataset.valor||0)*100)-Math.round(Number($('#orcEntradaPercentual').value||0)*Number($('#orcInvestimento').dataset.valor||0));
   const somaCent=[...document.querySelectorAll('[data-parcela-valor]')].reduce((s,c)=>s+Math.round(Number(c.value||0)*100),0);
   const diferenca=restanteCent-somaCent;
-  $('#orcPagamentoMsg').textContent=diferenca===0?'':`Ajuste os valores das parcelas: diferença de ${money(Math.abs(diferenca)/100)} ${diferenca>0?'a distribuir':'acima do restante'}.`;
+  const avisos=[];
+  const entrada=$('#orcDataEntrada').value,evento=$('#orcData').value;
+  const datas=[...document.querySelectorAll('[data-parcela-data]')].map(c=>c.value);
+  if(!entrada)avisos.push('Informe a data de pagamento da entrada para preencher as parcelas mensais.');
+  if(entrada&&evento&&entrada>evento)avisos.push('A entrada não pode ser depois do evento.');
+  if(evento&&datas.some(d=>d&&d>evento))avisos.push('Há parcela depois da data do evento. Ajuste a entrada, o número de parcelas ou as datas.');
+  if(diferenca!==0)avisos.push(`Ajuste os valores das parcelas: diferença de ${money(Math.abs(diferenca)/100)} ${diferenca>0?'a distribuir':'acima do restante'}.`);
+  $('#orcPagamentoMsg').textContent=avisos.join(' ');
 }
 $('#orcParcelasContratoLista').addEventListener('input',e=>{if(e.target.matches('[data-parcela-valor]'))atualizarSomaParcelas()});
 $('#orcParcelasContratoLista').addEventListener('change',e=>{
   if(!e.target.matches('[data-parcela-data]'))return;
-  const ultima=$('#orcParcelasContratoLista .contract-installment:last-child [data-parcela-data]');
-  const limite=$('#orcData').value?finAddDays($('#orcData').value,-5):'';
-  if(e.target===ultima&&limite&&ultima.value>limite){ultima.value=limite;$('#orcPagamentoMsg').textContent='A última parcela não pode vencer depois de 5 dias antes do evento.'}
+  atualizarSomaParcelas();
 });
 
 $('#btnAdicionarColaborador').onclick = () => {
@@ -836,7 +856,7 @@ atualizarEquipe();
     const descontoPercentual=Number($('#orcDescontoPercentual').value||0);
     const descontoValor=Number((subtotal*Math.min(100,Math.max(0,descontoPercentual))/100).toFixed(2));
     const total=Number((subtotal-descontoValor).toFixed(2));
-    const modo=$('#orcCondicaoPagamento').value;
+    const modo=document.querySelector('input[name="orcCondicaoPagamento"]:checked')?.value||'avista';
     const entradaPercentual=modo==='contratual'?Number($('#orcEntradaPercentual').value||0):0;
     const entradaValor=modo==='contratual'?Math.round(Math.round(total*100)*Math.min(100,Math.max(0,entradaPercentual))/100)/100:0;
     const parcelasDetalhes=modo==='contratual'?[...document.querySelectorAll('.contract-installment')].map((l,i)=>{const valor=l.querySelector('[data-parcela-valor]').value;return {numero:i+1,valor:valor===''?null:Number(valor),data:l.querySelector('[data-parcela-data]').value,forma:l.querySelector('[data-parcela-forma]').value}}):[];
@@ -849,7 +869,7 @@ atualizarEquipe();
       tecnico_responsavel:'',
       produtos:itensProduto.map(x=>({...x})), equipamentos:itensAtivo.map(x=>({...x})), equipe,
       deslocamento:{veiculo:$('#orcVeiculo')?.value?.trim()||'',km:Number($('#orcKm').value||0),valor_km:Number($('#orcValorKm').value||0),pedagio:Number($('#orcPedagio').value||0)},
-      pagamento:{modo,forma:modo==='avista'?$('#orcFormaPagamento').value:null,parcelas:modo==='avista'&&$('#orcFormaPagamento').value==='Cartão de crédito'?Number($('#orcParcelasCartao').value):1,entrada_percentual:entradaPercentual,entrada_valor:entradaValor,forma_entrada:modo==='contratual'?$('#orcFormaEntrada').value:null,restante:Number((total-entradaValor).toFixed(2)),parcelas_detalhes:parcelasDetalhes,vencimento_saldo:parcelasDetalhes.at(-1)?.data||null},
+      pagamento:{modo,forma:modo==='avista'?$('#orcFormaPagamento').value:null,parcelas:modo==='avista'&&$('#orcFormaPagamento').value==='Cartão de crédito'?Number($('#orcParcelasCartao').value):1,entrada_percentual:entradaPercentual,entrada_valor:entradaValor,data_entrada:modo==='contratual'?$('#orcDataEntrada').value:null,forma_entrada:modo==='contratual'?$('#orcFormaEntrada').value:null,restante:Number((total-entradaValor).toFixed(2)),parcelas_detalhes:parcelasDetalhes,vencimento_saldo:parcelasDetalhes.at(-1)?.data||null},
       subtotal,desconto_percentual:descontoPercentual,desconto_valor:descontoValor,total
     };
   }
@@ -860,11 +880,14 @@ atualizarEquipe();
     if(!d.produtos.length&&!d.equipamentos.length)return 'Adicione pelo menos um produto ou equipamento.';
     if(!Number.isFinite(d.desconto_percentual)||d.desconto_percentual<0||d.desconto_percentual>100)return 'Informe um desconto entre 0% e 100%.';
     if(d.pagamento.modo==='contratual'){
-      const p=d.pagamento,limite=finAddDays(d.data_evento,-5);
+      const p=d.pagamento,limite=d.data_evento;
       if(!Number.isFinite(p.entrada_percentual)||p.entrada_percentual<0||p.entrada_percentual>100)return 'Informe a entrada entre 0% e 100%.';
+      if(!p.data_entrada)return 'Informe a data de pagamento da entrada.';
+      if(p.data_entrada>limite)return 'A data da entrada não pode passar da data do evento.';
       if(!p.parcelas_detalhes.length)return 'Selecione as parcelas do restante.';
       if(p.parcelas_detalhes.some(x=>!Number.isFinite(x.valor)||x.valor<0||!x.data||!x.forma))return 'Preencha valor, data e forma de pagamento de cada parcela.';
-      if(p.parcelas_detalhes.at(-1).data>limite)return 'A última parcela deve vencer até 5 dias antes do evento.';
+      if(p.parcelas_detalhes.some(x=>x.data>limite))return 'Nenhuma parcela pode vencer depois da data do evento.';
+      if(p.parcelas_detalhes[0].data<=p.data_entrada)return 'A primeira parcela deve vencer depois da entrada.';
       if(p.parcelas_detalhes.some((x,i)=>i>0&&x.data<p.parcelas_detalhes[i-1].data))return 'As datas das parcelas devem ficar em ordem.';
       const somaCent=p.parcelas_detalhes.reduce((v,x)=>v+Math.round(x.valor*100),0);
       if(somaCent!==Math.round(p.restante*100))return 'A soma das parcelas deve ser igual ao restante a pagar.';
@@ -911,7 +934,7 @@ atualizarEquipe();
     const pg=d.pagamento||{};
     if(pg.modo==='contratual'){
       linhaPagamentoPDF('Parcelamento contratual');
-      linhaPagamentoPDF('Entrada ('+Number(pg.entrada_percentual||0).toLocaleString('pt-BR')+'%): '+money(pg.entrada_valor)+' • '+(pg.forma_entrada||'—'));
+      linhaPagamentoPDF('Entrada ('+Number(pg.entrada_percentual||0).toLocaleString('pt-BR')+'%): '+money(pg.entrada_valor)+' • '+finDate(pg.data_entrada)+' • '+(pg.forma_entrada||'—'));
       linhaPagamentoPDF('Restante a pagar: '+money(pg.restante));
       (pg.parcelas_detalhes||[]).forEach(parcela=>linhaPagamentoPDF(String(parcela.numero)+'ª parcela: '+money(parcela.valor)+' • '+finDate(parcela.data)+' • '+(parcela.forma||'—')));
     }else if(pg.modo==='avista'){
