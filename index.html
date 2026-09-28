@@ -1406,6 +1406,20 @@ function projetoExecucaoMarkup(shapes=[]){
   }).join('');
 }
 
+function configurarEditorProjeto(shapes){
+  const svg=$('#tecProjeto');let ferramenta='selecionar',selecionado=-1,inicio=null,preview=null;
+  const desenhar=()=>{svg.innerHTML=projetoExecucaoMarkup(preview?[...shapes,preview]:shapes);if(selecionado>=0)svg.querySelector(`[data-shape-index="${selecionado}"]`)?.setAttribute('stroke','#1671a8')};
+  const ponto=ev=>{const p=svg.createSVGPoint();p.x=ev.clientX;p.y=ev.clientY;const t=p.matrixTransform(svg.getScreenCTM().inverse());return {x:Math.max(0,Math.min(900,Math.round(t.x))),y:Math.max(0,Math.min(500,Math.round(t.y)))}};
+  const figura=(a,b)=>ferramenta==='retangulo'?{tipo:'retangulo',x:Math.min(a.x,b.x),y:Math.min(a.y,b.y),w:Math.max(12,Math.abs(a.x-b.x)),h:Math.max(12,Math.abs(a.y-b.y))}:ferramenta==='linha'?{tipo:'linha',x1:a.x,y1:a.y,x2:b.x,y2:b.y}:{tipo:'circulo',cx:a.x,cy:a.y,r:Math.max(8,Math.min(250,Math.hypot(a.x-b.x,a.y-b.y)))};
+  svg.onpointerdown=ev=>{const alvo=ev.target.closest('[data-shape-index]');if(ferramenta==='selecionar'){selecionado=alvo?Number(alvo.dataset.shapeIndex):-1;desenhar();return}if(ferramenta==='texto'){const label=prompt('Escreva o nome ou observação neste ponto:');if(label?.trim()){const p=ponto(ev);shapes.push({tipo:'texto',x:p.x,y:p.y,texto:label.trim().slice(0,120)});desenhar()}return}inicio=ponto(ev);svg.setPointerCapture(ev.pointerId)};
+  svg.onpointermove=ev=>{if(inicio){preview=figura(inicio,ponto(ev));desenhar()}};
+  svg.onpointerup=ev=>{if(!inicio)return;const fim=ponto(ev);if(Math.abs(fim.x-inicio.x)<4&&Math.abs(fim.y-inicio.y)<4){fim.x=Math.min(900,inicio.x+80);fim.y=Math.min(500,inicio.y+60)}shapes.push(figura(inicio,fim));inicio=null;preview=null;desenhar()};
+  svg.onpointercancel=()=>{inicio=null;preview=null;desenhar()};
+  document.querySelectorAll('[data-tec-tool]').forEach(btn=>btn.onclick=()=>{ferramenta=btn.dataset.tecTool;document.querySelectorAll('[data-tec-tool]').forEach(x=>x.classList.toggle('active',x===btn));selecionado=-1;desenhar()});
+  $('#tecApagar').onclick=()=>{if(selecionado>=0){shapes.splice(selecionado,1);selecionado=-1;desenhar()}};
+  desenhar();
+}
+
 async function abrirTecnicaEventoExistente(id){
   const {data:e,error}=await db.from('eventos_operacionais').select('*').eq('id',id).single();
   if(error){alert('Erro ao carregar a técnica: '+error.message);return}
@@ -1445,16 +1459,8 @@ async function mostrarTecnicaEvento(p,info,existente=null,materiaisExistentes=[]
     <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">Anotação técnica</h3><textarea id="tecAnotacao" rows="6" placeholder="Orientações para montagem e operação">${esc(existente?.anotacao_tecnica||'')}</textarea></div>
     <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">Material técnico</h3><div class="muted">Apenas ativos marcados como material de montagem e disponíveis.</div><div class="payment-grid" style="margin-top:12px"><div class="field"><label>Material de montagem</label><select id="tecMaterial"><option value="">Selecione</option>${disponiveis.map(a=>`<option value="${esc(a.id)}" ${a.codigo_barras?'':'disabled'}>${esc(a.nome)}${a.codigo_barras?' — '+esc(a.codigo_barras):' — cadastre o código de barras'}</option>`).join('')}</select></div><div class="field"><label>Quantidade</label><input id="tecQuantidade" type="number" min="1" step="1" value="1"></div><button type="button" class="btn secondary" id="tecAdicionar">+ Adicionar material</button></div><div id="tecMateriaisLista" style="margin-top:12px"></div></div>
     <div class="actions"><button type="button" class="btn secondary" id="tecRascunho">Salvar rascunho do evento</button><button type="button" class="btn primary" id="tecCriar">Criar evento</button></div><div id="tecMsg" class="msg" role="status"></div>`;
-  const svg=$('#tecProjeto');let ferramenta='selecionar',selecionado=-1,inicio=null,preview=null,eventoId=existente?.id||null;
-  const desenhar=()=>{svg.innerHTML=projetoExecucaoMarkup(preview?[...shapes,preview]:shapes);if(selecionado>=0)svg.querySelector(`[data-shape-index="${selecionado}"]`)?.setAttribute('stroke','#1671a8')};
-  const ponto=ev=>{const p=svg.createSVGPoint();p.x=ev.clientX;p.y=ev.clientY;const t=p.matrixTransform(svg.getScreenCTM().inverse());return {x:Math.max(0,Math.min(900,Math.round(t.x))),y:Math.max(0,Math.min(500,Math.round(t.y)))}};
-  const figura=(a,b)=>ferramenta==='retangulo'?{tipo:'retangulo',x:Math.min(a.x,b.x),y:Math.min(a.y,b.y),w:Math.max(12,Math.abs(a.x-b.x)),h:Math.max(12,Math.abs(a.y-b.y))}:ferramenta==='linha'?{tipo:'linha',x1:a.x,y1:a.y,x2:b.x,y2:b.y}:{tipo:'circulo',cx:a.x,cy:a.y,r:Math.max(8,Math.min(250,Math.hypot(a.x-b.x,a.y-b.y)))};
-  svg.onpointerdown=ev=>{const alvo=ev.target.closest('[data-shape-index]');if(ferramenta==='selecionar'){selecionado=alvo?Number(alvo.dataset.shapeIndex):-1;desenhar();return}if(ferramenta==='texto'){const label=prompt('Escreva o nome ou observação neste ponto:');if(label?.trim()){const p=ponto(ev);shapes.push({tipo:'texto',x:p.x,y:p.y,texto:label.trim().slice(0,120)});desenhar()}return}inicio=ponto(ev);svg.setPointerCapture(ev.pointerId)};
-  svg.onpointermove=ev=>{if(inicio){preview=figura(inicio,ponto(ev));desenhar()}};
-  svg.onpointerup=ev=>{if(!inicio)return;const fim=ponto(ev);if(Math.abs(fim.x-inicio.x)<4&&Math.abs(fim.y-inicio.y)<4){fim.x=Math.min(900,inicio.x+80);fim.y=Math.min(500,inicio.y+60)}shapes.push(figura(inicio,fim));inicio=null;preview=null;desenhar()};
-  svg.onpointercancel=()=>{inicio=null;preview=null;desenhar()};
-  document.querySelectorAll('[data-tec-tool]').forEach(btn=>btn.onclick=()=>{ferramenta=btn.dataset.tecTool;document.querySelectorAll('[data-tec-tool]').forEach(x=>x.classList.toggle('active',x===btn));selecionado=-1;desenhar()});
-  $('#tecApagar').onclick=()=>{if(selecionado>=0){shapes.splice(selecionado,1);selecionado=-1;desenhar()}};
+  let eventoId=existente?.id||null;
+  configurarEditorProjeto(shapes);
   const listar=()=>{$('#tecMateriaisLista').innerHTML=montagem.length?`<div class="tablewrap"><table><thead><tr><th>Material</th><th>Cód. de barras</th><th>Quantidade</th><th>Ação</th></tr></thead><tbody>${montagem.map((m,i)=>`<tr><td>${esc(m.nome)}</td><td>${esc(m.codigo)}</td><td>${m.quantidade}</td><td><button type="button" class="btn secondary" data-remover-montagem="${i}">Remover</button></td></tr>`).join('')}</tbody></table></div>`:'Nenhum material técnico adicionado.';document.querySelectorAll('[data-remover-montagem]').forEach(b=>b.onclick=()=>{montagem.splice(Number(b.dataset.removerMontagem),1);listar()})};
   $('#tecAdicionar').onclick=()=>{const a=disponiveis.find(x=>String(x.id)===$('#tecMaterial').value),q=Number($('#tecQuantidade').value);if(!a||!a.codigo_barras){$('#tecMsg').textContent='Selecione um ativo disponível com código de barras.';return}if(!Number.isInteger(q)||q<1){$('#tecMsg').textContent='Informe uma quantidade inteira maior que zero.';return}if(montagem.some(m=>String(m.id)===String(a.id))){$('#tecMsg').textContent='Este material já está na lista.';return}montagem.push({id:a.id,nome:a.nome,codigo:a.codigo_barras,quantidade:q});$('#tecMaterial').value='';$('#tecMsg').textContent='';listar()};
   $('#tecVoltar').onclick=()=>existente?renderEventos():renderOrcamentos();
@@ -1479,7 +1485,7 @@ async function mostrarTecnicaEvento(p,info,existente=null,materiaisExistentes=[]
       msg.textContent=status==='pendente'?'Rascunho salvo.':'Evento aguardando evento.';await renderEventos();
     }catch(err){if(novo&&eventoId){await db.from('evento_materiais').delete().eq('evento_id',eventoId);await db.from('eventos_operacionais').delete().eq('id',eventoId);eventoId=null}msg.textContent='Erro ao salvar evento: '+err.message;btns.forEach(b=>b.disabled=false)}
   }
-  $('#tecRascunho').onclick=()=>salvar('pendente');$('#tecCriar').onclick=()=>salvar('pronto');desenhar();listar();
+  $('#tecRascunho').onclick=()=>salvar('pendente');$('#tecCriar').onclick=()=>salvar('pronto');listar();
 }
 
 function iconeOlhoEvento(){return '<svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="2.5" fill="currentColor"/></svg>'}
@@ -1488,11 +1494,31 @@ async function visualizarProjetoEvento(id){
   if(er.error||mr.error){alert('Erro ao abrir projeto: '+(er.error||mr.error).message);return}
   const e=er.data,materiais=mr.data||[];
   const campos=[['Cliente',e.cliente_nome],['Telefone do cliente',e.cliente_telefone],['Projeto / Evento',e.nome_evento],['Data do evento',finDate(e.data_evento)],['Local do evento',e.local_evento],['Cidade do evento',e.cidade_evento],['Horário inicial',e.horario_evento],['Responsável pelo evento',e.responsavel_evento],['Telefone do responsável',e.telefone_responsavel],['Veículo',e.veiculo],['Colaboradores',(e.colaboradores||[]).join(', ')]];
-  $('#content').innerHTML=`<div class="sectionhead"><div><h2>👁 Projeto — ${esc(e.nome_evento||'Evento')}</h2><div class="muted">${statusEventoLabel(e.status)} • visualização técnica</div></div><button type="button" class="btn secondary" onclick="renderEventos()">Voltar aos eventos</button></div>
+  $('#content').innerHTML=`<div class="sectionhead"><div><h2>👁 Projeto — ${esc(e.nome_evento||'Evento')}</h2><div class="muted">${statusEventoLabel(e.status)} • visualização técnica</div></div><div class="actions"><button type="button" class="btn primary" onclick="editarProjetoEvento('${id}')">Editar projeto</button><button type="button" class="btn secondary" onclick="renderEventos()">Voltar aos eventos</button></div></div>
     <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">Dados do evento</h3><div class="tecnica-grid">${campos.map(([titulo,valor])=>`<div class="field"><label>${titulo}</label><div>${esc(valor||'—')}</div></div>`).join('')}</div></div>
     <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">Projeto de execução</h3><svg class="projeto-canvas" viewBox="0 0 900 500" xmlns="http://www.w3.org/2000/svg">${projetoExecucaoMarkup(e.projeto_execucao)}</svg></div>
     <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">Anotação técnica</h3><div style="white-space:pre-wrap">${esc(e.anotacao_tecnica||'—')}</div></div>
     <div class="card"><h3 style="margin-top:0">Materiais do evento</h3><div class="tablewrap"><table><thead><tr><th>Item</th><th>Tipo</th><th>Qtd.</th><th>Cód. de barras</th></tr></thead><tbody>${materiais.map(m=>`<tr><td>${esc(m.nome_item)}</td><td>${m.origem==='montagem'?'Material técnico':m.origem==='extra'?'Material extra':m.tipo==='ativo'?'Equipamento':'Produto'}</td><td>${esc(m.quantidade_necessaria)}</td><td>${esc(m.codigo||'—')}</td></tr>`).join('')||'<tr><td colspan="4">Nenhum material cadastrado.</td></tr>'}</tbody></table></div></div>`;
+}
+async function editarProjetoEvento(id){
+  const {data:e,error}=await db.from('eventos_operacionais').select('id,nome_evento,status,projeto_execucao,anotacao_tecnica,relatorio_impresso_em').eq('id',id).single();
+  if(error){alert('Erro ao abrir edição do projeto: '+error.message);return}
+  const shapes=Array.isArray(e.projeto_execucao)?structuredClone(e.projeto_execucao):[];
+  $('#content').innerHTML=`<div class="sectionhead"><div><h2>Editar projeto — ${esc(e.nome_evento||'Evento')}</h2><div class="muted">Desenho e anotação técnica do evento</div></div><button type="button" class="btn secondary" onclick="visualizarProjetoEvento('${id}')">Cancelar</button></div>
+    <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">Projeto de execução</h3><div class="muted">Escolha uma forma e arraste. Em Texto, clique no lugar e escreva a identificação. Use Selecionar e Apagar seleção para remover.</div>
+      <div class="projeto-toolbar"><button type="button" class="btn secondary active" data-tec-tool="selecionar">Selecionar</button><button type="button" class="btn secondary" data-tec-tool="retangulo">Quadrado</button><button type="button" class="btn secondary" data-tec-tool="linha">Linha</button><button type="button" class="btn secondary" data-tec-tool="circulo">Bolinha</button><button type="button" class="btn secondary" data-tec-tool="texto">Texto</button><button type="button" class="btn secondary" id="tecApagar">Apagar seleção</button></div>
+      <svg id="tecProjeto" class="projeto-canvas" viewBox="0 0 900 500" xmlns="http://www.w3.org/2000/svg" aria-label="Editar desenho do projeto"></svg></div>
+    <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">Anotação técnica</h3><textarea id="tecAnotacao" rows="6" placeholder="Orientações para montagem e operação">${esc(e.anotacao_tecnica||'')}</textarea></div>
+    <div class="actions"><button type="button" id="projetoSalvar" class="btn primary">Salvar projeto</button><button type="button" class="btn secondary" onclick="visualizarProjetoEvento('${id}')">Cancelar</button></div><div id="projetoMsg" class="msg" role="status"></div>`;
+  configurarEditorProjeto(shapes);
+  $('#projetoSalvar').onclick=async()=>{
+    const btn=$('#projetoSalvar');btn.disabled=true;$('#projetoMsg').textContent='Salvando...';
+    const payload={projeto_execucao:shapes,anotacao_tecnica:$('#tecAnotacao').value.trim()||null,atualizado_em:new Date().toISOString()};
+    if(e.status==='material_pronto'&&e.relatorio_impresso_em)payload.relatorio_impresso_em=null;
+    const {error:up}=await db.from('eventos_operacionais').update(payload).eq('id',id);
+    if(up){$('#projetoMsg').textContent='Erro: '+up.message;btn.disabled=false;return}
+    await visualizarProjetoEvento(id);
+  };
 }
 async function renderEventos(){
   await atualizarContaMaster();
