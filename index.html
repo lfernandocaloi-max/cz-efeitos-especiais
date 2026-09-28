@@ -40,7 +40,7 @@
 .client-table .actions .btn{padding:6px 8px;font-size:11px;white-space:nowrap}
 .orc-travel-grid{display:grid;grid-template-columns:repeat(5,minmax(115px,180px));gap:10px}
 .orc-travel-grid .field,.orc-team-row .field{margin-top:4px;min-width:0}
-.orc-travel-grid input,.orc-travel-grid select,.orc-team-row input{padding:7px 9px!important;font-size:13px!important;min-height:35px}
+.orc-travel-grid input,.orc-travel-grid select,.orc-team-row input,.orc-team-row select{padding:7px 9px!important;font-size:13px!important;min-height:35px}
 .orc-travel-grid input,.orc-travel-grid select{min-width:0;width:100%;box-sizing:border-box}
 .tecnica-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
 .tecnica-grid .field{margin:0}
@@ -487,26 +487,61 @@ async function renderColaboradores(){
       <div class="field"><label class="client-switch"><input id="colCnh" type="checkbox"> Possui CNH</label></div>
       <div class="field"><label class="client-switch"><input id="colBlaster" type="checkbox"> Habilitado como blaster</label></div>
       <div class="row"><div class="field"><label for="colDocumento">Documento pessoal em PDF (máx. 10 MB)</label><input id="colDocumento" type="file" accept="application/pdf,.pdf"><div id="colDocumentoAtual"></div></div><div class="field" id="colCnhArea"><label for="colCnhPdf">CNH em PDF (máx. 10 MB)</label><input id="colCnhPdf" type="file" accept="application/pdf,.pdf"><div id="colCnhAtual"></div></div></div>
-      <div class="actions"><button type="button" class="btn primary" id="colSalvar">Salvar colaborador</button><button type="button" class="btn secondary" id="colCancelar">Cancelar</button></div><div class="msg" id="colMsg" role="status"></div>
+      <div id="colHistorico" class="hidden" style="margin-top:16px"></div>
+      <div class="actions"><button type="button" class="btn danger hidden" id="colExcluir" style="margin-right:auto">Excluir colaborador</button><button type="button" class="btn secondary hidden" id="colStatus">Inativar colaborador</button><button type="button" class="btn primary" id="colSalvar">Salvar colaborador</button><button type="button" class="btn secondary" id="colCancelar">Cancelar</button></div><div class="msg" id="colMsg" role="status"></div>
     </div><div class="card"><h3 style="margin-top:0">Equipe cadastrada</h3><div id="colLista">Carregando...</div></div>`;
   const lista=$('#colLista'),form=$('#colForm'),msg=$('#colMsg');let colaboradores=[];
   const documentoAtual=(campo,caminho,rotulo)=>{campo.replaceChildren();if(!caminho)return;const b=document.createElement('button');b.type='button';b.className='btn secondary';b.textContent='Abrir '+rotulo;b.onclick=()=>abrirPdfColaborador(caminho);campo.append(b)};
-  const limpar=()=>{$('#colId').value='';for(const id of ['colNome','colTelefone','colCpf','colRg','colEndereco','colSexo','colNascimento','colDocumento','colCnhPdf'])$('#'+id).value='';$('#colCnh').checked=false;$('#colBlaster').checked=false;$('#colIdade').value='';$('#colDocumentoAtual').replaceChildren();$('#colCnhAtual').replaceChildren();$('#colFormTitle').textContent='Novo colaborador';msg.textContent='';$('#colCnhArea').classList.add('hidden')};
+  const limpar=()=>{$('#colId').value='';for(const id of ['colNome','colTelefone','colCpf','colRg','colEndereco','colSexo','colNascimento','colDocumento','colCnhPdf'])$('#'+id).value='';$('#colCnh').checked=false;$('#colBlaster').checked=false;$('#colIdade').value='';$('#colDocumentoAtual').replaceChildren();$('#colCnhAtual').replaceChildren();$('#colFormTitle').textContent='Novo colaborador';msg.textContent='';$('#colCnhArea').classList.add('hidden');$('#colExcluir').classList.add('hidden');$('#colStatus').classList.add('hidden');$('#colHistorico').classList.add('hidden');$('#colHistorico').replaceChildren()};
+  const carregarHistorico=async id=>{
+    const painel=$('#colHistorico');painel.classList.remove('hidden');painel.textContent='Carregando histórico de status...';
+    const {data,error}=await db.from('colaborador_status_historico').select('ativo,alterado_em,alterado_por').eq('colaborador_id',id).order('alterado_em',{ascending:false});
+    if($('#colId').value!==id)return;
+    if(error){painel.textContent='Erro ao carregar histórico: '+error.message;return}
+    painel.innerHTML='<h4>Histórico de situação</h4>'+((data||[]).length?`<div class="tablewrap"><table><thead><tr><th>Data e hora</th><th>Situação</th><th>Alterado por</th></tr></thead><tbody>${data.map(h=>`<tr><td>${esc(new Date(h.alterado_em).toLocaleString('pt-BR'))}</td><td>${h.ativo?'Ativado':'Inativado'}</td><td>${esc(h.alterado_por||'—')}</td></tr>`).join('')}</tbody></table></div>`:'Nenhuma mudança de situação registrada.');
+  };
   const carregar=async()=>{
     const {data,error}=await db.from('colaboradores').select('*').order('nome');if(!lista.isConnected)return;
     if(error){lista.textContent='Erro ao carregar colaboradores: '+error.message+'. Execute primeiro o SQL de colaboradores no Supabase.';return}
     colaboradores=data||[];
-    lista.innerHTML=colaboradores.length?`<div class="tablewrap"><table><thead><tr><th>Nome</th><th>Telefone</th><th>Idade</th><th>CNH</th><th>Blaster</th><th>Ações</th></tr></thead><tbody>${colaboradores.map(c=>`<tr><td><b>${esc(c.nome)}</b></td><td>${esc(c.telefone||'—')}</td><td>${idadeColaborador(c.data_nascimento)??'—'}</td><td>${c.possui_cnh?'Sim':'Não'}</td><td>${c.blaster?'Sim':'Não'}</td><td><button type="button" class="btn secondary" data-col-edit="${esc(c.id)}">Editar / ver ficha</button></td></tr>`).join('')}</tbody></table></div>`:'Nenhum colaborador cadastrado.';
+    lista.innerHTML=colaboradores.length?`<div class="tablewrap"><table><thead><tr><th>Nome</th><th>Telefone</th><th>Idade</th><th>CNH</th><th>Blaster</th><th>Situação</th><th>Ações</th></tr></thead><tbody>${colaboradores.map(c=>`<tr><td><b>${esc(c.nome)}</b></td><td>${esc(c.telefone||'—')}</td><td>${idadeColaborador(c.data_nascimento)??'—'}</td><td>${c.possui_cnh?'Sim':'Não'}</td><td>${c.blaster?'Sim':'Não'}</td><td>${c.ativo?'🟢 Ativo':'⚫ Inativo'}</td><td><button type="button" class="btn secondary" data-col-edit="${esc(c.id)}">Editar / ver ficha</button></td></tr>`).join('')}</tbody></table></div>`:'Nenhum colaborador cadastrado.';
     lista.querySelectorAll('[data-col-edit]').forEach(b=>b.onclick=()=>{
       const c=colaboradores.find(x=>String(x.id)===b.dataset.colEdit);if(!c)return;
       limpar();$('#colId').value=c.id;$('#colNome').value=c.nome||'';$('#colTelefone').value=c.telefone||'';$('#colCpf').value=c.cpf||'';$('#colRg').value=c.rg||'';$('#colEndereco').value=c.endereco||'';$('#colSexo').value=c.sexo||'';$('#colNascimento').value=c.data_nascimento||'';$('#colIdade').value=idadeColaborador(c.data_nascimento)??'';$('#colCnh').checked=!!c.possui_cnh;$('#colBlaster').checked=!!c.blaster;$('#colCnhArea').classList.toggle('hidden',!c.possui_cnh);
-      documentoAtual($('#colDocumentoAtual'),c.documento_pdf_path,'documento');documentoAtual($('#colCnhAtual'),c.cnh_pdf_path,'CNH');$('#colFormTitle').textContent='Editar colaborador';form.classList.remove('hidden');form.scrollIntoView({behavior:'smooth',block:'start'});
+      documentoAtual($('#colDocumentoAtual'),c.documento_pdf_path,'documento');documentoAtual($('#colCnhAtual'),c.cnh_pdf_path,'CNH');$('#colFormTitle').textContent='Editar colaborador';$('#colExcluir').classList.remove('hidden');$('#colStatus').textContent=c.ativo?'Inativar colaborador':'Ativar colaborador';$('#colStatus').classList.remove('hidden');form.classList.remove('hidden');carregarHistorico(c.id);form.scrollIntoView({behavior:'smooth',block:'start'});
     });
   };
   $('#colNovo').onclick=()=>{limpar();form.classList.remove('hidden');$('#colNome').focus()};
   $('#colCancelar').onclick=()=>{form.classList.add('hidden');limpar()};
   $('#colNascimento').onchange=()=>{$('#colIdade').value=idadeColaborador($('#colNascimento').value)??''};
   $('#colCnh').onchange=()=>{$('#colCnhArea').classList.toggle('hidden',!$('#colCnh').checked);if(!$('#colCnh').checked)$('#colCnhPdf').value=''};
+  $('#colStatus').onclick=async()=>{
+    const id=$('#colId').value,c=colaboradores.find(x=>String(x.id)===id),botao=$('#colStatus');if(!c)return;
+    const proximo=!c.ativo;
+    if(!confirm(`${proximo?'Ativar':'Inativar'} ${c.nome}? ${proximo?'Ele voltará a aparecer na escolha da equipe.':'O cadastro e o histórico serão mantidos.'}`))return;
+    botao.disabled=true;msg.textContent='Atualizando situação...';
+    const {data,error}=await db.from('colaboradores').update({ativo:proximo,atualizado_em:new Date().toISOString()}).eq('id',id).eq('ativo',c.ativo).select('id');
+    botao.disabled=false;
+    if(error||!data?.length){msg.textContent='Erro ao alterar situação: '+(error?.message||'O cadastro mudou. Reabra a ficha.');return}
+    msg.textContent=`Colaborador ${proximo?'ativado':'inativado'}.`;
+    botao.textContent=proximo?'Inativar colaborador':'Ativar colaborador';await carregar();await carregarHistorico(id);
+  };
+  $('#colExcluir').onclick=async()=>{
+    const id=$('#colId').value,c=colaboradores.find(x=>String(x.id)===id),botao=$('#colExcluir');
+    if(!id||!c)return;
+    if(!confirm(`Excluir definitivamente o cadastro de ${c.nome} e os PDFs enviados?`))return;
+    botao.disabled=true;$('#colSalvar').disabled=true;msg.textContent='Excluindo colaborador...';
+    try{
+      const {data,error}=await db.from('colaboradores').delete().eq('id',id).select('id');
+      if(error)throw error;
+      if(!data?.length)throw new Error('Cadastro não encontrado ou sem permissão para excluir.');
+      form.classList.add('hidden');limpar();await carregar();
+      const {data:arquivos,error:listarErro}=await db.storage.from('documentos-colaboradores').list(id,{limit:1000});
+      if(listarErro)throw new Error('Cadastro excluído, mas não foi possível consultar os PDFs: '+listarErro.message);
+      const caminhos=(arquivos||[]).filter(a=>a.name).map(a=>`${id}/${a.name}`);
+      if(caminhos.length){const {error:arquivosErro}=await db.storage.from('documentos-colaboradores').remove(caminhos);if(arquivosErro)throw new Error('Cadastro excluído, mas não foi possível remover os PDFs: '+arquivosErro.message)}
+    }catch(err){await carregar();if(form.classList.contains('hidden')){const aviso=document.createElement('div');aviso.className='msg';aviso.textContent='Atenção: '+err.message;lista.prepend(aviso)}else msg.textContent='Erro: '+err.message}finally{botao.disabled=false;$('#colSalvar').disabled=false}
+  };
   $('#colSalvar').onclick=async()=>{
     const id=$('#colId').value,nome=$('#colNome').value.trim(),telefone=$('#colTelefone').value.trim(),nascimento=$('#colNascimento').value,possuiCnh=$('#colCnh').checked;
     const documento=$('#colDocumento').files[0],cnh=$('#colCnhPdf').files[0],salvar=$('#colSalvar');
@@ -582,6 +617,8 @@ async function renderOrcamentos(novo=false){
     await carregarPropostasSalvas();
     return;
   }
+  const {data:nomesAtivos,error:erroNomes}=await db.rpc('listar_colaboradores_ativos');
+  const opcoesEquipe=(nomesAtivos||[]).map(c=>`<option value="${esc(c.id)}">${esc(c.nome)}</option>`).join('');
   $('#content').innerHTML = `
     <div style="margin-bottom:22px">
       <div style="font-size:13px;color:#ff641f;font-weight:800;letter-spacing:1px">
@@ -664,7 +701,7 @@ async function renderOrcamentos(novo=false){
     <div class="card orc-team-card" style="margin-bottom:18px">
       <h3 style="margin:0 0 12px">👷 Equipe</h3>
       <div id="orcEquipeLista"><div class="orc-equipe-linha orc-team-row">
-        <div class="field"><label>Nome do colaborador</label><input class="equipeNome" placeholder="Nome"></div>
+        <div class="field"><label>Nome do colaborador</label><select class="equipeNome"><option value="">Selecione</option>${opcoesEquipe}</select></div>
         <div class="field"><label>Qtd. diária</label><input class="equipeDiarias" type="number" min="0" value="0"></div>
         <div class="field"><label>Valor diária</label><input class="equipeValorDiaria" type="number" min="0" step="0.01" value="0"></div>
         <div class="field"><label>Valor alimentação</label><input class="equipeAlimentacao" type="number" min="0" step="0.01" value="0"></div>
@@ -672,6 +709,7 @@ async function renderOrcamentos(novo=false){
         <div class="field"><label>Total</label><input class="equipeTotal" value="R$ 0,00" readonly></div>
       </div></div>
       <button type="button" id="btnAdicionarColaborador" class="btn secondary" style="padding:6px 10px;font-size:12px;margin-top:10px">+ Adicionar colaborador</button>
+      ${erroNomes?`<div class="msg">Não foi possível carregar os colaboradores: ${esc(erroNomes.message)}. Execute o SQL de situação dos colaboradores.</div>`:''}
       <div class="orc-team-total"><strong>Total da Equipe: <span id="orcTotalEquipe">R$ 0,00</span></strong></div>
     </div>
 
@@ -886,7 +924,7 @@ $('#btnAdicionarColaborador').onclick = () => {
   novaLinha.innerHTML = `
     <div class="field">
       <label>Nome do colaborador</label>
-      <input class="equipeNome" placeholder="Nome">
+      <select class="equipeNome"><option value="">Selecione</option>${opcoesEquipe}</select>
 </div>
       <div class="field">
   <label>Qtd. diária</label>
@@ -988,7 +1026,7 @@ atualizarEquipe();
   }
   function dadosProposta(){
     const equipe=[...document.querySelectorAll('.orc-equipe-linha, .linhaEquipe')].map(l=>({
-      nome:l.querySelector('.equipeNome')?.value?.trim()||'',
+      nome:(nomesAtivos||[]).find(c=>String(c.id)===l.querySelector('.equipeNome')?.value)?.nome||'',
       diarias:Number(l.querySelector('.equipeDiarias')?.value||0),
       valor_diaria:Number(l.querySelector('.equipeValorDiaria')?.value||0),
       alimentacao:Number(l.querySelector('.equipeAlimentacao')?.value||0),
@@ -1109,6 +1147,13 @@ atualizarEquipe();
   }
   async function salvarProposta(status='enviado'){
     const d=dadosProposta(),erro=validarProposta(d);if(erro)throw new Error(erro);
+    const selecionados=[...document.querySelectorAll('.equipeNome')].map(c=>c.value).filter(Boolean);
+    if(selecionados.length){
+      const {data:atuais,error:erroEquipe}=await db.rpc('listar_colaboradores_ativos');
+      if(erroEquipe)throw new Error('Não foi possível conferir os colaboradores ativos: '+erroEquipe.message);
+      const ativos=new Set((atuais||[]).map(c=>String(c.id)));
+      if(selecionados.some(id=>!ativos.has(id)))throw new Error('Um colaborador selecionado foi inativado. Abra novamente o orçamento e escolha outro.');
+    }
     const numero=await proximoNumeroProposta();
     const payload={numero,status,cliente_nome:d.cliente,cliente_telefone:d.telefone||null,evento_nome:d.evento,data_evento:d.data_evento,local_evento:d.local_evento||null,valor_total:d.total,dados:d,criado_em:new Date().toISOString()};
     const {data,error}=await db.from('orcamentos').insert(payload).select('*').single();
