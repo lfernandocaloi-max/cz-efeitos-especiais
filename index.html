@@ -220,7 +220,7 @@ $('#logoutBtn').onclick=async()=>{await db.auth.signOut();showLogin()};
     ? 'Erro: '+error.message
     : 'Link de recuperação enviado para seu e-mail.';
 }
-async function renderModule(i){$('#pageTitle').textContent=modules[i];if(i===0)return renderDashboard();if(i===1)return renderClients();if(i===2)return renderOrcamentos();if(i===4)return renderEventos();if(i===5)return renderRetornoEventos();if(i===6)return renderProducts();if(i===7)return renderAssets();if(i===10)return renderFinanceiro();if(i===14)return renderShoppingList();if(i===15)return renderVehicles();$('#content').innerHTML=`<div class="sectionhead"><h2>${modules[i]}</h2></div><div class="placeholder">Módulo já previsto no banco de dados. A tela operacional será ativada nas próximas versões sem precisar recriar sua estrutura.</div>`}
+async function renderModule(i){$('#pageTitle').textContent=modules[i];if(i===0)return renderDashboard();if(i===1)return renderClients();if(i===2)return renderOrcamentos();if(i===4)return renderEventos();if(i===5)return renderRetornoEventos();if(i===6)return renderProducts();if(i===7)return renderAssets();if(i===8)return renderColaboradores();if(i===10)return renderFinanceiro();if(i===14)return renderShoppingList();if(i===15)return renderVehicles();$('#content').innerHTML=`<div class="sectionhead"><h2>${modules[i]}</h2></div><div class="placeholder">Módulo já previsto no banco de dados. A tela operacional será ativada nas próximas versões sem precisar recriar sua estrutura.</div>`}
 async function count(table){const {count,error}=await db.from(table).select('*',{count:'exact',head:true});return error?'—':count}
 
 const CZ_MASTER_EMAIL='lfernando.caloi@gmail.com';
@@ -463,6 +463,72 @@ async function renderDashboard(){
   `;
   const receb=await finRecebiveis(),desp=finDespesas(),fr=finResumoMes(receb,desp);
   const df=$('#dashFinanceiro');if(df)df.innerHTML=`<div class="sectionhead" style="margin-bottom:10px"><div><h3 style="margin:0">Financeiro do dia</h3><div class="muted">Clique para ver o que receber ou pagar</div></div><button class="btn primary" onclick="novaDespesa()">+ Nova despesa</button></div><div class="cards" style="margin-bottom:18px"><div class="card" style="cursor:pointer" onclick="abrirFinanceFiltro('receber_hoje')"><div class="muted">💰 A receber hoje</div><div class="n">${money(fr.receberHoje)}</div></div><div class="card" style="cursor:pointer" onclick="abrirFinanceFiltro('receber_mes')"><div class="muted">📅 A receber restante do mês</div><div class="n">${money(fr.receberMes)}</div></div><div class="card" style="cursor:pointer" onclick="abrirFinanceFiltro('pagar_hoje')"><div class="muted">💸 A pagar hoje</div><div class="n">${money(fr.pagarHoje)}</div></div><div class="card" style="cursor:pointer" onclick="abrirFinanceFiltro('pagar_mes')"><div class="muted">🧾 A pagar restante do mês</div><div class="n">${money(fr.pagarMes)}</div></div><div class="card" style="cursor:pointer" onclick="abrirFinanceFiltro('vencidos')"><div class="muted">🔴 Clientes vencidos</div><div class="n">${money(fr.vencidos)}</div></div><div class="card" style="cursor:pointer" onclick="renderFinanceiro()"><div class="muted">📞 Cobranças para hoje</div><div class="n">${fr.cobrancas.length}</div></div></div>`;
+}
+function idadeColaborador(data){
+  if(!data)return null;
+  const [ano,mes,dia]=data.split('-').map(Number),hoje=new Date();
+  if(!ano||!mes||!dia)return null;
+  let idade=hoje.getFullYear()-ano;
+  if(hoje.getMonth()+1<mes||(hoje.getMonth()+1===mes&&hoje.getDate()<dia))idade--;
+  return idade>=0&&idade<=120?idade:null;
+}
+async function abrirPdfColaborador(caminho){
+  const {data,error}=await db.storage.from('documentos-colaboradores').createSignedUrl(caminho,60);
+  if(error){alert('Não foi possível abrir o PDF: '+error.message);return}
+  window.location.assign(data.signedUrl);
+}
+async function renderColaboradores(){
+  $('#content').innerHTML=`<div class="sectionhead"><div><h2>Colaboradores</h2><div class="muted">Cadastro da equipe e documentos</div></div><button type="button" class="btn primary" id="colNovo">+ Novo colaborador</button></div>
+    <div class="card hidden" id="colForm" style="margin-bottom:18px"><h3 id="colFormTitle" style="margin-top:0">Novo colaborador</h3><input type="hidden" id="colId">
+      <div class="row"><div class="field"><label for="colNome">Nome *</label><input id="colNome" autocomplete="name"></div><div class="field"><label for="colTelefone">Telefone *</label><input id="colTelefone" type="tel" autocomplete="tel"></div></div>
+      <div class="row"><div class="field"><label for="colCpf">CPF</label><input id="colCpf" inputmode="numeric" maxlength="14"></div><div class="field"><label for="colRg">RG</label><input id="colRg"></div></div>
+      <div class="field"><label for="colEndereco">Endereço</label><input id="colEndereco" autocomplete="street-address"></div>
+      <div class="row"><div class="field"><label for="colSexo">Sexo</label><select id="colSexo"><option value="">Selecione</option><option value="feminino">Feminino</option><option value="masculino">Masculino</option><option value="outro">Outro</option><option value="nao_informado">Prefiro não informar</option></select></div><div class="field"><label for="colNascimento">Data de nascimento</label><input id="colNascimento" type="date"></div><div class="field"><label for="colIdade">Idade (automática)</label><input id="colIdade" readonly></div></div>
+      <div class="field"><label class="client-switch"><input id="colCnh" type="checkbox"> Possui CNH</label></div>
+      <div class="field"><label class="client-switch"><input id="colBlaster" type="checkbox"> Habilitado como blaster</label></div>
+      <div class="row"><div class="field"><label for="colDocumento">Documento pessoal em PDF (máx. 10 MB)</label><input id="colDocumento" type="file" accept="application/pdf,.pdf"><div id="colDocumentoAtual"></div></div><div class="field" id="colCnhArea"><label for="colCnhPdf">CNH em PDF (máx. 10 MB)</label><input id="colCnhPdf" type="file" accept="application/pdf,.pdf"><div id="colCnhAtual"></div></div></div>
+      <div class="actions"><button type="button" class="btn primary" id="colSalvar">Salvar colaborador</button><button type="button" class="btn secondary" id="colCancelar">Cancelar</button></div><div class="msg" id="colMsg" role="status"></div>
+    </div><div class="card"><h3 style="margin-top:0">Equipe cadastrada</h3><div id="colLista">Carregando...</div></div>`;
+  const lista=$('#colLista'),form=$('#colForm'),msg=$('#colMsg');let colaboradores=[];
+  const documentoAtual=(campo,caminho,rotulo)=>{campo.replaceChildren();if(!caminho)return;const b=document.createElement('button');b.type='button';b.className='btn secondary';b.textContent='Abrir '+rotulo;b.onclick=()=>abrirPdfColaborador(caminho);campo.append(b)};
+  const limpar=()=>{$('#colId').value='';for(const id of ['colNome','colTelefone','colCpf','colRg','colEndereco','colSexo','colNascimento','colDocumento','colCnhPdf'])$('#'+id).value='';$('#colCnh').checked=false;$('#colBlaster').checked=false;$('#colIdade').value='';$('#colDocumentoAtual').replaceChildren();$('#colCnhAtual').replaceChildren();$('#colFormTitle').textContent='Novo colaborador';msg.textContent='';$('#colCnhArea').classList.add('hidden')};
+  const carregar=async()=>{
+    const {data,error}=await db.from('colaboradores').select('*').order('nome');if(!lista.isConnected)return;
+    if(error){lista.textContent='Erro ao carregar colaboradores: '+error.message+'. Execute primeiro o SQL de colaboradores no Supabase.';return}
+    colaboradores=data||[];
+    lista.innerHTML=colaboradores.length?`<div class="tablewrap"><table><thead><tr><th>Nome</th><th>Telefone</th><th>Idade</th><th>CNH</th><th>Blaster</th><th>Ações</th></tr></thead><tbody>${colaboradores.map(c=>`<tr><td><b>${esc(c.nome)}</b></td><td>${esc(c.telefone||'—')}</td><td>${idadeColaborador(c.data_nascimento)??'—'}</td><td>${c.possui_cnh?'Sim':'Não'}</td><td>${c.blaster?'Sim':'Não'}</td><td><button type="button" class="btn secondary" data-col-edit="${esc(c.id)}">Editar / ver ficha</button></td></tr>`).join('')}</tbody></table></div>`:'Nenhum colaborador cadastrado.';
+    lista.querySelectorAll('[data-col-edit]').forEach(b=>b.onclick=()=>{
+      const c=colaboradores.find(x=>String(x.id)===b.dataset.colEdit);if(!c)return;
+      limpar();$('#colId').value=c.id;$('#colNome').value=c.nome||'';$('#colTelefone').value=c.telefone||'';$('#colCpf').value=c.cpf||'';$('#colRg').value=c.rg||'';$('#colEndereco').value=c.endereco||'';$('#colSexo').value=c.sexo||'';$('#colNascimento').value=c.data_nascimento||'';$('#colIdade').value=idadeColaborador(c.data_nascimento)??'';$('#colCnh').checked=!!c.possui_cnh;$('#colBlaster').checked=!!c.blaster;$('#colCnhArea').classList.toggle('hidden',!c.possui_cnh);
+      documentoAtual($('#colDocumentoAtual'),c.documento_pdf_path,'documento');documentoAtual($('#colCnhAtual'),c.cnh_pdf_path,'CNH');$('#colFormTitle').textContent='Editar colaborador';form.classList.remove('hidden');form.scrollIntoView({behavior:'smooth',block:'start'});
+    });
+  };
+  $('#colNovo').onclick=()=>{limpar();form.classList.remove('hidden');$('#colNome').focus()};
+  $('#colCancelar').onclick=()=>{form.classList.add('hidden');limpar()};
+  $('#colNascimento').onchange=()=>{$('#colIdade').value=idadeColaborador($('#colNascimento').value)??''};
+  $('#colCnh').onchange=()=>{$('#colCnhArea').classList.toggle('hidden',!$('#colCnh').checked);if(!$('#colCnh').checked)$('#colCnhPdf').value=''};
+  $('#colSalvar').onclick=async()=>{
+    const id=$('#colId').value,nome=$('#colNome').value.trim(),telefone=$('#colTelefone').value.trim(),nascimento=$('#colNascimento').value,possuiCnh=$('#colCnh').checked;
+    const documento=$('#colDocumento').files[0],cnh=$('#colCnhPdf').files[0],salvar=$('#colSalvar');
+    if(!nome||!telefone){msg.textContent='Informe nome e telefone.';return}
+    if(nascimento&&idadeColaborador(nascimento)===null){msg.textContent='Informe uma data de nascimento válida.';return}
+    for(const arquivo of [documento,cnh].filter(Boolean))if(arquivo.size>10*1024*1024||!(arquivo.type==='application/pdf'||arquivo.name.toLowerCase().endsWith('.pdf'))){msg.textContent='Envie somente arquivos PDF de até 10 MB.';return}
+    const atual=colaboradores.find(c=>String(c.id)===id),payload={nome,telefone,cpf:$('#colCpf').value.trim()||null,rg:$('#colRg').value.trim()||null,endereco:$('#colEndereco').value.trim()||null,sexo:$('#colSexo').value||null,data_nascimento:nascimento||null,possui_cnh:possuiCnh,blaster:$('#colBlaster').checked,atualizado_em:new Date().toISOString()};
+    salvar.disabled=true;msg.textContent='Salvando cadastro...';
+    try{
+      const {data,error}=await (id?db.from('colaboradores').update(payload).eq('id',id).select().single():db.from('colaboradores').insert(payload).select().single());if(error)throw error;
+      $('#colId').value=data.id;
+      const caminhoBase=data.id;
+      for(const [arquivo,coluna,tipo] of [[documento,'documento_pdf_path','documento'],[cnh,'cnh_pdf_path','cnh']]){
+        if(!arquivo)continue;
+        const caminho=`${caminhoBase}/${tipo}-${crypto.randomUUID()}.pdf`;
+        const res=await db.storage.from('documentos-colaboradores').upload(caminho,arquivo,{contentType:'application/pdf',upsert:false});if(res.error)throw res.error;
+        const {error:up}=await db.from('colaboradores').update({[coluna]:caminho}).eq('id',data.id);if(up)throw up;
+      }
+      form.classList.add('hidden');limpar();await carregar();
+    }catch(err){msg.textContent='Erro ao salvar: '+err.message+'. Se o cadastro já foi criado, procure o nome na lista antes de tentar novamente.';await carregar()}finally{salvar.disabled=false}
+  };
+  await carregar();
 }
 async function renderVehicles(){
   $('#content').innerHTML=`<div class="sectionhead"><div><h2>Veículos</h2><div class="muted">Cadastre o custo por km usado nos orçamentos</div></div></div>
