@@ -677,7 +677,7 @@ $('#orcFormaPagamento').onchange=()=>atualizarPagamento();
 $('#orcParcelasCartao').onchange=()=>atualizarPagamento();
 $('#orcEntradaPercentual').addEventListener('input',()=>atualizarPagamento());
 $('#orcParcelasContrato').onchange=()=>atualizarPagamento();
-$('#orcData').addEventListener('change',()=>atualizarPagamento());
+$('#orcData').addEventListener('change',()=>atualizarPagamento(true));
 
 function atualizarPagamento(forcarData=false){
   const totalCent=Math.round(Number($('#orcInvestimento').dataset.valor||0)*100);
@@ -706,16 +706,16 @@ function atualizarPagamento(forcarData=false){
     const base=Math.floor(restanteCent/n);
     $('#orcParcelasContratoLista').innerHTML=Array.from({length:n},(_,i)=>{
       const valor=(i===n-1?restanteCent-base*(n-1):base)/100;
-      const data=i===n-1?limite:(dataEntrada?(forcarData||mudouQuantidade||!anteriores[i]?.data?finAddMonths(dataEntrada,i+1):anteriores[i].data):'');
+      const data=i===n-1?(n===1&&!forcarData&&!mudouQuantidade&&anteriores[i]?.data?anteriores[i].data:limite):(dataEntrada?(forcarData||mudouQuantidade||!anteriores[i]?.data?finAddMonths(dataEntrada,i+1):anteriores[i].data):'');
       const forma=anteriores[i]?.forma||'PIX';
       const formas=['PIX','Dinheiro','Cartão de débito','Cartão de crédito','Transferência'];
-      return `<div class="contract-installment"><b>${i+1}ª parcela</b><div class="field"><label>Valor (R$)</label><input data-parcela-valor type="number" min="0" step="0.01" value="${valor.toFixed(2)}" inputmode="decimal"></div><div class="field"><label>Data${i===n-1?' (5 dias antes do evento)':''}</label><input data-parcela-data type="date" value="${esc(data)}" ${i===n-1?'readonly':` ${limite?`max="${limite}"`:''}`}></div><div class="field"><label>Forma de pagamento</label><select data-parcela-forma>${formas.map(f=>`<option ${forma===f?'selected':''}>${f}</option>`).join('')}</select></div></div>`;
+      return `<div class="contract-installment"><b>${i+1}ª parcela</b><div class="field"><label>Valor (R$)</label><input data-parcela-valor type="number" min="0" step="0.01" value="${valor.toFixed(2)}" inputmode="decimal"></div><div class="field"><label>Data${i===n-1&&n>1?' (5 dias antes do evento)':''}</label><input data-parcela-data type="date" value="${esc(data)}" ${i===n-1&&n>1?'readonly':limite?`max="${limite}"`:''}></div><div class="field"><label>Forma de pagamento</label><select data-parcela-forma>${formas.map(f=>`<option ${forma===f?'selected':''}>${f}</option>`).join('')}</select></div></div>`;
     }).join('');
     parcelasRestanteBase=restanteCent;parcelasRestanteQtd=n;
   }
   document.querySelectorAll('[data-parcela-data]').forEach(c=>{if(limite)c.max=limite;else c.removeAttribute('max')});
   const ultima=$('#orcParcelasContratoLista .contract-installment:last-child [data-parcela-data]');
-  if(ultima)ultima.value=limite;
+  if(ultima&&n>1)ultima.value=limite;
   atualizarSomaParcelas();
 }
 function atualizarSomaParcelas(){
@@ -891,7 +891,7 @@ atualizarEquipe();
       if(p.data_entrada>=limite)return 'A data do evento deve permitir que a última parcela vença depois da entrada, 5 dias antes do evento.';
       if(!p.parcelas_detalhes.length)return 'Selecione as parcelas do restante.';
       if(p.parcelas_detalhes.some(x=>!Number.isFinite(x.valor)||x.valor<0||!x.data||!x.forma))return 'Preencha valor, data e forma de pagamento de cada parcela.';
-      if(p.parcelas_detalhes.at(-1).data!==limite)return 'A última parcela deve vencer 5 dias antes do evento.';
+      if(p.parcelas_detalhes.length>1&&p.parcelas_detalhes.at(-1).data!==limite)return 'A última parcela deve vencer 5 dias antes do evento.';
       if(p.parcelas_detalhes.some(x=>x.data>limite))return 'Nenhuma parcela pode vencer depois de 5 dias antes do evento.';
       if(p.parcelas_detalhes[0].data<=p.data_entrada)return 'A primeira parcela deve vencer depois da entrada.';
       if(p.parcelas_detalhes.some((x,i)=>i>0&&x.data<p.parcelas_detalhes[i-1].data))return 'As datas das parcelas devem ficar em ordem.';
