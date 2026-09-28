@@ -677,9 +677,9 @@ $('#orcFormaPagamento').onchange=()=>atualizarPagamento();
 $('#orcParcelasCartao').onchange=()=>atualizarPagamento();
 $('#orcEntradaPercentual').addEventListener('input',()=>atualizarPagamento());
 $('#orcParcelasContrato').onchange=()=>atualizarPagamento();
-$('#orcData').addEventListener('change',()=>atualizarPagamento(true));
+$('#orcData').addEventListener('change',()=>atualizarPagamento());
 
-function atualizarPagamento(forcarData=false){
+function atualizarPagamento(){
   const totalCent=Math.round(Number($('#orcInvestimento').dataset.valor||0)*100);
   const modo=document.querySelector('input[name="orcCondicaoPagamento"]:checked')?.value||'avista';
   $('#orcPagamentoVista').classList.toggle('hidden',modo!=='avista');
@@ -699,17 +699,15 @@ function atualizarPagamento(forcarData=false){
   $('#orcEntradaValor').value=money(entradaCent/100);
   $('#orcRestante').value=money(restanteCent/100);
   const limite=$('#orcData').value?finAddDays($('#orcData').value,-1):'';
-  const dataEntrada=$('#orcDataEntrada').value;
-  if(parcelasRestanteBase!==restanteCent||parcelasRestanteQtd!==n||forcarData){
-    const mudouQuantidade=parcelasRestanteQtd!==n;
+  if(parcelasRestanteBase!==restanteCent||parcelasRestanteQtd!==n){
     const anteriores=[...document.querySelectorAll('.contract-installment')].map(l=>({data:l.querySelector('[data-parcela-data]')?.value,forma:l.querySelector('[data-parcela-forma]')?.value}));
     const base=Math.floor(restanteCent/n);
     $('#orcParcelasContratoLista').innerHTML=Array.from({length:n},(_,i)=>{
       const valor=(i===n-1?restanteCent-base*(n-1):base)/100;
-      const data=i===n-1?(!forcarData&&!mudouQuantidade&&anteriores[i]?.data?anteriores[i].data:limite):(dataEntrada?(mudouQuantidade||!anteriores[i]?.data?finAddMonths(dataEntrada,i+1):anteriores[i].data):'');
+      const data=anteriores[i]?.data||'';
       const forma=anteriores[i]?.forma||'PIX';
       const formas=['PIX','Dinheiro','Cartão de débito','Cartão de crédito','Transferência'];
-      return `<div class="contract-installment"><b>${i+1}ª parcela</b><div class="field"><label>Valor (R$)</label><input data-parcela-valor type="number" min="0" step="0.01" value="${valor.toFixed(2)}" inputmode="decimal"></div><div class="field"><label>Data${i===n-1?' (sugestão: 1 dia antes do evento)':''}</label><input data-parcela-data type="date" value="${esc(data)}" ${limite?`max="${limite}"`:''}></div><div class="field"><label>Forma de pagamento</label><select data-parcela-forma>${formas.map(f=>`<option ${forma===f?'selected':''}>${f}</option>`).join('')}</select></div></div>`;
+      return `<div class="contract-installment"><b>${i+1}ª parcela</b><div class="field"><label>Valor (R$)</label><input data-parcela-valor type="number" min="0" step="0.01" value="${valor.toFixed(2)}" inputmode="decimal"></div><div class="field"><label>Data</label><input data-parcela-data type="date" value="${esc(data)}" ${limite?`max="${limite}"`:''}></div><div class="field"><label>Forma de pagamento</label><select data-parcela-forma>${formas.map(f=>`<option ${forma===f?'selected':''}>${f}</option>`).join('')}</select></div></div>`;
     }).join('');
     parcelasRestanteBase=restanteCent;parcelasRestanteQtd=n;
   }
@@ -724,7 +722,7 @@ function atualizarSomaParcelas(){
   const entrada=$('#orcDataEntrada').value,evento=$('#orcData').value;
   const limite=evento?finAddDays(evento,-1):'';
   const datas=[...document.querySelectorAll('[data-parcela-data]')].map(c=>c.value);
-  if(!evento)avisos.push('Informe a data do evento para sugerir a última parcela.');
+  if(!evento)avisos.push('Informe a data do evento para definir o limite das parcelas.');
   if(entrada&&limite&&entrada>=limite)avisos.push('A última parcela precisa ser depois da entrada e antes do evento. Ajuste a data do evento.');
   if(limite&&datas.some(d=>d&&d>limite))avisos.push('Há parcela na data do evento ou depois. Ajuste as datas para até um dia antes.');
   if(diferenca!==0)avisos.push(`Ajuste os valores das parcelas: diferença de ${money(Math.abs(diferenca)/100)} ${diferenca>0?'a distribuir':'acima do restante'}.`);
