@@ -984,7 +984,7 @@ atualizarEquipe();
     if(rp.error||ra.error){destino.textContent='Erro ao carregar itens: '+(rp.error||ra.error).message;return}
     const opcoes=[...(rp.data||[]).map(p=>({tipo:'produto',item:p})),...(ra.data||[]).map(a=>({tipo:'ativo',item:a}))];
     if(!opcoes.length){destino.innerHTML='<div>Nenhum produto ou equipamento cadastrado. Cadastre itens no Estoque ou em Ativos / Equipamentos.</div>';return}
-    const opcoesTipo=tipo=>opcoes.map((o,i)=>o.tipo===tipo?`<option value="${i}">${esc(o.item.nome)}</option>`:'').join('');
+    const opcoesTipo=tipo=>opcoes.map((o,i)=>o.tipo===tipo?`<option value="${i}">${esc(o.item.nome)} — disponível: ${esc(o.tipo==='ativo'?(o.item.quantidade??1):(o.item.estoque_atual??0))}</option>`:'').join('');
     destino.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;align-items:end">
       <div class="field"><label>Produto ou equipamento</label><select id="orcItemSelect"><option value="">Selecione</option><optgroup label="Produtos">${opcoesTipo('produto')}</optgroup><optgroup label="Equipamentos">${opcoesTipo('ativo')}</optgroup></select></div>
       <div class="field"><label>Quantidade</label><input id="orcItemQtd" type="number" min="1" step="1" value="1"></div>
@@ -1187,8 +1187,9 @@ Obrigado!`;
       if(eo)throw eo;
       const eventoId=orc?.dados?.evento_operacional_id||null;
       if(eventoId){
-        const {data:ev,error:ee}=await db.from('eventos_operacionais').select('id,status').eq('id',eventoId).maybeSingle();
+        const {data:ev,error:ee}=await db.from('eventos_operacionais').select('id,status,saida_baixada_em').eq('id',eventoId).maybeSingle();
         if(ee)throw ee;
+        if(ev?.saida_baixada_em)throw new Error('A proposta está vinculada a um evento que já movimentou o estoque. Preserve o histórico do evento e da proposta.');
         if(ev&&ev.status!=='finalizado'){
           const {error:em}=await db.from('evento_materiais').delete().eq('evento_id',eventoId);
           if(em)throw em;
@@ -1556,14 +1557,14 @@ async function mostrarTecnicaEvento(p,info,existente=null,materiaisExistentes=[]
   const [rp,ra,rm]=await Promise.all([
     produtoIds.length?db.from('produtos').select('id,nome,codigo_barras').in('id',produtoIds):Promise.resolve({data:[],error:null}),
     ativoIds.length?db.from('ativos').select('id,nome,codigo_barras,codigo_interno').in('id',ativoIds):Promise.resolve({data:[],error:null}),
-    db.from('ativos').select('id,nome,codigo_barras,status,material_montagem').eq('material_montagem',true).order('nome')
+    db.from('ativos').select('id,nome,codigo_barras,status,material_montagem,quantidade').eq('material_montagem',true).order('nome')
   ]);
   if(rp.error||ra.error||rm.error){alert('Não foi possível abrir Técnica do evento: '+(rp.error||ra.error||rm.error).message+'. Execute o SQL desta versão no Supabase.');return}
   const produtos=new Map((rp.data||[]).map(x=>[String(x.id),x]));
   const ativos=new Map((ra.data||[]).map(x=>[String(x.id),x]));
   const orcamento=itensOrc.map(x=>{const cadastro=(x.tipo==='produto'?produtos:ativos).get(String(x.id));return {tipo:x.tipo,id:x.id||null,nome:cadastro?.nome||x.nome||'Item',quantidade:Number(x.quantidade||1),codigo:cadastro?.codigo_barras||cadastro?.codigo_interno||''}});
   const idsOrc=new Set(orcamento.filter(x=>x.tipo==='ativo').map(x=>String(x.id)));
-  const disponiveis=(rm.data||[]).filter(a=>!idsOrc.has(String(a.id))&&!['manutencao','perdido','indisponivel','locado','reservado'].includes(String(a.status||'').toLowerCase()));
+  const disponiveis=(rm.data||[]).filter(a=>!idsOrc.has(String(a.id))&&Number(a.quantidade||0)>0&&!['manutencao','perdido','indisponivel','locado','reservado'].includes(String(a.status||'').toLowerCase()));
   const montagem=materiaisExistentes.filter(m=>m.origem==='montagem').map(m=>({id:m.item_id,nome:m.nome_item,codigo:m.codigo||'',quantidade:Number(m.quantidade_necessaria||1)}));
   const shapes=Array.isArray(existente?.projeto_execucao)?structuredClone(existente.projeto_execucao):[];
   $('#content').innerHTML=`<div class="sectionhead"><div><h2>🛠️ Técnica do evento</h2><div class="muted">Proposta ${esc(p.numero||'')} • sem valores financeiros</div></div><button type="button" class="btn secondary" id="tecVoltar">Voltar</button></div>
@@ -1625,7 +1626,7 @@ async function editarProjetoEvento(id){
   const [er,mr,ar]=await Promise.all([
     db.from('eventos_operacionais').select('*').eq('id',id).single(),
     db.from('evento_materiais').select('*').eq('evento_id',id).order('criado_em'),
-    db.from('ativos').select('id,nome,codigo_barras,status,material_montagem').eq('material_montagem',true).order('nome')
+    db.from('ativos').select('id,nome,codigo_barras,status,material_montagem,quantidade').eq('material_montagem',true).order('nome')
   ]);
   if(er.error||mr.error||ar.error){alert('Erro ao abrir edição do projeto: '+(er.error||mr.error||ar.error).message);return}
   const e=er.data,materiais=mr.data||[],shapes=Array.isArray(e.projeto_execucao)?structuredClone(e.projeto_execucao):[];
@@ -1633,7 +1634,7 @@ async function editarProjetoEvento(id){
   const originais=materiais.filter(m=>m.origem==='montagem'||m.origem==='extra');
   const montagem=originais.map(m=>({registro_id:m.id,id:m.item_id,nome:m.nome_item,codigo:m.codigo||'',origem:m.origem,quantidade:Number(m.quantidade_necessaria||1),conferida:Number(m.quantidade_bipada||0)}));
   const idsOrc=new Set(materiais.filter(m=>m.origem==='orcamento'&&m.tipo==='ativo').map(m=>String(m.item_id)));
-  const disponiveis=(ar.data||[]).filter(a=>!idsOrc.has(String(a.id))&&!['manutencao','perdido','indisponivel','locado','reservado'].includes(String(a.status||'').toLowerCase()));
+  const disponiveis=(ar.data||[]).filter(a=>!idsOrc.has(String(a.id))&&Number(a.quantidade||0)>0&&!['manutencao','perdido','indisponivel','locado','reservado'].includes(String(a.status||'').toLowerCase()));
   const campos=[['Cliente',e.cliente_nome],['Telefone do cliente',e.cliente_telefone],['Projeto / Evento',e.nome_evento],['Data do evento',finDate(e.data_evento)],['Local do evento',e.local_evento],['Cidade',e.cidade_evento],['Horário inicial',e.horario_evento],['Responsável pelo evento',e.responsavel_evento],['Telefone do responsável',e.telefone_responsavel],['Veículo',e.veiculo],['Colaboradores',(e.colaboradores||[]).join(', ')]];
   $('#content').innerHTML=`<div class="sectionhead"><div><h2>Editar projeto — ${esc(e.nome_evento||'Evento')}</h2><div class="muted">Dados do orçamento em leitura • dados técnicos editáveis</div></div><button type="button" class="btn secondary" onclick="visualizarProjetoEvento('${id}')">Cancelar</button></div>
     <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">Dados do orçamento</h3><div class="tecnica-grid">${campos.map(([titulo,valor])=>`<div class="field"><label>${titulo}</label><div>${esc(valor||'—')}</div></div>`).join('')}</div><h4>Itens do orçamento</h4><div class="tablewrap"><table><thead><tr><th>Item</th><th>Qtd.</th><th>Cód. de barras</th></tr></thead><tbody>${materiais.filter(m=>m.origem==='orcamento').map(m=>`<tr><td>${esc(m.nome_item)}</td><td>${esc(m.quantidade_necessaria)}</td><td>${esc(m.codigo||'—')}</td></tr>`).join('')||'<tr><td colspan="3">Nenhum item.</td></tr>'}</tbody></table></div></div>
@@ -1746,10 +1747,10 @@ async function adicionarMaterialEvento(eventoId){
  const [pr,ar]=await Promise.all([db.from('produtos').select('id,nome,codigo_barras').order('nome'),db.from('ativos').select('id,nome,codigo_barras,codigo_interno,status').order('nome')]);
  const op=[...(pr.data||[]).map(x=>({tipo:'produto',...x,codigo:x.codigo_barras||''})),...(ar.data||[]).map(x=>({tipo:'ativo',...x,codigo:x.codigo_barras||x.codigo_interno||''}))];
  const escolha=prompt('Digite parte do nome ou código do material:');if(!escolha)return;const q=textoFiltro(escolha);const achados=op.filter(x=>textoFiltro(x.nome).includes(q)||textoFiltro(x.codigo).includes(q));if(!achados.length){alert('Material não encontrado.');return}let item=achados[0];if(achados.length>1){const lista=achados.slice(0,10).map((x,i)=>`${i+1} - ${x.nome} (${x.codigo||'sem código'})`).join('\n');const n=Number(prompt('Escolha o número:\n'+lista));if(!n||!achados[n-1])return;item=achados[n-1]}
- const qtd=Number(prompt('Quantidade necessária:',1));if(!Number.isFinite(qtd)||qtd<=0)return;
+ const qtd=Number(prompt('Quantidade necessária:',1));if(!Number.isInteger(qtd)||qtd<=0){alert('Informe uma quantidade inteira maior que zero.');return}
  const {error}=await db.from('evento_materiais').insert({evento_id:eventoId,tipo:item.tipo,item_id:item.id,nome_item:item.nome,codigo:item.codigo||null,quantidade_necessaria:qtd,quantidade_bipada:0,origem:'extra'});if(error){alert('Erro: '+error.message);return}abrirEvento(eventoId);
 }
-async function biparEvento(eventoId){const campo=$('#scanEvento'),codigo=campo.value.trim();if(!codigo){$('#scanMsg').textContent='Bipe ou digite um código.';return}const {data,error}=await db.from('evento_materiais').select('*').eq('evento_id',eventoId).eq('codigo',codigo);if(error){$('#scanMsg').textContent=error.message;return}const item=(data||[]).find(x=>Number(x.quantidade_bipada||0)<Number(x.quantidade_necessaria||0));if(!item){$('#scanMsg').textContent=data?.length?'Este código já foi conferido na quantidade completa.':'Código não pertence aos materiais deste evento.';return}const novo=Number(item.quantidade_bipada)+1;const {error:up}=await db.from('evento_materiais').update({quantidade_bipada:novo}).eq('id',item.id);if(up){$('#scanMsg').textContent=up.message;return}try{localStorage.setItem('cz_conf_'+item.id,new Date().toISOString())}catch(_){}campo.value='';abrirEvento(eventoId)}
+async function biparEvento(eventoId){const campo=$('#scanEvento'),codigo=campo.value.trim();if(!codigo){$('#scanMsg').textContent='Bipe ou digite um código.';return}const {data,error}=await db.from('evento_materiais').select('*').eq('evento_id',eventoId).eq('codigo',codigo);if(error){$('#scanMsg').textContent=error.message;return}const item=(data||[]).find(x=>Number(x.quantidade_bipada||0)<Number(x.quantidade_necessaria||0));if(!item){$('#scanMsg').textContent=data?.length?'Este código já foi conferido na quantidade completa.':'Código não pertence aos materiais deste evento.';return}const novo=Number(item.quantidade_bipada)+1;const {data:atualizada,error:up}=await db.from('evento_materiais').update({quantidade_bipada:novo}).eq('id',item.id).eq('quantidade_bipada',item.quantidade_bipada).select('id');if(up||!atualizada?.length){$('#scanMsg').textContent=up?.message||'A conferência mudou. Bipe novamente após atualizar.';return}try{localStorage.setItem('cz_conf_'+item.id,new Date().toISOString())}catch(_){}campo.value='';abrirEvento(eventoId)}
 async function concluirConferenciaEvento(id){
   const [er,mr]=await Promise.all([db.from('eventos_operacionais').select('status').eq('id',id).single(),db.from('evento_materiais').select('quantidade_necessaria,quantidade_bipada').eq('evento_id',id)]);
   if(er.error||mr.error){alert((er.error||mr.error).message);return}
@@ -1776,18 +1777,16 @@ async function confirmarImpressaoEvento(id){
   if(error){alert(error.message);return}abrirEvento(id);
 }
 async function liberarSaidaEvento(id){
- const {data:e,error:ee}=await db.from('eventos_operacionais').select('status,relatorio_impresso_em').eq('id',id).single();if(ee){alert(ee.message);return}
- if(!e.relatorio_impresso_em){alert('Imprima o relatório de campo e confirme a impressão antes de liberar a saída.');return}
- if(e.status!=='material_pronto'){alert('Primeiro clique em CONCLUIR CONFERÊNCIA. Só depois a saída pode ser liberada.');return}
- const {data:m,error:me}=await db.from('evento_materiais').select('quantidade_necessaria,quantidade_bipada').eq('evento_id',id);if(me){alert(me.message);return}
- if(!(m||[]).length||(m||[]).some(x=>Number(x.quantidade_bipada||0)<Number(x.quantidade_necessaria||0))){alert('Ainda existem itens sem conferência completa.');return}
- const {error}=await db.from('eventos_operacionais').update({status:'aguardando_retorno',atualizado_em:new Date().toISOString()}).eq('id',id);if(error){alert(error.message);return}
+ const {error}=await db.rpc('cz_liberar_saida_evento',{p_evento_id:id});
+ if(error){alert('Não foi possível liberar a saída: '+error.message);return}
  try{localStorage.setItem('cz_saida_evento_'+id,new Date().toISOString())}catch(_){}renderRetornoEventos()
 }
 function retornoKey(mid){return 'cz_retorno_'+mid}
 function retornoInfo(mid){try{return JSON.parse(localStorage.getItem(retornoKey(mid))||'{"qtd":0,"registros":[],"status":""}')}catch(_){return {qtd:0,registros:[],status:''}}}
 function salvarRetorno(mid,obj){try{localStorage.setItem(retornoKey(mid),JSON.stringify(obj))}catch(_){}}
 function dataUltimoRetorno(mid){const r=retornoInfo(mid),v=r.registros?.[r.registros.length-1];return v?new Date(v).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}):'—'}
+function retornoInfoMaterial(m,e){return e.saida_baixada_em?{qtd:Number(m.quantidade_devolvida||0),status:m.ocorrencia_retorno||''}:retornoInfo(m.id)}
+function dataUltimoRetornoMaterial(m,e){return e.saida_baixada_em?(m.ultima_devolucao_em?new Date(m.ultima_devolucao_em).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}):'—'):dataUltimoRetorno(m.id)}
 async function renderRetornoEventos(){
  await atualizarContaMaster();
  const {data,error}=await db.from('eventos_operacionais').select('*').in('status',['aguardando_retorno','finalizado']).order('data_evento',{ascending:true});
@@ -1804,13 +1803,15 @@ async function visualizarEventoRetorno(id){
   const dados=[['Cliente',e.cliente_nome],['Telefone do cliente',e.cliente_telefone],['Evento',e.nome_evento],['Data do evento',finDate(e.data_evento)],['Local do evento',e.local_evento],['Cidade do evento',e.cidade_evento],['Horário inicial',e.horario_evento],['Início da montagem',finDate(e.data_inicio_montagem)],['Término da montagem',finDate(e.data_termino_montagem)],['Horário de montagem',e.horario_montagem],['Responsável pelo evento',e.responsavel_evento],['Telefone do responsável',e.telefone_responsavel],['Técnico responsável',e.tecnico_responsavel],['Veículo',e.veiculo],['Colaboradores',(e.colaboradores||[]).join(', ')]];
   $('#content').innerHTML=`<div class="sectionhead"><div><h2>👁 ${esc(e.nome_evento||'Evento')}</h2><div class="muted">${statusEventoLabel(e.status)} • visualização do retorno</div></div><button type="button" class="btn secondary" onclick="renderRetornoEventos()">Voltar ao retorno</button></div>
     <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">Dados do evento</h3><div class="tecnica-grid">${dados.map(([titulo,valor])=>`<div class="field"><label>${titulo}</label><div>${esc(valor||'—')}</div></div>`).join('')}</div></div>
-    <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">Materiais e devolução</h3><div class="tablewrap"><table><thead><tr><th>Material</th><th>Cód. de barras</th><th>Qtd. saída</th><th>Devolvido</th><th>Situação</th></tr></thead><tbody>${materiais.map(m=>{const esperado=Number(m.quantidade_bipada||0),r=retornoInfo(m.id),q=Math.min(Number(r.qtd||0),esperado);return `<tr><td>${esc(m.nome_item)}</td><td>${esc(m.codigo||'—')}</td><td>${esperado}</td><td>${q}</td><td>${r.status==='perda'?'⚠️ Perda':r.status==='manutencao'?'🛠️ Manutenção':esperado>0&&q>=esperado?'✅ Devolvido':esperado>0?'🟥 Pendente':'—'}</td></tr>`}).join('')||'<tr><td colspan="5">Nenhum material cadastrado.</td></tr>'}</tbody></table></div></div>
+    <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">Materiais e devolução</h3><div class="tablewrap"><table><thead><tr><th>Material</th><th>Cód. de barras</th><th>Qtd. saída</th><th>Devolvido</th><th>Situação</th></tr></thead><tbody>${materiais.map(m=>{const esperado=Number(m.quantidade_bipada||0),r=retornoInfoMaterial(m,e),q=Math.min(Number(r.qtd||0),esperado);return `<tr><td>${esc(m.nome_item)}</td><td>${esc(m.codigo||'—')}</td><td>${esperado}</td><td>${q}</td><td>${r.status==='perda'?'⚠️ Perda':r.status==='manutencao'?'🛠️ Manutenção':esperado>0&&q>=esperado?'✅ Devolvido':esperado>0?'🟥 Pendente':'—'}</td></tr>`}).join('')||'<tr><td colspan="5">Nenhum material cadastrado.</td></tr>'}</tbody></table></div></div>
     <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">Projeto de execução</h3><svg class="projeto-canvas" viewBox="0 0 900 500" xmlns="http://www.w3.org/2000/svg">${projetoExecucaoMarkup(e.projeto_execucao)}</svg></div>
     <div class="card"><h3 style="margin-top:0">Anotação técnica</h3><div style="white-space:pre-wrap">${esc(e.anotacao_tecnica||'—')}</div></div>`;
 }
 async function excluirEvento(id,origem='eventos'){
  if(!contaMaster()){alert('Somente a conta Master pode excluir eventos.');return}
- const {data:ev}=await db.from('eventos_operacionais').select('nome_evento').eq('id',id).maybeSingle();
+ const {data:ev,error:evErro}=await db.from('eventos_operacionais').select('nome_evento,saida_baixada_em').eq('id',id).maybeSingle();
+ if(evErro){alert('Não foi possível verificar o evento: '+evErro.message);return}
+ if(ev?.saida_baixada_em){alert('Este evento já movimentou o estoque. Mantenha o histórico para preservar as quantidades.');return}
  const nome=ev?.nome_evento||'este evento';
  if(!confirm(`Excluir definitivamente ${nome}? Esta ação não poderá ser desfeita.`))return;
  const {error:merr}=await db.from('evento_materiais').delete().eq('evento_id',id);
@@ -1822,16 +1823,51 @@ async function excluirEvento(id,origem='eventos'){
 async function abrirRetornoEvento(id){
  const [evr,matr]=await Promise.all([db.from('eventos_operacionais').select('*').eq('id',id).single(),db.from('evento_materiais').select('*').eq('evento_id',id).order('criado_em')]);if(evr.error||matr.error){alert((evr.error||matr.error).message);return}
  const e=evr.data,mats=(matr.data||[]).filter(m=>Number(m.quantidade_bipada||0)>0);const finalizado=e.status==='finalizado';
- const linhas=mats.map(m=>{const r=retornoInfo(m.id),esperado=Number(m.quantidade_bipada||0),q=Math.min(Number(r.qtd||0),esperado),ok=q>=esperado,perda=r.status==='perda',man=r.status==='manutencao';return `<tr><td>${esperado}</td><td><b>${esc(m.nome_item)}</b><div class="muted">${m.tipo==='ativo'?'Ativo':'Consumo'}</div></td><td><b>${esc(m.codigo||'—')}</b></td><td>${q}/${esperado}</td><td>${dataUltimoRetorno(m.id)}</td><td>${man?'🛠️ Manutenção':perda?'⚠️ Perda':ok?'✅ Devolvido':'🟥 Pendente'}</td><td>${m.tipo==='ativo'&&!finalizado?`<button class="btn secondary" onclick="marcarManutencaoRetorno('${id}','${m.id}','${m.item_id||''}')">Manutenção</button> <button class="btn danger" onclick="marcarPerdaRetorno('${id}','${m.id}','${m.item_id||''}')">Perda</button>`:(m.tipo==='produto'?'<span class="muted">Ao bipar, volta ao estoque</span>':'—')}</td></tr>`}).join('');
- $('#content').innerHTML=`<div class="sectionhead"><div><h2>↩️ Retorno — ${esc(e.nome_evento)}</h2><div class="muted">${esc(e.cliente_nome||'')} • compare a devolução com a conferência de saída</div></div><button class="btn secondary" onclick="renderRetornoEventos()">Voltar</button></div><div class="card" style="margin-bottom:16px"><div><b>Status:</b> ${statusEventoLabel(e.status)}</div>${!finalizado?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><input id="scanRetorno" placeholder="Bipe o código devolvido" autocomplete="off" style="flex:1;min-width:240px;background:#0b1118;color:#fff;border:1px solid var(--line);border-radius:9px;padding:12px"><button class="btn primary" id="btnRetorno">CONF. DEVOLUÇÃO</button></div><div id="retMsg" class="msg"></div>`:''}</div><div class="tablewrap"><table><thead><tr><th>Qtd. saída</th><th>Descrição</th><th>Cód.</th><th>Retorno</th><th>Data e hora</th><th>Status</th><th>Ocorrência</th></tr></thead><tbody>${linhas||'<tr><td colspan="7">Nenhum item registrado na saída.</td></tr>'}</tbody></table></div>${!finalizado?`<div class="card" style="margin-top:16px"><div class="muted">Ativos precisam ser devolvidos, enviados para manutenção ou marcados como perda. Materiais de consumo devolvidos voltam ao estoque no momento da bipagem.</div><div class="actions"><button class="btn primary" onclick="finalizarRetornoEvento('${id}')">CONCLUIR RETORNO DO EVENTO</button></div></div>`:''}`;
+ const linhas=mats.map(m=>{const r=retornoInfoMaterial(m,e),esperado=Number(m.quantidade_bipada||0),q=Math.min(Number(r.qtd||0),esperado),ok=q>=esperado,perda=r.status==='perda',man=r.status==='manutencao';return `<tr><td>${esperado}</td><td><b>${esc(m.nome_item)}</b><div class="muted">${m.tipo==='ativo'?'Ativo':'Consumo'}</div></td><td><b>${esc(m.codigo||'—')}</b></td><td>${q}/${esperado}</td><td>${dataUltimoRetornoMaterial(m,e)}</td><td>${man?'🛠️ Manutenção':perda?'⚠️ Perda':ok?'✅ Devolvido':'🟥 Pendente'}</td><td>${m.tipo==='ativo'&&!finalizado&&!perda&&!man&&!ok?`<button class="btn secondary" onclick="marcarManutencaoRetorno('${id}','${m.id}','${m.item_id||''}')">Manutenção</button> <button class="btn danger" onclick="marcarPerdaRetorno('${id}','${m.id}','${m.item_id||''}')">Perda</button>`:(m.tipo==='produto'?'<span class="muted">Conferir devolução</span>':'—')}</td></tr>`}).join('');
+ $('#content').innerHTML=`<div class="sectionhead"><div><h2>↩️ Retorno — ${esc(e.nome_evento)}</h2><div class="muted">${esc(e.cliente_nome||'')} • compare a devolução com a conferência de saída</div></div><button class="btn secondary" onclick="renderRetornoEventos()">Voltar</button></div><div class="card" style="margin-bottom:16px"><div><b>Status:</b> ${statusEventoLabel(e.status)}</div>${!finalizado?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><input id="scanRetorno" placeholder="Bipe o código devolvido" autocomplete="off" style="flex:1;min-width:240px;background:#0b1118;color:#fff;border:1px solid var(--line);border-radius:9px;padding:12px"><button class="btn primary" id="btnRetorno">CONF. DEVOLUÇÃO</button></div><div id="retMsg" class="msg"></div>`:''}</div><div class="tablewrap"><table><thead><tr><th>Qtd. saída</th><th>Descrição</th><th>Cód.</th><th>Retorno</th><th>Data e hora</th><th>Status</th><th>Ocorrência</th></tr></thead><tbody>${linhas||'<tr><td colspan="7">Nenhum item registrado na saída.</td></tr>'}</tbody></table></div>${!finalizado?`<div class="card" style="margin-top:16px"><div class="muted">Ativos precisam ser devolvidos, enviados para manutenção ou marcados como perda. Consumíveis e ativos devolvidos voltam ao estoque no momento da conferência.</div><div class="actions"><button class="btn primary" onclick="finalizarRetornoEvento('${id}')">CONCLUIR RETORNO DO EVENTO</button></div></div>`:''}`;
  if(!finalizado){$('#btnRetorno').onclick=()=>biparRetornoEvento(id);$('#scanRetorno').addEventListener('keydown',x=>{if(x.key==='Enter')biparRetornoEvento(id)});$('#scanRetorno').focus()}
 }
-async function biparRetornoEvento(eventoId){const c=$('#scanRetorno'),codigo=c.value.trim();if(!codigo){$('#retMsg').textContent='Bipe ou digite um código.';return}const {data,error}=await db.from('evento_materiais').select('*').eq('evento_id',eventoId).eq('codigo',codigo);if(error){$('#retMsg').textContent=error.message;return}const m=(data||[]).find(x=>Number(x.quantidade_bipada||0)>0);if(!m){$('#retMsg').textContent='Este código não consta na saída deste evento.';return}const esperado=Number(m.quantidade_bipada||0),r=retornoInfo(m.id);if(Number(r.qtd||0)>=esperado){$('#retMsg').textContent='A devolução deste item já está completa.';return}r.qtd=Number(r.qtd||0)+1;r.registros=[...(r.registros||[]),new Date().toISOString()];r.status='devolvido';salvarRetorno(m.id,r);
+async function biparRetornoEvento(eventoId){
+ const c=$('#scanRetorno'),codigo=c.value.trim();if(!codigo){$('#retMsg').textContent='Bipe ou digite um código.';return}
+ const {data:e,error:evErro}=await db.from('eventos_operacionais').select('saida_baixada_em,status').eq('id',eventoId).single();
+ if(evErro){$('#retMsg').textContent=evErro.message;return}
+ if(e.saida_baixada_em){
+   const {error}=await db.rpc('cz_confirmar_retorno_evento',{p_evento_id:eventoId,p_codigo:codigo});
+   if(error){$('#retMsg').textContent='Não foi possível conferir: '+error.message;return}
+   c.value='';await abrirRetornoEvento(eventoId);return;
+ }
+ const {data,error}=await db.from('evento_materiais').select('*').eq('evento_id',eventoId).eq('codigo',codigo);if(error){$('#retMsg').textContent=error.message;return}
+ const m=(data||[]).find(x=>Number(x.quantidade_bipada||0)>0);if(!m){$('#retMsg').textContent='Este código não consta na saída deste evento.';return}
+ const esperado=Number(m.quantidade_bipada||0),r=retornoInfo(m.id);if(Number(r.qtd||0)>=esperado){$('#retMsg').textContent='A devolução deste item já está completa.';return}
+ r.qtd=Number(r.qtd||0)+1;r.registros=[...(r.registros||[]),new Date().toISOString()];r.status='devolvido';salvarRetorno(m.id,r);
  if(m.tipo==='produto'&&m.item_id){const {data:p}=await db.from('produtos').select('estoque_atual').eq('id',m.item_id).single();if(p){const {error:up}=await db.from('produtos').update({estoque_atual:Number(p.estoque_atual||0)+1}).eq('id',m.item_id);if(up){r.qtd--;r.registros.pop();salvarRetorno(m.id,r);$('#retMsg').textContent='Não foi possível devolver ao estoque: '+up.message;return}}}
- if(m.tipo==='ativo'&&m.item_id)await db.from('ativos').update({status:'disponivel'}).eq('id',m.item_id);c.value='';abrirRetornoEvento(eventoId)}
-async function marcarManutencaoRetorno(eventoId,mid,ativoId){const r=retornoInfo(mid);r.status='manutencao';salvarRetorno(mid,r);if(ativoId){const {error}=await db.from('ativos').update({status:'manutencao'}).eq('id',ativoId);if(error){alert(error.message);return}}abrirRetornoEvento(eventoId)}
-async function marcarPerdaRetorno(eventoId,mid,ativoId){if(!confirm('Confirmar este ativo como perda?'))return;const r=retornoInfo(mid);r.status='perda';salvarRetorno(mid,r);if(ativoId){const {error}=await db.from('ativos').update({status:'perdido'}).eq('id',ativoId);if(error){alert(error.message);return}}abrirRetornoEvento(eventoId)}
-async function finalizarRetornoEvento(id){const {data:m,error}=await db.from('evento_materiais').select('*').eq('evento_id',id);if(error){alert(error.message);return}const ativos=(m||[]).filter(x=>x.tipo==='ativo'&&Number(x.quantidade_bipada||0)>0);const pend=ativos.filter(x=>{const r=retornoInfo(x.id);return Number(r.qtd||0)<Number(x.quantidade_bipada||0)&&!['perda','manutencao'].includes(r.status)});if(pend.length){alert('Ainda existem ativos sem retorno. Bipe o ativo ou marque a ocorrência como Manutenção ou Perda.');return}if(!confirm('Concluir o retorno e finalizar este evento?'))return;const {error:up}=await db.from('eventos_operacionais').update({status:'finalizado',atualizado_em:new Date().toISOString()}).eq('id',id);if(up){alert(up.message);return}renderRetornoEventos()}
+ if(m.tipo==='ativo'&&m.item_id)await db.from('ativos').update({status:'disponivel'}).eq('id',m.item_id);c.value='';abrirRetornoEvento(eventoId)
+}
+async function registrarOcorrenciaRetorno(eventoId,mid,ativoId,tipo){
+ if(tipo==='perda'&&!confirm('Confirmar este ativo como perda?'))return;
+ const {data:e,error:evErro}=await db.from('eventos_operacionais').select('saida_baixada_em').eq('id',eventoId).single();if(evErro){alert(evErro.message);return}
+ if(e.saida_baixada_em){const {error}=await db.rpc('cz_ocorrencia_retorno_ativo',{p_evento_id:eventoId,p_material_id:mid,p_ocorrencia:tipo});if(error){alert(error.message);return}abrirRetornoEvento(eventoId);return}
+ const r=retornoInfo(mid);r.status=tipo;salvarRetorno(mid,r);
+ if(ativoId){const {error}=await db.from('ativos').update({status:tipo==='perda'?'perdido':'manutencao'}).eq('id',ativoId);if(error){alert(error.message);return}}
+ abrirRetornoEvento(eventoId);
+}
+function marcarManutencaoRetorno(eventoId,mid,ativoId){return registrarOcorrenciaRetorno(eventoId,mid,ativoId,'manutencao')}
+function marcarPerdaRetorno(eventoId,mid,ativoId){return registrarOcorrenciaRetorno(eventoId,mid,ativoId,'perda')}
+async function finalizarRetornoEvento(id){
+ const {data:e,error:evErro}=await db.from('eventos_operacionais').select('saida_baixada_em').eq('id',id).single();if(evErro){alert(evErro.message);return}
+ if(e.saida_baixada_em){
+   if(!confirm('Concluir o retorno e finalizar este evento?'))return;
+   const {error}=await db.rpc('cz_concluir_retorno_evento',{p_evento_id:id});if(error){alert(error.message);return}
+   renderRetornoEventos();return;
+ }
+ const {data:m,error}=await db.from('evento_materiais').select('*').eq('evento_id',id);if(error){alert(error.message);return}
+ const ativos=(m||[]).filter(x=>x.tipo==='ativo'&&Number(x.quantidade_bipada||0)>0);
+ const pend=ativos.filter(x=>{const r=retornoInfo(x.id);return Number(r.qtd||0)<Number(x.quantidade_bipada||0)&&!['perda','manutencao'].includes(r.status)});
+ if(pend.length){alert('Ainda existem ativos sem retorno. Bipe o ativo ou marque a ocorrência como Manutenção ou Perda.');return}
+ if(!confirm('Concluir o retorno e finalizar este evento?'))return;
+ const {error:up}=await db.from('eventos_operacionais').update({status:'finalizado',atualizado_em:new Date().toISOString()}).eq('id',id);
+ if(up){alert(up.message);return}renderRetornoEventos()
+}
 async function removerMaterialEvento(id,eventoId){if(!confirm('Remover este material do evento?'))return;const {error}=await db.from('evento_materiais').delete().eq('id',id);if(error){alert(error.message);return}abrirEvento(eventoId)}
 async function mudarStatusEvento(id,status){const {error}=await db.from('eventos_operacionais').update({status,atualizado_em:new Date().toISOString()}).eq('id',id);if(error){alert(error.message);return}abrirEvento(id)}
 
