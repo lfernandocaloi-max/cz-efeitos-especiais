@@ -77,7 +77,7 @@
 </style>
 </head><body>
 <section id="login" class="login"><div class="loginbox"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><h3>Acesso ao sistema</h3><div class="field"><label>E-mail</label><input id="email" type="email"></div><div class="field"><label>Senha</label><input id="password" type="password"></div><button id="loginBtn" class="btn primary full" style="margin-top:18px">ENTRAR</button><button type="button" class="btn secondary full" style="margin-top:8px" onclick="recuperarSenha()">Esqueci minha senha</button><div id="loginMsg" class="msg"></div></div></section>
-<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><div class="muted" style="font-size:12px">Sistema de gestão CZ · Agenda v61</div></div><div><span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
+<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><div class="muted" style="font-size:12px">Sistema de gestão CZ · Agenda v62</div></div><div><span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
 <div id="clientModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="modalTitle">Novo cliente</h2><button class="btn secondary" onclick="closeClient()">Fechar</button></div>
   <input id="clientId" type="hidden"><div class="muted" id="clientOpenedAt" style="font-size:13px">Data de abertura: será definida ao salvar</div>
   <div class="row"><div class="field"><label>Nome / Razão social *</label><input id="clientName" autocomplete="name"></div><div class="field"><label>Telefone *</label><input id="clientPhone" type="tel" inputmode="tel" autocomplete="tel"></div></div>
@@ -226,38 +226,52 @@ async function renderModule(i){$('#pageTitle').textContent=modules[i];if(i===0)r
 let agendaMesRef=null,agendaConsulta=0;
 function agendaISO(data){return `${data.getFullYear()}-${String(data.getMonth()+1).padStart(2,'0')}-${String(data.getDate()).padStart(2,'0')}`}
 function agendaMudarMes(delta){const atual=agendaMesRef||new Date();renderAgenda(new Date(atual.getFullYear(),atual.getMonth()+delta,1))}
+function agendaIrMes(iso){renderAgenda(new Date(iso+'T12:00:00'))}
 async function renderAgenda(mes){
   const referencia=mes instanceof Date&&!Number.isNaN(mes.getTime())?mes:new Date();
   agendaMesRef=new Date(referencia.getFullYear(),referencia.getMonth(),1);
-  const consulta=++agendaConsulta,primeiro=new Date(agendaMesRef),ultimo=new Date(primeiro.getFullYear(),primeiro.getMonth()+1,0);
-  const inicio=new Date(primeiro);inicio.setDate(primeiro.getDate()-primeiro.getDay());
-  const fim=new Date(ultimo);fim.setDate(ultimo.getDate()+6-ultimo.getDay());
-  const inicioISO=agendaISO(inicio),fimISO=agendaISO(fim);
+  const consulta=++agendaConsulta;
   $('#pageTitle').textContent='Agenda';
   $('#content').innerHTML='<div class="sectionhead"><h2>📅 Agenda</h2></div><div class="muted">Carregando montagens e eventos...</div>';
   const campos='id,cliente_nome,nome_evento,data_evento,data_inicio_montagem,data_termino_montagem,horario_evento,horario_montagem,local_evento';
-  const [ev,mont]=await Promise.all([
-    db.from('eventos_operacionais').select(campos).gte('data_evento',inicioISO).lte('data_evento',fimISO),
-    db.from('eventos_operacionais').select(campos).lte('data_inicio_montagem',fimISO).gte('data_termino_montagem',inicioISO)
-  ]);
+  const registros=[];let erro=null;
+  for(let offset=0;offset<10000;offset+=1000){
+    const {data,error}=await db.from('eventos_operacionais').select(campos).order('data_evento',{ascending:true}).range(offset,offset+999);
+    if(error){erro=error;break}registros.push(...(data||[]));if((data||[]).length<1000)break;
+  }
   if(consulta!==agendaConsulta)return;
-  if(ev.error||mont.error){$('#content').innerHTML=`<div class="sectionhead"><h2>📅 Agenda</h2></div><div class="msg">Erro ao carregar a Agenda: ${esc((ev.error||mont.error).message)}</div>`;return}
+  if(erro){$('#content').innerHTML=`<div class="sectionhead"><h2>📅 Agenda</h2></div><div class="msg">Erro ao carregar a Agenda: ${esc(erro.message)}</div>`;return}
+  const hoje=agendaISO(new Date());
+  const datas=registros.flatMap(e=>[e.data_inicio_montagem,e.data_evento]).filter(Boolean).sort();
+  const mesAtual=agendaISO(agendaMesRef).slice(0,7);
+  if(!(mes instanceof Date)&&datas.length&&!datas.some(d=>d.slice(0,7)===mesAtual)){
+    const maisProxima=datas.find(d=>d>=hoje)||datas[datas.length-1];
+    agendaMesRef=new Date(maisProxima.slice(0,7)+'-01T12:00:00');
+  }
+  const primeiro=new Date(agendaMesRef),ultimo=new Date(primeiro.getFullYear(),primeiro.getMonth()+1,0);
+  const inicio=new Date(primeiro);inicio.setDate(primeiro.getDate()-primeiro.getDay());
+  const fim=new Date(ultimo);fim.setDate(ultimo.getDate()+6-ultimo.getDay());
+  const inicioISO=agendaISO(inicio),fimISO=agendaISO(fim);
   const porDia=new Map(),adicionar=(dia,tipo,item)=>{if(!porDia.has(dia))porDia.set(dia,[]);porDia.get(dia).push({tipo,item})};
-  (ev.data||[]).forEach(e=>{if(e.data_evento)adicionar(e.data_evento,'evento',e)});
-  (mont.data||[]).forEach(e=>{
+  registros.forEach(e=>{if(e.data_evento&&e.data_evento>=inicioISO&&e.data_evento<=fimISO)adicionar(e.data_evento,'evento',e)});
+  registros.forEach(e=>{
     if(!e.data_inicio_montagem||!e.data_termino_montagem)return;
+    if(e.data_inicio_montagem>fimISO||e.data_termino_montagem<inicioISO)return;
     let dia=new Date((e.data_inicio_montagem<inicioISO?inicioISO:e.data_inicio_montagem)+'T12:00:00');
     const ate=e.data_termino_montagem>fimISO?fimISO:e.data_termino_montagem;
     while(agendaISO(dia)<=ate){adicionar(agendaISO(dia),'montagem',e);dia.setDate(dia.getDate()+1)}
   });
   const dias=[];for(let dia=new Date(inicio);dia<=fim;dia.setDate(dia.getDate()+1))dias.push(new Date(dia));
-  const hoje=agendaISO(new Date()),titulo=primeiro.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
-  $('#content').innerHTML=`<div class="sectionhead"><div><h2>📅 Agenda</h2><div class="muted">Montagens e eventos cadastrados • clique para ver o projeto</div></div><div class="actions" style="margin:0;align-items:center"><button type="button" class="btn secondary" onclick="agendaMudarMes(-1)" aria-label="Mês anterior">‹</button><b style="min-width:150px;text-align:center;text-transform:capitalize">${esc(titulo)}</b><button type="button" class="btn secondary" onclick="agendaMudarMes(1)" aria-label="Próximo mês">›</button><button type="button" class="btn secondary" onclick="renderAgenda()">Hoje</button></div></div>
+  const titulo=primeiro.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+  const proximos=registros.flatMap(e=>[{data:e.data_inicio_montagem,tipo:'Montagem',e},{data:e.data_evento,tipo:'Evento',e}]).filter(x=>x.data&&x.data>=hoje).sort((a,b)=>a.data.localeCompare(b.data)).slice(0,8);
+  $('#content').innerHTML=`<div class="sectionhead"><div><h2>📅 Agenda</h2><div class="muted">Montagens e eventos cadastrados • clique para ver o projeto</div></div><div class="actions" style="margin:0;align-items:center"><button type="button" class="btn secondary" onclick="agendaMudarMes(-1)" aria-label="Mês anterior">‹</button><b style="min-width:150px;text-align:center;text-transform:capitalize">${esc(titulo)}</b><button type="button" class="btn secondary" onclick="agendaMudarMes(1)" aria-label="Próximo mês">›</button><button type="button" class="btn secondary" onclick="renderAgenda(new Date())">Hoje</button></div></div>
   <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px"><span style="color:#7db9ff">■ Montagem</span><span style="color:#ff8585">■ Evento</span></div>
   <div style="overflow-x:auto;border:1px solid var(--line);border-radius:12px"><div style="min-width:790px;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));background:#10171f">
   ${['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].map(x=>`<div style="padding:10px;border-bottom:1px solid var(--line);text-align:center;font-weight:700;color:var(--muted)">${x}</div>`).join('')}
   ${dias.map(d=>{const data=agendaISO(d),doMes=d.getMonth()===primeiro.getMonth(),itens=(porDia.get(data)||[]).sort((a,b)=>a.tipo===b.tipo?String(a.item.nome_evento||'').localeCompare(String(b.item.nome_evento||''),'pt-BR'):a.tipo==='montagem'?-1:1);return `<div style="min-height:125px;padding:8px 5px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);background:${data===hoje?'#182535':doMes?'#111821':'#0b1016'};opacity:${doMes?'1':'.58'}"><div style="font-weight:800;margin-bottom:7px;color:${data===hoje?'#fff':'var(--muted)'}">${d.getDate()}</div>${itens.map(({tipo,item})=>`<button type="button" onclick="visualizarProjetoEvento('${esc(item.id)}')" title="Ver projeto: ${esc(item.nome_evento||'Evento')} — ${esc(item.cliente_nome||'Cliente não informado')}" style="display:block;width:100%;text-align:left;white-space:normal;overflow-wrap:anywhere;border:1px solid ${tipo==='montagem'?'#39669a':'#8f4345'};background:${tipo==='montagem'?'#123052':'#512326'};color:${tipo==='montagem'?'#cee6ff':'#ffe2e2'};border-radius:7px;padding:6px;margin-bottom:5px;cursor:pointer;font-size:12px;line-height:1.35"><strong>${tipo==='montagem'?'MONTAGEM':'EVENTO'}: ${esc(item.nome_evento||'Sem nome')}</strong><br>${esc(item.cliente_nome||'Cliente não informado')}${tipo==='evento'&&item.horario_evento?`<br>${esc(String(item.horario_evento).slice(0,5))}`:tipo==='montagem'&&item.horario_montagem?`<br>${esc(String(item.horario_montagem).slice(0,5))}`:''}</button>`).join('')}</div>`}).join('')}
-  </div></div>`;
+  </div></div>
+  ${!porDia.size?`<div class="card" style="margin-top:16px;color:var(--muted)">Nenhuma montagem ou evento em ${esc(titulo)}. ${!registros.length?'<button type="button" class="btn secondary" onclick="renderEventos()">Abrir Eventos para cadastrar</button>':''}</div>`:''}
+  <div class="card" style="margin-top:16px"><h3 style="margin-top:0">Próximos compromissos</h3>${proximos.length?proximos.map(x=>`<button type="button" onclick="agendaIrMes('${esc(x.data)}')" style="display:block;width:100%;text-align:left;background:transparent;border:0;border-bottom:1px solid var(--line);color:${x.tipo==='Montagem'?'#7db9ff':'#ff8585'};padding:9px 4px;cursor:pointer"><b>${finDate(x.data)} • ${x.tipo}: ${esc(x.e.nome_evento||'Sem nome')}</b> — ${esc(x.e.cliente_nome||'Cliente não informado')}</button>`).join(''):'<div class="muted">Não há eventos futuros cadastrados. As datas da Agenda vêm da página Eventos.</div>'}</div>`;
 }
 async function count(table){const {count,error}=await db.from(table).select('*',{count:'exact',head:true});return error?'—':count}
 
