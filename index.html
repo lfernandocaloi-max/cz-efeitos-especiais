@@ -1959,26 +1959,28 @@ async function adicionarMaterialEvento(eventoId){
  const qtd=Number(prompt('Quantidade necessária:',1));if(!Number.isInteger(qtd)||qtd<=0){alert('Informe uma quantidade inteira maior que zero.');return}
  const {error}=await db.from('evento_materiais').insert({evento_id:eventoId,tipo:item.tipo,item_id:item.id,nome_item:item.nome,codigo:item.codigo||null,quantidade_necessaria:qtd,quantidade_bipada:0,origem:'extra'});if(error){alert('Erro: '+error.message);return}abrirEvento(eventoId);
 }
-function normalizarCodigoBipagem(v){return String(v??'').replace(/[\r\n\t]/g,'').trim().replace(/\s+/g,'').toUpperCase()}
+function normalizarCodigoBipagem(v){return String(v??'').replace(/[\r\n\t]/g,'').trim()}
 async function biparEvento(eventoId){
  const campo=$('#scanEvento'),msg=$('#scanMsg');
- const codigoLido=normalizarCodigoBipagem(campo?.value);
- if(!codigoLido){if(msg)msg.textContent='Bipe ou digite um código.';campo?.focus();return}
+ const codigo=normalizarCodigoBipagem(campo?.value);
+ if(!codigo){if(msg)msg.textContent='Bipe ou digite um código.';campo?.focus();return}
  if(msg){msg.style.color='var(--muted)';msg.textContent='Conferindo código...'}
- const {data,error}=await db.from('evento_materiais').select('*').eq('evento_id',eventoId).order('criado_em');
+ // Restaura a lógica de bipagem que já funcionava: busca o código diretamente no banco
+ // e grava a nova quantidade sem a trava otimista que impedia a atualização.
+ let {data,error}=await db.from('evento_materiais').select('*').eq('evento_id',eventoId).eq('codigo',codigo).order('criado_em');
  if(error){if(msg){msg.style.color='#ffb0b0';msg.textContent='Erro ao conferir: '+error.message}campo?.focus();return}
- const mesmoCodigo=(data||[]).filter(x=>normalizarCodigoBipagem(x.codigo)===codigoLido);
- const item=mesmoCodigo.find(x=>Number(x.quantidade_bipada||0)<Number(x.quantidade_necessaria||0));
- if(!item){if(msg){msg.style.color='#ffb0b0';msg.textContent=mesmoCodigo.length?'Este código já foi conferido na quantidade completa.':'Código não pertence aos materiais deste evento.'}campo?.select();campo?.focus();return}
- const anterior=Number(item.quantidade_bipada||0),novo=anterior+1;
- // Registros antigos podem ter quantidade_bipada = NULL. Comparar com .eq(...,0)
- // fazia a atualização retornar zero linhas e a bipagem nunca avançava.
- const {data:atualizada,error:up}=await db.from('evento_materiais')
-   .update({quantidade_bipada:novo})
-   .eq('id',item.id)
-   .eq('evento_id',eventoId)
-   .select('id,quantidade_bipada');
- if(up||!atualizada?.length){if(msg){msg.style.color='#ffb0b0';msg.textContent=up?.message||'Não foi possível registrar a conferência.'}campo?.focus();return}
+ // Fallback para leitores/cadastros que possam trazer espaços ou variação de caixa.
+ if(!(data||[]).length){
+   const r=await db.from('evento_materiais').select('*').eq('evento_id',eventoId).order('criado_em');
+   if(r.error){if(msg){msg.style.color='#ffb0b0';msg.textContent='Erro ao conferir: '+r.error.message}campo?.focus();return}
+   const alvo=codigo.replace(/\s+/g,'').toUpperCase();
+   data=(r.data||[]).filter(x=>String(x.codigo??'').trim().replace(/\s+/g,'').toUpperCase()===alvo);
+ }
+ const item=(data||[]).find(x=>Number(x.quantidade_bipada||0)<Number(x.quantidade_necessaria||0));
+ if(!item){if(msg){msg.style.color='#ffb0b0';msg.textContent=(data||[]).length?'Este código já foi conferido na quantidade completa.':'Código não pertence aos materiais deste evento.'}campo?.select();campo?.focus();return}
+ const novo=Number(item.quantidade_bipada||0)+1;
+ const {error:up}=await db.from('evento_materiais').update({quantidade_bipada:novo}).eq('id',item.id);
+ if(up){if(msg){msg.style.color='#ffb0b0';msg.textContent='Erro ao registrar conferência: '+up.message}campo?.focus();return}
  try{localStorage.setItem('cz_conf_'+item.id,new Date().toISOString())}catch(_){}
  if(campo)campo.value='';
  await abrirEvento(eventoId);
