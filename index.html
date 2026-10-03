@@ -1950,7 +1950,7 @@ async function abrirEvento(id){
  <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">Lista para separação</h3><div class="tablewrap">${pendentes.length?`<table><thead><tr><th>Quant.</th><th>Descrição</th><th>Cód.</th><th>Conf.</th><th>Horário e data da conf.</th><th>Status</th></tr></thead><tbody>${pendentes.map(m=>`<tr><td>${m.quantidade_necessaria}</td><td><b>${esc(m.nome_item)}</b></td><td><b>${esc(m.codigo||'SEM CÓDIGO')}</b></td><td><b>${m.quantidade_bipada}/${m.quantidade_necessaria}</b></td><td>${Number(m.quantidade_bipada)>0?registroConferencia(m.id):'—'}</td><td><span title="Quantidade ainda não conferida" style="display:inline-block;width:14px;height:14px;border-radius:3px;background:#d62828"></span></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhum material pendente de conferência.</div>'}</div></div>
  <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">✅ Material conferidos</h3><div class="tablewrap">${conferidos.length?`<table><thead><tr><th>Quant.</th><th>Descrição</th><th>Cód.</th><th>Conf.</th><th>Horário e data da conf.</th><th>Status</th></tr></thead><tbody>${conferidos.map(m=>`<tr><td>${m.quantidade_necessaria}</td><td>${esc(m.nome_item)}</td><td><b>${esc(m.codigo||'—')}</b></td><td><b>${m.quantidade_bipada}/${m.quantidade_necessaria}</b></td><td>${registroConferencia(m.id)}</td><td>✅</td></tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhum material conferido ainda.</div>'}</div></div>
  <div class="card" style="margin-top:16px"><div><b>Progresso da conferência:</b> ${conf}/${total} unidade(s)</div>${e.status==='material_pronto'?`<div class="msg" style="margin-top:8px">✅ Conferência concluída. Imprima o relatório de campo completo para a equipe técnica e confirme a impressão antes de liberar a saída.</div><div class="actions"><button type="button" class="btn secondary" onclick="imprimirRelatorioCampo('${id}')">Imprimir relatório de campo</button></div>${e.relatorio_impresso_em?'<div class="msg">Relatório confirmado para a equipe.</div>':`<label style="display:flex;gap:8px;align-items:center;margin-top:12px"><input type="checkbox" id="relatorioImpresso"> Confirmo que imprimi o relatório de campo</label><button type="button" class="btn secondary" onclick="confirmarImpressaoEvento('${id}')">Confirmar impressão</button>`}`:''}<div class="actions"><button class="btn primary" ${completo&&['separando','aguardando_evento','aguardando_separacao','pronto'].includes(e.status)?'':'disabled'} onclick="concluirConferenciaEvento('${id}')">CONCLUIR CONFERÊNCIA</button><button class="btn primary" ${e.status==='material_pronto'&&e.relatorio_impresso_em?'':'disabled'} onclick="liberarSaidaEvento('${id}')">LIBERAR SAÍDA</button></div></div>`}`;
- if(!emRetorno){$('#btnBipar').onclick=()=>biparEvento(id);$('#scanEvento').addEventListener('keydown',x=>{if(x.key==='Enter')biparEvento(id)});$('#btnAddMat').onclick=()=>adicionarMaterialEvento(id);$('#scanEvento').focus()}
+ if(!emRetorno){$('#btnBipar').onclick=()=>biparEvento(id);$('#scanEvento').addEventListener('keydown',x=>{if(x.key==='Enter'){x.preventDefault();x.stopPropagation();biparEvento(id)}});$('#btnAddMat').onclick=()=>adicionarMaterialEvento(id);$('#scanEvento').focus()}
 }
 async function adicionarMaterialEvento(eventoId){
  const [pr,ar]=await Promise.all([db.from('produtos').select('id,nome,codigo_barras').order('nome'),db.from('ativos').select('id,nome,codigo_barras,codigo_interno,status').order('nome')]);
@@ -1959,7 +1959,51 @@ async function adicionarMaterialEvento(eventoId){
  const qtd=Number(prompt('Quantidade necessária:',1));if(!Number.isInteger(qtd)||qtd<=0){alert('Informe uma quantidade inteira maior que zero.');return}
  const {error}=await db.from('evento_materiais').insert({evento_id:eventoId,tipo:item.tipo,item_id:item.id,nome_item:item.nome,codigo:item.codigo||null,quantidade_necessaria:qtd,quantidade_bipada:0,origem:'extra'});if(error){alert('Erro: '+error.message);return}abrirEvento(eventoId);
 }
-async function biparEvento(eventoId){const campo=$('#scanEvento'),codigo=campo.value.trim();if(!codigo){$('#scanMsg').textContent='Bipe ou digite um código.';return}const {data,error}=await db.from('evento_materiais').select('*').eq('evento_id',eventoId).eq('codigo',codigo);if(error){$('#scanMsg').textContent=error.message;return}const item=data?.[0];if(!item){$('#scanMsg').textContent='Código não pertence aos materiais deste evento.';return}if(Number(item.quantidade_bipada)>=Number(item.quantidade_necessaria)){ $('#scanMsg').textContent='Quantidade deste item já está completa.';return}const novo=Number(item.quantidade_bipada)+1;const {error:up}=await db.from('evento_materiais').update({quantidade_bipada:novo}).eq('id',item.id);if(up){$('#scanMsg').textContent=up.message;return}try{localStorage.setItem('cz_conf_'+item.id,new Date().toISOString())}catch(_){}campo.value='';abrirEvento(eventoId)}
+function normalizarCodigoEvento(v){return String(v??'').replace(/[\r\n\t ]+/g,'').trim().toUpperCase()}
+let bipagemEventoEmAndamento=false;
+async function biparEvento(eventoId){
+ const campo=$('#scanEvento'),msg=$('#scanMsg');
+ if(bipagemEventoEmAndamento)return;
+ const codigoLido=normalizarCodigoEvento(campo?.value);
+ if(!codigoLido){if(msg)msg.textContent='Bipe ou digite um código.';campo?.focus();return}
+ bipagemEventoEmAndamento=true;
+ if(msg){msg.style.color='var(--muted)';msg.textContent='Conferindo '+codigoLido+'...'}
+ try{
+   const {data:mats,error}=await db.from('evento_materiais').select('*').eq('evento_id',eventoId).order('criado_em');
+   if(error)throw error;
+   let candidatos=(mats||[]).filter(m=>normalizarCodigoEvento(m.codigo)===codigoLido);
+
+   // Compatibilidade com eventos antigos: se o código não foi gravado em evento_materiais,
+   // confere o cadastro atual do produto/ativo pelo item_id e corrige o código do evento.
+   if(!candidatos.length){
+     const produtos=(mats||[]).filter(m=>m.tipo==='produto'&&m.item_id).map(m=>m.item_id);
+     const ativos=(mats||[]).filter(m=>m.tipo==='ativo'&&m.item_id).map(m=>m.item_id);
+     let codigos=new Map();
+     if(produtos.length){const r=await db.from('produtos').select('id,codigo_barras').in('id',produtos);if(r.error)throw r.error;(r.data||[]).forEach(x=>codigos.set('produto:'+x.id,x.codigo_barras||''))}
+     if(ativos.length){const r=await db.from('ativos').select('id,codigo_barras,codigo_interno').in('id',ativos);if(r.error)throw r.error;(r.data||[]).forEach(x=>codigos.set('ativo:'+x.id,x.codigo_barras||x.codigo_interno||''))}
+     candidatos=(mats||[]).filter(m=>normalizarCodigoEvento(codigos.get(m.tipo+':'+m.item_id))===codigoLido);
+     for(const m of candidatos){if(!normalizarCodigoEvento(m.codigo)){await db.from('evento_materiais').update({codigo:codigos.get(m.tipo+':'+m.item_id)}).eq('id',m.id)}}
+   }
+
+   const item=candidatos.find(m=>Number(m.quantidade_bipada||0)<Number(m.quantidade_necessaria||0));
+   if(!item){
+     if(msg){msg.style.color='#ffb0b0';msg.textContent=candidatos.length?'Quantidade deste item já está completa.':'Código '+codigoLido+' não pertence aos materiais deste evento.'}
+     campo?.select();campo?.focus();return;
+   }
+   const novo=Number(item.quantidade_bipada||0)+1;
+   const {data:salvo,error:up}=await db.from('evento_materiais').update({quantidade_bipada:novo}).eq('id',item.id).select('id,quantidade_bipada').maybeSingle();
+   if(up)throw up;
+   if(!salvo)throw new Error('O banco não autorizou a atualização deste material. Verifique as permissões da tabela evento_materiais.');
+   if(Number(salvo.quantidade_bipada)!==novo)throw new Error('A quantidade não foi gravada corretamente no banco.');
+   try{localStorage.setItem('cz_conf_'+item.id,new Date().toISOString())}catch(_){}
+   if(campo)campo.value='';
+   await abrirEvento(eventoId);
+ }catch(err){
+   if(msg){msg.style.color='#ffb0b0';msg.textContent='Erro na conferência: '+(err?.message||err)}
+   else alert('Erro na conferência: '+(err?.message||err));
+   campo?.focus();
+ }finally{bipagemEventoEmAndamento=false}
+}
 async function concluirConferenciaEvento(id){
   const [er,mr]=await Promise.all([db.from('eventos_operacionais').select('status').eq('id',id).single(),db.from('evento_materiais').select('quantidade_necessaria,quantidade_bipada').eq('evento_id',id)]);
   if(er.error||mr.error){alert((er.error||mr.error).message);return}
