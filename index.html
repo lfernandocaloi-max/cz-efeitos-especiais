@@ -1950,7 +1950,7 @@ async function abrirEvento(id){
  <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">Lista para separação</h3><div class="tablewrap">${pendentes.length?`<table><thead><tr><th>Quant.</th><th>Descrição</th><th>Cód.</th><th>Conf.</th><th>Horário e data da conf.</th><th>Status</th></tr></thead><tbody>${pendentes.map(m=>`<tr><td>${m.quantidade_necessaria}</td><td><b>${esc(m.nome_item)}</b></td><td><b>${esc(m.codigo||'SEM CÓDIGO')}</b></td><td><b>${m.quantidade_bipada}/${m.quantidade_necessaria}</b></td><td>${Number(m.quantidade_bipada)>0?registroConferencia(m.id):'—'}</td><td><span title="Quantidade ainda não conferida" style="display:inline-block;width:14px;height:14px;border-radius:3px;background:#d62828"></span></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhum material pendente de conferência.</div>'}</div></div>
  <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">✅ Material conferidos</h3><div class="tablewrap">${conferidos.length?`<table><thead><tr><th>Quant.</th><th>Descrição</th><th>Cód.</th><th>Conf.</th><th>Horário e data da conf.</th><th>Status</th></tr></thead><tbody>${conferidos.map(m=>`<tr><td>${m.quantidade_necessaria}</td><td>${esc(m.nome_item)}</td><td><b>${esc(m.codigo||'—')}</b></td><td><b>${m.quantidade_bipada}/${m.quantidade_necessaria}</b></td><td>${registroConferencia(m.id)}</td><td>✅</td></tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhum material conferido ainda.</div>'}</div></div>
  <div class="card" style="margin-top:16px"><div><b>Progresso da conferência:</b> ${conf}/${total} unidade(s)</div>${e.status==='material_pronto'?`<div class="msg" style="margin-top:8px">✅ Conferência concluída. Imprima o relatório de campo completo para a equipe técnica e confirme a impressão antes de liberar a saída.</div><div class="actions"><button type="button" class="btn secondary" onclick="imprimirRelatorioCampo('${id}')">Imprimir relatório de campo</button></div>${e.relatorio_impresso_em?'<div class="msg">Relatório confirmado para a equipe.</div>':`<label style="display:flex;gap:8px;align-items:center;margin-top:12px"><input type="checkbox" id="relatorioImpresso"> Confirmo que imprimi o relatório de campo</label><button type="button" class="btn secondary" onclick="confirmarImpressaoEvento('${id}')">Confirmar impressão</button>`}`:''}<div class="actions"><button class="btn primary" ${completo&&['separando','aguardando_evento','aguardando_separacao','pronto'].includes(e.status)?'':'disabled'} onclick="concluirConferenciaEvento('${id}')">CONCLUIR CONFERÊNCIA</button><button class="btn primary" ${e.status==='material_pronto'&&e.relatorio_impresso_em?'':'disabled'} onclick="liberarSaidaEvento('${id}')">LIBERAR SAÍDA</button></div></div>`}`;
- if(!emRetorno){$('#btnBipar').onclick=()=>biparEvento(id);$('#scanEvento').addEventListener('keydown',x=>{if(x.key==='Enter')biparEvento(id)});$('#btnAddMat').onclick=()=>adicionarMaterialEvento(id);$('#scanEvento').focus()}
+ if(!emRetorno){$('#btnBipar').onclick=()=>biparEvento(id);$('#scanEvento').addEventListener('keydown',x=>{if(x.key==='Enter'){x.preventDefault();biparEvento(id)}});$('#btnAddMat').onclick=()=>adicionarMaterialEvento(id);$('#scanEvento').focus()}
 }
 async function adicionarMaterialEvento(eventoId){
  const [pr,ar]=await Promise.all([db.from('produtos').select('id,nome,codigo_barras').order('nome'),db.from('ativos').select('id,nome,codigo_barras,codigo_interno,status').order('nome')]);
@@ -1971,8 +1971,14 @@ async function biparEvento(eventoId){
  const item=mesmoCodigo.find(x=>Number(x.quantidade_bipada||0)<Number(x.quantidade_necessaria||0));
  if(!item){if(msg){msg.style.color='#ffb0b0';msg.textContent=mesmoCodigo.length?'Este código já foi conferido na quantidade completa.':'Código não pertence aos materiais deste evento.'}campo?.select();campo?.focus();return}
  const anterior=Number(item.quantidade_bipada||0),novo=anterior+1;
- const {data:atualizada,error:up}=await db.from('evento_materiais').update({quantidade_bipada:novo}).eq('id',item.id).eq('quantidade_bipada',anterior).select('id,quantidade_bipada');
- if(up||!atualizada?.length){if(msg){msg.style.color='#ffb0b0';msg.textContent=up?.message||'A conferência mudou. Bipe novamente.'}campo?.focus();return}
+ // Registros antigos podem ter quantidade_bipada = NULL. Comparar com .eq(...,0)
+ // fazia a atualização retornar zero linhas e a bipagem nunca avançava.
+ const {data:atualizada,error:up}=await db.from('evento_materiais')
+   .update({quantidade_bipada:novo})
+   .eq('id',item.id)
+   .eq('evento_id',eventoId)
+   .select('id,quantidade_bipada');
+ if(up||!atualizada?.length){if(msg){msg.style.color='#ffb0b0';msg.textContent=up?.message||'Não foi possível registrar a conferência.'}campo?.focus();return}
  try{localStorage.setItem('cz_conf_'+item.id,new Date().toISOString())}catch(_){}
  if(campo)campo.value='';
  await abrirEvento(eventoId);
