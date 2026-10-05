@@ -225,7 +225,7 @@ function contaMaster(){
  const perfil=String(czPerfilUsuario?.perfil||'').trim().toLowerCase();
  return email===CZ_MASTER_EMAIL || perfil==='master' || perfil==='master_principal' || perfil==='master_autorizado';
 }
-async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V104';reconstruirMenuPermissoes();renderModule(0)}
+async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V105';reconstruirMenuPermissoes();renderModule(0)}
 $('#loginBtn').onclick=async()=>{const email=$('#email').value.trim(),password=$('#password').value;$('#loginMsg').textContent='Entrando...';const {data,error}=await db.auth.signInWithPassword({email,password});if(error){$('#loginMsg').textContent='Não foi possível entrar: '+error.message;return}$('#loginMsg').textContent='';showApp(data.user)};
 $('#logoutBtn').onclick=async()=>{await db.auth.signOut();showLogin()};
   async function recuperarSenha(){
@@ -2363,7 +2363,7 @@ async function carregarPermissoesUsuario(){
 }
 
 // ========================= PDV =========================
-let pdvProdutos=[], pdvCarrinho=[], pdvClientes=[];
+let pdvProdutos=[], pdvCarrinho=[], pdvClientes=[], pdvOrcamentoSalvando=false;
 
 async function renderPDV(){
   $('#pageTitle').textContent='PDV';
@@ -2481,15 +2481,62 @@ function pdvMostrarOrcamentos(){
   <div class="tablewrap">${lista.length?`<table><thead><tr><th>Nº</th><th>Data</th><th>Cliente</th><th>Telefone</th><th>Itens</th><th>Total</th><th>Ações</th></tr></thead><tbody>${lista.map(o=>`<tr><td>${esc(o.numero)}</td><td>${esc(o.dataHora)}</td><td>${esc(o.cliente)}</td><td>${esc(o.telefone||'—')}</td><td>${o.itens.reduce((s,x)=>s+Number(x.qtd||0),0)}</td><td><b>${money(o.total)}</b></td><td><div class="actions" style="margin:0"><button class="btn primary" onclick="pdvVenderOrcamento('${o.id}')">Venda</button><button class="btn secondary" onclick="pdvCarregarOrcamento('${o.id}')">Abrir</button><button class="btn danger" onclick="pdvExcluirOrcamento('${o.id}')">Excluir</button></div></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhum orçamento salvo no PDV.</div>'}</div></div>`;
 }
 async function pdvSalvarOrcamento(){
+  if(pdvOrcamentoSalvando)return;
   const nome=$('#pdvClienteNome')?.value.trim(),telefone=$('#pdvClienteTelefone')?.value.trim()||'';
   if(!nome)return czAlert('Informe o nome do cliente.','Orçamento PDV');
   if(!pdvCarrinho.length)return czAlert('Adicione pelo menos um produto ao orçamento.','Orçamento PDV');
   const total=pdvCarrinho.reduce((s,x)=>s+x.qtd*x.valor,0),agora=new Date();
-  const lista=pdvOrcamentos();
-  const orc={id:crypto.randomUUID(),numero:'ORC-PDV-'+String(agora.getTime()).slice(-7),dataHora:agora.toLocaleString('pt-BR'),cliente:nome,telefone,forma:$('#pdvForma')?.value||'Pix',total,itens:pdvCarrinho.map(x=>({...x}))};
-  lista.unshift(orc);pdvSalvarOrcamentos(lista);
-  await czAlert('Orçamento salvo na aba Orçamentos PDV. Nenhum estoque foi baixado.','Orçamento salvo');
-  pdvCarrinho=[];pdvMontarTela();pdvMostrarOrcamentos();
+  pdvOrcamentoSalvando=true;
+  const btn=[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='Salvar como orçamento');
+  if(btn){btn.disabled=true;btn.textContent='Salvando...'}
+  try{
+    const lista=pdvOrcamentos();
+    const orc={id:crypto.randomUUID(),numero:'ORC-PDV-'+String(agora.getTime()).slice(-7),dataHora:agora.toLocaleString('pt-BR'),cliente:nome,telefone,forma:$('#pdvForma')?.value||'Pix',total,itens:pdvCarrinho.map(x=>({...x}))};
+    lista.unshift(orc);
+    pdvSalvarOrcamentos(lista); // um único salvamento por clique
+    pdvImprimirOrcamentoPDF(orc);
+    await czAlert('Orçamento salvo uma única vez e PDF gerado para impressão.','Orçamento salvo');
+    pdvCarrinho=[];
+    pdvMontarTela();
+    pdvMostrarOrcamentos();
+  }finally{
+    pdvOrcamentoSalvando=false;
+  }
+}
+
+function pdvImprimirOrcamentoPDF(orc){
+  try{
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF({unit:'mm',format:'a4'});
+    let y=18;
+    doc.setFont('helvetica','bold');doc.setFontSize(18);doc.text('CZ Efeitos Especiais',15,y);y+=8;
+    doc.setFont('helvetica','normal');doc.setFontSize(11);doc.text('ORÇAMENTO PDV',15,y);y+=9;
+    doc.setFontSize(10);
+    doc.text(`Orçamento: ${orc.numero}`,15,y);y+=6;
+    doc.text(`Data: ${orc.dataHora}`,15,y);y+=6;
+    doc.text(`Cliente: ${orc.cliente}`,15,y);y+=6;
+    doc.text(`Telefone: ${orc.telefone||'—'}`,15,y);y+=10;
+    doc.setFont('helvetica','bold');
+    doc.text('Produto',15,y);doc.text('Qtd.',105,y);doc.text('Tabela',122,y);doc.text('Unitário',145,y);doc.text('Total',175,y,{align:'right'});y+=5;
+    doc.line(15,y,195,y);y+=6;
+    doc.setFont('helvetica','normal');
+    orc.itens.forEach(x=>{
+      if(y>270){doc.addPage();y=18}
+      const nome=String(x.nome||'').slice(0,42);
+      doc.text(nome,15,y);
+      doc.text(String(x.qtd),108,y,{align:'right'});
+      doc.text(String(x.tabela||'1'),130,y,{align:'center'});
+      doc.text(money(x.valor),165,y,{align:'right'});
+      doc.text(money(x.qtd*x.valor),195,y,{align:'right'});
+      y+=7;
+    });
+    y+=3;doc.line(15,y,195,y);y+=9;
+    doc.setFont('helvetica','bold');doc.setFontSize(14);doc.text(`TOTAL: ${money(orc.total)}`,195,y,{align:'right'});
+    y+=10;doc.setFont('helvetica','normal');doc.setFontSize(9);doc.text('Este documento é um orçamento e não realiza baixa de estoque até ser convertido em venda.',15,y);
+    doc.save(`${orc.numero}.pdf`);
+  }catch(e){
+    czAlert('O orçamento foi salvo, mas não foi possível gerar o PDF: '+e.message,'PDF do orçamento');
+  }
 }
 function pdvCarregarOrcamento(id){
   const o=pdvOrcamentos().find(x=>x.id===id);if(!o)return;
