@@ -78,7 +78,7 @@
 </style>
 </head><body>
 <section id="login" class="login"><div class="loginbox"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><h3>Acesso ao sistema</h3><div class="field"><label>E-mail</label><input id="email" type="email"></div><div class="field"><label>Senha</label><input id="password" type="password"></div><button id="loginBtn" class="btn primary full" style="margin-top:18px">ENTRAR</button><button type="button" class="btn secondary full" style="margin-top:8px" onclick="recuperarSenha()">Esqueci minha senha</button><div id="loginMsg" class="msg"></div></div></section>
-<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><div class="muted" style="font-size:12px">Sistema de gestão CZ · V98</div></div><div><span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
+<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><div class="muted" style="font-size:12px">Sistema de gestão CZ · V117</div></div><div><span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
 <div id="clientModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="modalTitle">Novo cliente</h2><button class="btn secondary" onclick="closeClient()">Fechar</button></div>
   <input id="clientId" type="hidden"><div class="muted" id="clientOpenedAt" style="font-size:13px">Data de abertura: será definida ao salvar</div>
   <div class="row"><div class="field"><label>Nome / Razão social *</label><input id="clientName" autocomplete="name"></div><div class="field"><label>Telefone *</label><input id="clientPhone" type="tel" inputmode="tel" autocomplete="tel"></div></div>
@@ -225,7 +225,7 @@ function contaMaster(){
  const perfil=String(czPerfilUsuario?.perfil||'').trim().toLowerCase();
  return email===CZ_MASTER_EMAIL || perfil==='master' || perfil==='master_principal' || perfil==='master_autorizado';
 }
-async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V116';reconstruirMenuPermissoes();renderModule(0)}
+async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V117';reconstruirMenuPermissoes();renderModule(0)}
 $('#loginBtn').onclick=async()=>{const email=$('#email').value.trim(),password=$('#password').value;$('#loginMsg').textContent='Entrando...';const {data,error}=await db.auth.signInWithPassword({email,password});if(error){$('#loginMsg').textContent='Não foi possível entrar: '+error.message;return}$('#loginMsg').textContent='';showApp(data.user)};
 $('#logoutBtn').onclick=async()=>{await db.auth.signOut();showLogin()};
   async function recuperarSenha(){
@@ -1994,7 +1994,7 @@ async function mostrarTecnicaEvento(p,info,existente=null,materiaisExistentes=[]
   const ativos=new Map((ra.data||[]).map(x=>[String(x.id),x]));
   const orcamento=itensOrc.map(x=>{const cadastro=(x.tipo==='produto'?produtos:ativos).get(String(x.id));return {tipo:x.tipo,id:x.id||null,nome:cadastro?.nome||x.nome||'Item',quantidade:Number(x.quantidade||1),codigo:cadastro?.codigo_barras||cadastro?.codigo_interno||''}});
   const idsOrc=new Set(orcamento.filter(x=>x.tipo==='ativo').map(x=>String(x.id)));
-  const disponiveis=(rm.data||[]).filter(a=>!idsOrc.has(String(a.id))&&Number(a.quantidade||0)>0&&!['manutencao','perdido','indisponivel','locado','reservado'].includes(String(a.status||'').toLowerCase()));
+  const disponiveis=(rm.data||[]).filter(a=>!idsOrc.has(String(a.id))&&Number(a.quantidade||0)>0&&!['em_manutencao','perdido','indisponivel','locado','reservado'].includes(String(a.status||'').toLowerCase()));
   const montagem=materiaisExistentes.filter(m=>m.origem==='montagem').map(m=>({id:m.item_id,nome:m.nome_item,codigo:m.codigo||'',quantidade:Number(m.quantidade_necessaria||1)}));
   const shapes=Array.isArray(existente?.projeto_execucao)?structuredClone(existente.projeto_execucao):[];
   $('#content').innerHTML=`<div class="sectionhead"><div><h2>🛠️ Técnica do evento</h2><div class="muted">Proposta ${esc(p.numero||'')} • sem valores financeiros</div></div><button type="button" class="btn secondary" id="tecVoltar">Voltar</button></div>
@@ -2064,7 +2064,7 @@ async function editarProjetoEvento(id){
   const originais=materiais.filter(m=>m.origem==='montagem'||m.origem==='extra');
   const montagem=originais.map(m=>({registro_id:m.id,id:m.item_id,nome:m.nome_item,codigo:m.codigo||'',origem:m.origem,quantidade:Number(m.quantidade_necessaria||1),conferida:Number(m.quantidade_bipada||0)}));
   const idsOrc=new Set(materiais.filter(m=>m.origem==='orcamento'&&m.tipo==='ativo').map(m=>String(m.item_id)));
-  const disponiveis=(ar.data||[]).filter(a=>!idsOrc.has(String(a.id))&&Number(a.quantidade||0)>0&&!['manutencao','perdido','indisponivel','locado','reservado'].includes(String(a.status||'').toLowerCase()));
+  const disponiveis=(ar.data||[]).filter(a=>!idsOrc.has(String(a.id))&&Number(a.quantidade||0)>0&&!['em_manutencao','perdido','indisponivel','locado','reservado'].includes(String(a.status||'').toLowerCase()));
   const campos=[['Cliente',e.cliente_nome],['Telefone do cliente',e.cliente_telefone],['Projeto / Evento',e.nome_evento],['Data do evento',finDate(e.data_evento)],['Local do evento',e.local_evento],['Cidade',e.cidade_evento],['Horário inicial',e.horario_evento],['Responsável pelo evento',e.responsavel_evento],['Telefone do responsável',e.telefone_responsavel],['Veículo',e.veiculo],['Colaboradores',(e.colaboradores||[]).join(', ')]];
   $('#content').innerHTML=`<div class="sectionhead"><div><h2>Editar projeto — ${esc(e.nome_evento||'Evento')}</h2><div class="muted">Dados do orçamento em leitura • dados técnicos editáveis</div></div><button type="button" class="btn secondary" onclick="visualizarProjetoEvento('${id}')">Cancelar</button></div>
     <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">Dados do orçamento</h3><div class="tecnica-grid">${campos.map(([titulo,valor])=>`<div class="field"><label>${titulo}</label><div>${esc(valor||'—')}</div></div>`).join('')}</div><h4>Itens do orçamento</h4><div class="tablewrap"><table><thead><tr><th>Item</th><th>Qtd.</th><th>Cód. de barras</th></tr></thead><tbody>${materiais.filter(m=>m.origem==='orcamento').map(m=>`<tr><td>${esc(m.nome_item)}</td><td>${esc(m.quantidade_necessaria)}</td><td>${esc(m.codigo||'—')}</td></tr>`).join('')||'<tr><td colspan="3">Nenhum item.</td></tr>'}</tbody></table></div></div>
@@ -2364,7 +2364,7 @@ async function registrarOcorrenciaRetorno(eventoId,mid,ativoId,tipo){
  const {data:e,error:evErro}=await db.from('eventos_operacionais').select('saida_baixada_em').eq('id',eventoId).single();if(evErro){alert(evErro.message);return}
  if(e.saida_baixada_em){const {error}=await db.rpc('cz_ocorrencia_retorno_ativo',{p_evento_id:eventoId,p_material_id:mid,p_ocorrencia:tipo});if(error){alert(error.message);return}abrirRetornoEvento(eventoId);return}
  const r=retornoInfo(mid);r.status=tipo;salvarRetorno(mid,r);
- if(ativoId){const {error}=await db.from('ativos').update({status:tipo==='perda'?'perdido':'manutencao'}).eq('id',ativoId);if(error){alert(error.message);return}}
+ if(ativoId){const {error}=await db.from('ativos').update({status:tipo==='perda'?'perdido':'em_manutencao'}).eq('id',ativoId);if(error){alert(error.message);return}}
  abrirRetornoEvento(eventoId);
 }
 function marcarManutencaoRetorno(eventoId,mid,ativoId){return registrarOcorrenciaRetorno(eventoId,mid,ativoId,'manutencao')}
@@ -2401,7 +2401,7 @@ async function registrarOcorrenciaRetorno(eventoId,mid,ativoId,tipo){
  const qtd=Number(await czPrompt(`Quantidade para ${tipo==='perda'?'PERDA':'MANUTENÇÃO'} (máximo ${restante}):`,'1',tipo==='perda'?'Registrar perda':'Enviar para manutenção'));if(!Number.isInteger(qtd)||qtd<=0||qtd>restante){alert('Informe uma quantidade inteira entre 1 e '+restante+'.');return}
  if(tipo==='perda'&&!await czConfirm(`Confirmar a perda de ${qtd} unidade(s)?`,'Registrar perda','Confirmar perda'))return;
  let ocorrencia='';if(tipo==='manutencao'){ocorrencia=(await czPrompt('Ocorrência / o que aconteceu com o equipamento:','','Ocorrência de manutenção'))||'';if(!ocorrencia.trim()){alert('Informe a ocorrência para gerar a ordem de manutenção.');return}}
- if(!(await czAjustarQuantidadeAtivo(ativoId,-qtd,tipo==='perda'?'perdido':'manutencao')))return;
+ if(!(await czAjustarQuantidadeAtivo(ativoId,-qtd,tipo==='perda'?'perdido':'em_manutencao')))return;
  if(tipo==='perda')r.qtd_perda=Number(r.qtd_perda||0)+qtd;else r.qtd_manutencao=Number(r.qtd_manutencao||0)+qtd;r.status=(jaDev+Number(r.qtd_perda||0)+Number(r.qtd_manutencao||0)>=esperado)?tipo:'parcial';salvarRetorno(mid,r);
  if(tipo==='manutencao'){const os=await czCriarOS(eventoId,m,ativoId,qtd,ocorrencia);if(await czConfirm(`${os.numero} gerada. Deseja imprimir a ordem agora?`,'Ordem de manutenção','Imprimir ordem'))imprimirOSManutencao(os.id)}
  abrirRetornoEvento(eventoId)
@@ -2424,7 +2424,7 @@ async function gerarOSModalManutencao(eventoId,mid,ativoId,imprimir){
  const m=mr.data,esperado=Number(m.quantidade_bipada||0),r=retornoInfo(mid),jaDev=Number(r.qtd||0),jaOc=Number(r.qtd_perda||0)+Number(r.qtd_manutencao||0),restante=Math.max(0,esperado-jaDev-jaOc);
  if(!ocorrencia){if(msg)msg.textContent='Informe a ocorrência.';return}
  if(!Number.isInteger(qtd)||qtd<=0||qtd>restante){if(msg)msg.textContent='Informe uma quantidade entre 1 e '+restante+'.';return}
- if(!(await czAjustarQuantidadeAtivo(ativoId,-qtd,'manutencao')))return;
+ if(!(await czAjustarQuantidadeAtivo(ativoId,-qtd,'em_manutencao')))return;
  r.qtd_manutencao=Number(r.qtd_manutencao||0)+qtd;r.status=(jaDev+Number(r.qtd_perda||0)+Number(r.qtd_manutencao||0)>=esperado)?'manutencao':'parcial';salvarRetorno(mid,r);
  const os=await czCriarOS(eventoId,m,ativoId,qtd,ocorrencia);fecharModalManutencao();if(imprimir)imprimirOSManutencao(os.id);abrirRetornoEvento(eventoId);
 }
