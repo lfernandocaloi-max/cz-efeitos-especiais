@@ -225,7 +225,7 @@ function contaMaster(){
  const perfil=String(czPerfilUsuario?.perfil||'').trim().toLowerCase();
  return email===CZ_MASTER_EMAIL || perfil==='master' || perfil==='master_principal' || perfil==='master_autorizado';
 }
-async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V102';reconstruirMenuPermissoes();renderModule(0)}
+async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V104';reconstruirMenuPermissoes();renderModule(0)}
 $('#loginBtn').onclick=async()=>{const email=$('#email').value.trim(),password=$('#password').value;$('#loginMsg').textContent='Entrando...';const {data,error}=await db.auth.signInWithPassword({email,password});if(error){$('#loginMsg').textContent='Não foi possível entrar: '+error.message;return}$('#loginMsg').textContent='';showApp(data.user)};
 $('#logoutBtn').onclick=async()=>{await db.auth.signOut();showLogin()};
   async function recuperarSenha(){
@@ -2363,14 +2363,18 @@ async function carregarPermissoesUsuario(){
 }
 
 // ========================= PDV =========================
-let pdvProdutos=[], pdvCarrinho=[];
+let pdvProdutos=[], pdvCarrinho=[], pdvClientes=[];
 
 async function renderPDV(){
   $('#pageTitle').textContent='PDV';
   $('#content').innerHTML='<div class="sectionhead"><div><h2>🛒 PDV</h2><div class="muted">Venda rápida com baixa automática do estoque e lançamento no Caixa.</div></div></div><div class="muted">Carregando produtos...</div>';
-  const {data,error}=await db.from('produtos').select('id,nome,codigo_barras,estoque_atual,valor_varejo,valor_atacado,unidade').order('nome');
+  const [{data,error},{data:clientesPdv,error:erroClientes}]=await Promise.all([
+    db.from('produtos').select('id,nome,codigo_barras,estoque_atual,valor_varejo,valor_atacado,unidade').order('nome'),
+    db.from('clientes').select('id,nome,telefone').order('nome').limit(10000)
+  ]);
   if(error){$('#content').innerHTML=`<div class="msg">Erro ao carregar o PDV: ${esc(error.message)}</div>`;return}
-  pdvProdutos=data||[];pdvCarrinho=[];
+  if(erroClientes){$('#content').innerHTML=`<div class="msg">Erro ao carregar a base de clientes no PDV: ${esc(erroClientes.message)}</div>`;return}
+  pdvProdutos=data||[];pdvClientes=clientesPdv||[];pdvCarrinho=[];
   pdvMontarTela();
 }
 
@@ -2387,10 +2391,13 @@ function pdvMontarTela(){
     <div id="pdvAreaVenda">
     <div class="card" style="margin-bottom:16px">
       <h3 style="margin-top:0">Cliente</h3>
+      <div class="field"><label>Buscar cliente da base</label><input id="pdvBuscaCliente" list="pdvListaClientes" placeholder="Digite nome ou telefone" oninput="pdvSelecionarClienteBase(this.value)"><datalist id="pdvListaClientes">${pdvClientes.map(c=>`<option value="${esc(c.nome||'')} — ${esc(c.telefone||'')}"></option>`).join('')}</datalist></div>
       <div class="row">
         <div class="field"><label>Nome *</label><input id="pdvClienteNome" placeholder="Nome do cliente"></div>
         <div class="field"><label>Telefone</label><input id="pdvClienteTelefone" type="tel" inputmode="tel" placeholder="Telefone / WhatsApp"></div>
       </div>
+      <div class="muted" style="font-size:12px;margin-top:8px">Selecione um cliente existente ou digite Nome + Telefone para cadastrar um novo cliente ao finalizar.</div>
+      <div class="actions" style="justify-content:flex-start;margin-top:12px"><button type="button" class="btn secondary" onclick="pdvCadastrarClienteAgora()">+ Cadastrar cliente agora</button></div>
     </div>
     <div class="card" style="margin-bottom:16px">
       <h3 style="margin-top:0">Adicionar produto</h3>
@@ -2421,6 +2428,33 @@ function pdvMontarTela(){
   pdvAtualizarCarrinho();
 }
 
+
+
+function pdvCadastrarClienteAgora(){
+  const nome=$('#pdvClienteNome')?.value.trim()||'';
+  const telefone=$('#pdvClienteTelefone')?.value.trim()||'';
+  if(typeof openClient==='function'){
+    openClient();
+    setTimeout(()=>{
+      if($('#clientName'))$('#clientName').value=nome;
+      if($('#clientPhone'))$('#clientPhone').value=telefone;
+      if($('#clientOrigin'))$('#clientOrigin').value='PDV';
+    },30);
+  }else czAlert('Não foi possível abrir o cadastro de cliente.','PDV');
+}
+function pdvSelecionarClienteBase(valor){
+  const v=String(valor||'').trim().toLowerCase();
+  if(!v)return;
+  const telBusca=v.replace(/\D/g,'');
+  const c=pdvClientes.find(x=>{
+    const rotulo=`${x.nome||''} — ${x.telefone||''}`.toLowerCase();
+    const tel=String(x.telefone||'').replace(/\D/g,'');
+    return rotulo===v || (telBusca.length>=8 && tel===telBusca);
+  });
+  if(!c)return;
+  if($('#pdvClienteNome'))$('#pdvClienteNome').value=c.nome||'';
+  if($('#pdvClienteTelefone'))$('#pdvClienteTelefone').value=c.telefone||'';
+}
 function pdvAtualizarLinhaProduto(){
   const id=$('#pdvProduto')?.value,tabela=$('#pdvTabela')?.value||'1',qtd=Math.max(1,Math.floor(Number($('#pdvQtd')?.value||1)));
   const p=pdvProdutos.find(x=>String(x.id)===String(id));
