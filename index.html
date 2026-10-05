@@ -225,7 +225,7 @@ function contaMaster(){
  const perfil=String(czPerfilUsuario?.perfil||'').trim().toLowerCase();
  return email===CZ_MASTER_EMAIL || perfil==='master' || perfil==='master_principal' || perfil==='master_autorizado';
 }
-async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V105';reconstruirMenuPermissoes();renderModule(0)}
+async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V107';reconstruirMenuPermissoes();renderModule(0)}
 $('#loginBtn').onclick=async()=>{const email=$('#email').value.trim(),password=$('#password').value;$('#loginMsg').textContent='Entrando...';const {data,error}=await db.auth.signInWithPassword({email,password});if(error){$('#loginMsg').textContent='Não foi possível entrar: '+error.message;return}$('#loginMsg').textContent='';showApp(data.user)};
 $('#logoutBtn').onclick=async()=>{await db.auth.signOut();showLogin()};
   async function recuperarSenha(){
@@ -2387,6 +2387,7 @@ function pdvMontarTela(){
     <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
       <button type="button" class="btn primary" id="pdvAbaVenda" onclick="pdvMostrarVenda()">Venda</button>
       <button type="button" class="btn secondary" id="pdvAbaOrcamentos" onclick="pdvMostrarOrcamentos()">Orçamentos PDV</button>
+      <button type="button" class="btn secondary" id="pdvAbaVendasFeitas" onclick="pdvMostrarVendasFeitas()">Vendas realizadas</button>
     </div>
     <div id="pdvAreaVenda">
     <div class="card" style="margin-bottom:16px">
@@ -2424,7 +2425,8 @@ function pdvMontarTela(){
       </div>
     </div>
     </div>
-    <div id="pdvAreaOrcamentos" class="hidden"></div>`;
+    <div id="pdvAreaOrcamentos" class="hidden"></div>
+    <div id="pdvAreaVendasFeitas" class="hidden"></div>`;
   pdvAtualizarCarrinho();
 }
 
@@ -2467,18 +2469,66 @@ function pdvAtualizarLinhaProduto(){
 const PDV_ORC_KEY='cz_pdv_orcamentos_v1';
 function pdvOrcamentos(){try{return JSON.parse(localStorage.getItem(PDV_ORC_KEY)||'[]')}catch(_){return []}}
 function pdvSalvarOrcamentos(lista){localStorage.setItem(PDV_ORC_KEY,JSON.stringify(lista))}
+function pdvProximoNumero(){
+  const nums=pdvOrcamentos().map(o=>{
+    const m=String(o.numero||'').match(/^PDV\s*0*(\d+)$/i);
+    return m?Number(m[1]):0;
+  });
+  const proximo=Math.max(0,...nums)+1;
+  return 'PDV '+String(proximo).padStart(3,'0');
+}
 function pdvMostrarVenda(){
-  $('#pdvAreaVenda')?.classList.remove('hidden');$('#pdvAreaOrcamentos')?.classList.add('hidden');
+  $('#pdvAreaVenda')?.classList.remove('hidden');$('#pdvAreaOrcamentos')?.classList.add('hidden');$('#pdvAreaVendasFeitas')?.classList.add('hidden');
   $('#pdvAbaVenda')?.classList.add('primary');$('#pdvAbaVenda')?.classList.remove('secondary');
   $('#pdvAbaOrcamentos')?.classList.add('secondary');$('#pdvAbaOrcamentos')?.classList.remove('primary');
+  $('#pdvAbaVendasFeitas')?.classList.add('secondary');$('#pdvAbaVendasFeitas')?.classList.remove('primary');
 }
 function pdvMostrarOrcamentos(){
-  $('#pdvAreaVenda')?.classList.add('hidden');$('#pdvAreaOrcamentos')?.classList.remove('hidden');
+  $('#pdvAreaVenda')?.classList.add('hidden');$('#pdvAreaOrcamentos')?.classList.remove('hidden');$('#pdvAreaVendasFeitas')?.classList.add('hidden');
   $('#pdvAbaOrcamentos')?.classList.add('primary');$('#pdvAbaOrcamentos')?.classList.remove('secondary');
   $('#pdvAbaVenda')?.classList.add('secondary');$('#pdvAbaVenda')?.classList.remove('primary');
+  $('#pdvAbaVendasFeitas')?.classList.add('secondary');$('#pdvAbaVendasFeitas')?.classList.remove('primary');
   const lista=pdvOrcamentos(),area=$('#pdvAreaOrcamentos');
   area.innerHTML=`<div class="card"><div class="sectionhead"><div><h3 style="margin:0">Orçamentos do PDV</h3><div class="muted">Orçamentos rápidos aguardando conversão em venda.</div></div></div>
-  <div class="tablewrap">${lista.length?`<table><thead><tr><th>Nº</th><th>Data</th><th>Cliente</th><th>Telefone</th><th>Itens</th><th>Total</th><th>Ações</th></tr></thead><tbody>${lista.map(o=>`<tr><td>${esc(o.numero)}</td><td>${esc(o.dataHora)}</td><td>${esc(o.cliente)}</td><td>${esc(o.telefone||'—')}</td><td>${o.itens.reduce((s,x)=>s+Number(x.qtd||0),0)}</td><td><b>${money(o.total)}</b></td><td><div class="actions" style="margin:0"><button class="btn primary" onclick="pdvVenderOrcamento('${o.id}')">Venda</button><button class="btn secondary" onclick="pdvCarregarOrcamento('${o.id}')">Abrir</button><button class="btn danger" onclick="pdvExcluirOrcamento('${o.id}')">Excluir</button></div></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhum orçamento salvo no PDV.</div>'}</div></div>`;
+  <div class="tablewrap">${lista.length?`<table><thead><tr><th>Cliente</th><th>Nº item</th><th>Total</th><th>Telefone</th><th>Ação</th></tr></thead><tbody>${lista.map(o=>`<tr><td>${esc(o.cliente)}</td><td>${esc(o.numero)}</td><td><b>${money(o.total)}</b></td><td>${esc(o.telefone||'—')}</td><td><div class="actions" style="margin:0"><button class="btn primary" onclick="pdvVenderOrcamento('${o.id}')">Venda</button><button class="btn secondary" onclick="pdvCarregarOrcamento('${o.id}')">Abrir</button><button class="btn danger" onclick="pdvExcluirOrcamento('${o.id}')">Excluir</button></div></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhum orçamento salvo no PDV.</div>'}</div></div>`;
+}
+
+async function pdvMostrarVendasFeitas(){
+  $('#pdvAreaVenda')?.classList.add('hidden');$('#pdvAreaOrcamentos')?.classList.add('hidden');$('#pdvAreaVendasFeitas')?.classList.remove('hidden');
+  $('#pdvAbaVendasFeitas')?.classList.add('primary');$('#pdvAbaVendasFeitas')?.classList.remove('secondary');
+  $('#pdvAbaVenda')?.classList.add('secondary');$('#pdvAbaVenda')?.classList.remove('primary');
+  $('#pdvAbaOrcamentos')?.classList.add('secondary');$('#pdvAbaOrcamentos')?.classList.remove('primary');
+  const area=$('#pdvAreaVendasFeitas');
+  area.innerHTML='<div class="card"><div class="muted">Carregando vendas realizadas...</div></div>';
+  await carregarCaixa();
+  pdvRenderHistoricoVendas();
+}
+function pdvRenderHistoricoVendas(){
+  const area=$('#pdvAreaVendasFeitas');if(!area)return;
+  const cliente=($('#pdvFiltroCliente')?.value||'').trim().toLowerCase();
+  const de=$('#pdvFiltroDataDe')?.value||'',ate=$('#pdvFiltroDataAte')?.value||'';
+  let vendas=caixaCache.filter(x=>x.tipo==='entrada'&&(String(x.categoria||'').toLowerCase()==='venda pdv'||String(x.descricao||'').toLowerCase()==='venda pdv'));
+  if(cliente)vendas=vendas.filter(x=>String(x.cliente_nome||'').toLowerCase().includes(cliente));
+  if(de)vendas=vendas.filter(x=>String(x.data||'')>=de);
+  if(ate)vendas=vendas.filter(x=>String(x.data||'')<=ate);
+  vendas=vendas.slice().sort((a,b)=>String(b.data||'').localeCompare(String(a.data||'')));
+  const total=vendas.reduce((s,x)=>s+Number(x.valor||0),0);
+  area.innerHTML=`<div class="card"><div class="sectionhead"><div><h3 style="margin:0">Vendas realizadas</h3><div class="muted">Histórico das vendas concluídas pelo PDV.</div></div><b>Total filtrado: ${money(total)}</b></div>
+  <div class="filters">
+    <div class="field"><label>Cliente</label><input id="pdvFiltroCliente" value="${esc(cliente)}" placeholder="Nome do cliente"></div>
+    <div class="field"><label>Data de</label><input id="pdvFiltroDataDe" type="date" value="${esc(de)}"></div>
+    <div class="field"><label>Data até</label><input id="pdvFiltroDataAte" type="date" value="${esc(ate)}"></div>
+    <div class="actions" style="margin:0;align-items:end;justify-content:flex-start"><button type="button" class="btn primary" onclick="pdvRenderHistoricoVendas()">Filtrar</button><button type="button" class="btn secondary" onclick="pdvLimparFiltroVendas()">Limpar</button></div>
+  </div>
+  <div class="tablewrap">${vendas.length?`<table><thead><tr><th>Cliente</th><th>Data</th><th>Nº venda</th><th>Forma de pagamento</th><th>Total</th></tr></thead><tbody>${vendas.map(x=>`<tr><td>${esc(x.cliente_nome||'—')}</td><td>${finDate(x.data)}</td><td>${esc(x.proposta_numero||'—')}</td><td>${esc(x.forma||'—')}</td><td><b>${money(x.valor)}</b></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhuma venda encontrada para este filtro.</div>'}</div></div>`;
+}
+function pdvLimparFiltroVendas(){
+  const a=$('#pdvAreaVendasFeitas');if(!a)return;
+  a.innerHTML='<div class="card"><div class="muted">Atualizando...</div></div>';
+  const area=$('#pdvAreaVendasFeitas');
+  let vendas=caixaCache.filter(x=>x.tipo==='entrada'&&(String(x.categoria||'').toLowerCase()==='venda pdv'||String(x.descricao||'').toLowerCase()==='venda pdv')).slice().sort((a,b)=>String(b.data||'').localeCompare(String(a.data||'')));
+  const total=vendas.reduce((s,x)=>s+Number(x.valor||0),0);
+  area.innerHTML=`<div class="card"><div class="sectionhead"><div><h3 style="margin:0">Vendas realizadas</h3><div class="muted">Histórico das vendas concluídas pelo PDV.</div></div><b>Total filtrado: ${money(total)}</b></div><div class="filters"><div class="field"><label>Cliente</label><input id="pdvFiltroCliente" placeholder="Nome do cliente"></div><div class="field"><label>Data de</label><input id="pdvFiltroDataDe" type="date"></div><div class="field"><label>Data até</label><input id="pdvFiltroDataAte" type="date"></div><div class="actions" style="margin:0;align-items:end;justify-content:flex-start"><button type="button" class="btn primary" onclick="pdvRenderHistoricoVendas()">Filtrar</button><button type="button" class="btn secondary" onclick="pdvLimparFiltroVendas()">Limpar</button></div></div><div class="tablewrap">${vendas.length?`<table><thead><tr><th>Cliente</th><th>Data</th><th>Nº venda</th><th>Forma de pagamento</th><th>Total</th></tr></thead><tbody>${vendas.map(x=>`<tr><td>${esc(x.cliente_nome||'—')}</td><td>${finDate(x.data)}</td><td>${esc(x.proposta_numero||'—')}</td><td>${esc(x.forma||'—')}</td><td><b>${money(x.valor)}</b></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhuma venda realizada.</div>'}</div></div>`;
 }
 async function pdvSalvarOrcamento(){
   if(pdvOrcamentoSalvando)return;
@@ -2491,7 +2541,7 @@ async function pdvSalvarOrcamento(){
   if(btn){btn.disabled=true;btn.textContent='Salvando...'}
   try{
     const lista=pdvOrcamentos();
-    const orc={id:crypto.randomUUID(),numero:'ORC-PDV-'+String(agora.getTime()).slice(-7),dataHora:agora.toLocaleString('pt-BR'),cliente:nome,telefone,forma:$('#pdvForma')?.value||'Pix',total,itens:pdvCarrinho.map(x=>({...x}))};
+    const orc={id:crypto.randomUUID(),numero:pdvProximoNumero(),dataHora:agora.toLocaleString('pt-BR'),cliente:nome,telefone,forma:$('#pdvForma')?.value||'Pix',total,itens:pdvCarrinho.map(x=>({...x}))};
     lista.unshift(orc);
     pdvSalvarOrcamentos(lista); // um único salvamento por clique
     pdvImprimirOrcamentoPDF(orc);
@@ -2513,7 +2563,6 @@ function pdvImprimirOrcamentoPDF(orc){
     doc.setFont('helvetica','normal');doc.setFontSize(11);doc.text('ORÇAMENTO PDV',15,y);y+=9;
     doc.setFontSize(10);
     doc.text(`Orçamento: ${orc.numero}`,15,y);y+=6;
-    doc.text(`Data: ${orc.dataHora}`,15,y);y+=6;
     doc.text(`Cliente: ${orc.cliente}`,15,y);y+=6;
     doc.text(`Telefone: ${orc.telefone||'—'}`,15,y);y+=10;
     doc.setFont('helvetica','bold');
