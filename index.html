@@ -78,15 +78,15 @@
 </style>
 </head><body>
 <section id="login" class="login"><div class="loginbox"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><h3>Acesso ao sistema</h3><div class="field"><label>E-mail</label><input id="email" type="email"></div><div class="field"><label>Senha</label><input id="password" type="password"></div><button id="loginBtn" class="btn primary full" style="margin-top:18px">ENTRAR</button><button type="button" class="btn secondary full" style="margin-top:8px" onclick="recuperarSenha()">Esqueci minha senha</button><div id="loginMsg" class="msg"></div></div></section>
-<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><div class="muted" style="font-size:12px">Sistema de gestão CZ · V95</div></div><div><span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
+<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><div class="muted" style="font-size:12px">Sistema de gestão CZ · V97</div></div><div><span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
 <div id="clientModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="modalTitle">Novo cliente</h2><button class="btn secondary" onclick="closeClient()">Fechar</button></div>
   <input id="clientId" type="hidden"><div class="muted" id="clientOpenedAt" style="font-size:13px">Data de abertura: será definida ao salvar</div>
   <div class="row"><div class="field"><label>Nome / Razão social *</label><input id="clientName" autocomplete="name"></div><div class="field"><label>Telefone *</label><input id="clientPhone" type="tel" inputmode="tel" autocomplete="tel"></div></div>
-  <div class="field"><label class="client-switch"><input id="clientIsCompany" type="checkbox"> Cadastro com CNPJ (empresa)</label></div>
+  <div class="field"><label class="client-switch"><input id="clientIsCompany" type="checkbox"> CNPJ</label></div>
   <div class="row" id="clientPfFields"><div class="field"><label>CPF</label><input id="clientCpf" inputmode="numeric"></div><div class="field"><label>RG</label><input id="clientRg"></div></div>
   <div class="row hidden" id="clientPjFields"><div class="field"><label>CNPJ</label><input id="clientCnpj" inputmode="numeric"></div><div class="field"><label>IE (Inscrição Estadual)</label><input id="clientIe"></div></div>
   <div class="field"><label>Endereço</label><input id="clientAddress" autocomplete="street-address"></div>
-  <div class="row"><div class="field"><label>Número</label><input id="clientNumber"></div><div class="field"><label>Complemento</label><input id="clientComplement"></div></div>
+  <div class="field"><label>Complemento</label><input id="clientComplement"></div>
   <div class="row"><div class="field"><label>Cidade</label><input id="clientCity" autocomplete="address-level2"></div><div class="field"><label>CEP</label><input id="clientZip" inputmode="numeric" autocomplete="postal-code"></div></div>
   <div class="row"><div class="field"><label>E-mail</label><input id="clientEmail" type="email" autocomplete="email"></div><div class="field"><label>Profissão</label><input id="clientProfession"></div></div>
   <div class="field"><label>Origem</label><input id="clientOrigin" value="manual"></div><div class="field"><label>Observações</label><textarea id="clientNotes"></textarea></div>
@@ -225,7 +225,7 @@ function contaMaster(){
  const perfil=String(czPerfilUsuario?.perfil||'').trim().toLowerCase();
  return email===CZ_MASTER_EMAIL || perfil==='master' || perfil==='master_principal' || perfil==='master_autorizado';
 }
-async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V96';reconstruirMenuPermissoes();renderModule(0)}
+async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V97';reconstruirMenuPermissoes();renderModule(0)}
 $('#loginBtn').onclick=async()=>{const email=$('#email').value.trim(),password=$('#password').value;$('#loginMsg').textContent='Entrando...';const {data,error}=await db.auth.signInWithPassword({email,password});if(error){$('#loginMsg').textContent='Não foi possível entrar: '+error.message;return}$('#loginMsg').textContent='';showApp(data.user)};
 $('#logoutBtn').onclick=async()=>{await db.auth.signOut();showLogin()};
   async function recuperarSenha(){
