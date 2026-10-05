@@ -225,7 +225,7 @@ function contaMaster(){
  const perfil=String(czPerfilUsuario?.perfil||'').trim().toLowerCase();
  return email===CZ_MASTER_EMAIL || perfil==='master' || perfil==='master_principal' || perfil==='master_autorizado';
 }
-async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V100';reconstruirMenuPermissoes();renderModule(0)}
+async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V101';reconstruirMenuPermissoes();renderModule(0)}
 $('#loginBtn').onclick=async()=>{const email=$('#email').value.trim(),password=$('#password').value;$('#loginMsg').textContent='Entrando...';const {data,error}=await db.auth.signInWithPassword({email,password});if(error){$('#loginMsg').textContent='Não foi possível entrar: '+error.message;return}$('#loginMsg').textContent='';showApp(data.user)};
 $('#logoutBtn').onclick=async()=>{await db.auth.signOut();showLogin()};
   async function recuperarSenha(){
@@ -2368,7 +2368,7 @@ let pdvProdutos=[], pdvCarrinho=[];
 async function renderPDV(){
   $('#pageTitle').textContent='PDV';
   $('#content').innerHTML='<div class="sectionhead"><div><h2>🛒 PDV</h2><div class="muted">Venda rápida com baixa automática do estoque e lançamento no Caixa.</div></div></div><div class="muted">Carregando produtos...</div>';
-  const {data,error}=await db.from('produtos').select('id,nome,codigo_barras,estoque_atual,valor_varejo,unidade').order('nome');
+  const {data,error}=await db.from('produtos').select('id,nome,codigo_barras,estoque_atual,valor_varejo,valor_atacado,unidade').order('nome');
   if(error){$('#content').innerHTML=`<div class="msg">Erro ao carregar o PDV: ${esc(error.message)}</div>`;return}
   pdvProdutos=data||[];pdvCarrinho=[];
   pdvMontarTela();
@@ -2389,11 +2389,14 @@ function pdvMontarTela(){
     </div>
     <div class="card" style="margin-bottom:16px">
       <h3 style="margin-top:0">Adicionar produto</h3>
-      <div class="row">
-        <div class="field"><label>Produto</label><select id="pdvProduto"><option value="">Selecione</option>${pdvProdutos.filter(p=>Number(p.estoque_atual||0)>0).map(p=>`<option value="${esc(p.id)}">${esc(p.nome)} — estoque ${Number(p.estoque_atual||0)} — ${money(p.valor_varejo)}</option>`).join('')}</select></div>
-        <div class="field"><label>Quantidade</label><input id="pdvQtd" type="number" min="1" step="1" value="1"></div>
+      <div style="display:grid;grid-template-columns:minmax(220px,2fr) minmax(100px,.7fr) minmax(110px,.8fr) minmax(130px,.9fr) minmax(130px,.9fr) auto;gap:10px;align-items:end">
+        <div class="field"><label>Produto</label><select id="pdvProduto" onchange="pdvAtualizarLinhaProduto()"><option value="">Selecione</option>${pdvProdutos.filter(p=>Number(p.estoque_atual||0)>0).map(p=>`<option value="${esc(p.id)}">${esc(p.nome)}</option>`).join('')}</select></div>
+        <div class="field"><label>Quantidade</label><input id="pdvQtd" type="number" min="1" step="1" value="1" oninput="pdvAtualizarLinhaProduto()"></div>
+        <div class="field"><label>Tabela</label><select id="pdvTabela" onchange="pdvAtualizarLinhaProduto()"><option value="1">Tabela 1</option><option value="2">Tabela 2</option></select></div>
+        <div class="field"><label>Valor unitário</label><input id="pdvValorUnit" type="text" readonly></div>
+        <div class="field"><label>Valor total</label><input id="pdvValorLinha" type="text" readonly></div>
+        <button type="button" class="btn primary" onclick="pdvAdicionar()" style="margin-bottom:1px">+ Adicionar</button>
       </div>
-      <div class="actions"><button type="button" class="btn primary" onclick="pdvAdicionar()">+ Adicionar item</button></div>
     </div>
     <div class="card">
       <h3 style="margin-top:0">Pedido</h3>
@@ -2408,16 +2411,26 @@ function pdvMontarTela(){
   pdvAtualizarCarrinho();
 }
 
+function pdvAtualizarLinhaProduto(){
+  const id=$('#pdvProduto')?.value,tabela=$('#pdvTabela')?.value||'1',qtd=Math.max(1,Math.floor(Number($('#pdvQtd')?.value||1)));
+  const p=pdvProdutos.find(x=>String(x.id)===String(id));
+  const valor=p?Number(tabela==='2'?(p.valor_atacado||0):(p.valor_varejo||0)):0;
+  if($('#pdvValorUnit'))$('#pdvValorUnit').value=p?money(valor):'';
+  if($('#pdvValorLinha'))$('#pdvValorLinha').value=p?money(valor*qtd):'';
+}
+
 function pdvAdicionar(){
-  const id=$('#pdvProduto')?.value,qtd=Math.max(1,Math.floor(Number($('#pdvQtd')?.value||1)));
+  const id=$('#pdvProduto')?.value,qtd=Math.max(1,Math.floor(Number($('#pdvQtd')?.value||1))),tabela=$('#pdvTabela')?.value||'1';
   const p=pdvProdutos.find(x=>String(x.id)===String(id));
   if(!p)return czAlert('Selecione um produto.','PDV');
-  const existente=pdvCarrinho.find(x=>String(x.id)===String(id));
+  const valor=Number(tabela==='2'?(p.valor_atacado||0):(p.valor_varejo||0));
+  const existente=pdvCarrinho.find(x=>String(x.id)===String(id)&&String(x.tabela)===String(tabela));
   const novaQtd=(existente?.qtd||0)+qtd;
-  if(novaQtd>Number(p.estoque_atual||0))return czAlert(`Estoque insuficiente. Disponível: ${Number(p.estoque_atual||0)}.`,'PDV');
+  const qtdMesmoProduto=pdvCarrinho.filter(x=>String(x.id)===String(id)&&x!==existente).reduce((s,x)=>s+Number(x.qtd||0),0);
+  if(novaQtd+qtdMesmoProduto>Number(p.estoque_atual||0))return czAlert(`Estoque insuficiente. Disponível: ${Number(p.estoque_atual||0)}.`,'PDV');
   if(existente)existente.qtd=novaQtd;
-  else pdvCarrinho.push({id:p.id,nome:p.nome,qtd,valor:Number(p.valor_varejo||0),estoque:Number(p.estoque_atual||0),unidade:p.unidade||'un'});
-  $('#pdvQtd').value=1;$('#pdvProduto').value='';pdvAtualizarCarrinho();
+  else pdvCarrinho.push({id:p.id,nome:p.nome,qtd,valor,tabela,estoque:Number(p.estoque_atual||0),unidade:p.unidade||'un'});
+  $('#pdvQtd').value=1;$('#pdvProduto').value='';$('#pdvTabela').value='1';pdvAtualizarLinhaProduto();pdvAtualizarCarrinho();
 }
 
 function pdvRemover(i){pdvCarrinho.splice(i,1);pdvAtualizarCarrinho()}
@@ -2425,17 +2438,17 @@ function pdvRemover(i){pdvCarrinho.splice(i,1);pdvAtualizarCarrinho()}
 function pdvAtualizarCarrinho(){
   const area=$('#pdvCarrinho');if(!area)return;
   const total=pdvCarrinho.reduce((s,x)=>s+x.qtd*x.valor,0);
-  area.innerHTML=pdvCarrinho.length?`<div class="tablewrap"><table><thead><tr><th>Produto</th><th>Qtd.</th><th>Valor unitário</th><th>Total</th><th></th></tr></thead><tbody>${pdvCarrinho.map((x,i)=>`<tr><td>${esc(x.nome)}</td><td>${x.qtd}</td><td>${money(x.valor)}</td><td><b>${money(x.qtd*x.valor)}</b></td><td><button type="button" class="btn danger" onclick="pdvRemover(${i})">Remover</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Nenhum produto adicionado.</div>';
+  area.innerHTML=pdvCarrinho.length?`<div class="tablewrap"><table><thead><tr><th>Produto</th><th>Quantidade</th><th>Tabela</th><th>Valor unitário</th><th>Valor total</th><th></th></tr></thead><tbody>${pdvCarrinho.map((x,i)=>`<tr><td>${esc(x.nome)}</td><td>${x.qtd}</td><td>Tabela ${esc(x.tabela||'1')}</td><td>${money(x.valor)}</td><td><b>${money(x.qtd*x.valor)}</b></td><td><button type="button" class="btn danger" onclick="pdvRemover(${i})">Remover</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Nenhum produto adicionado.</div>';
   if($('#pdvTotal'))$('#pdvTotal').textContent=money(total);
 }
 
 function pdvLimpar(){pdvCarrinho=[];pdvMontarTela()}
 
 function pdvImprimirPedido(venda){
-  const linhas=venda.itens.map(x=>`<tr><td>${esc(x.nome)}</td><td style="text-align:center">${x.qtd}</td><td style="text-align:right">${money(x.valor)}</td><td style="text-align:right">${money(x.qtd*x.valor)}</td></tr>`).join('');
+  const linhas=venda.itens.map(x=>`<tr><td>${esc(x.nome)}</td><td style="text-align:center">${x.qtd}</td><td style="text-align:center">Tabela ${esc(x.tabela||'1')}</td><td style="text-align:right">${money(x.valor)}</td><td style="text-align:right">${money(x.qtd*x.valor)}</td></tr>`).join('');
   const w=window.open('','_blank','width=820,height=900');
   if(!w){czAlert('O navegador bloqueou a janela de impressão. Libere pop-ups para imprimir o pedido.','Impressão');return}
-  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Pedido PDV</title><style>body{font-family:Arial,sans-serif;color:#111;padding:28px;max-width:760px;margin:auto}h1{margin:0}small{color:#555}table{width:100%;border-collapse:collapse;margin-top:22px}th,td{padding:9px;border-bottom:1px solid #ccc;text-align:left}th{background:#eee}.total{font-size:22px;font-weight:bold;text-align:right;margin-top:18px}.info{margin-top:16px;line-height:1.6}@media print{button{display:none}}</style></head><body><h1>CZ Efeitos Especiais</h1><small>Pedido de venda PDV</small><div class="info"><b>Pedido:</b> ${esc(venda.numero)}<br><b>Data:</b> ${esc(venda.dataHora)}<br><b>Cliente:</b> ${esc(venda.cliente)}<br><b>Telefone:</b> ${esc(venda.telefone||'—')}<br><b>Pagamento:</b> ${esc(venda.forma)}</div><table><thead><tr><th>Produto</th><th>Qtd.</th><th>Valor unitário</th><th>Total</th></tr></thead><tbody>${linhas}</tbody></table><div class="total">Valor total: ${money(venda.total)}</div><script>window.onload=()=>{window.print()}<\/script></body></html>`);
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Pedido PDV</title><style>body{font-family:Arial,sans-serif;color:#111;padding:28px;max-width:760px;margin:auto}h1{margin:0}small{color:#555}table{width:100%;border-collapse:collapse;margin-top:22px}th,td{padding:9px;border-bottom:1px solid #ccc;text-align:left}th{background:#eee}.total{font-size:22px;font-weight:bold;text-align:right;margin-top:18px}.info{margin-top:16px;line-height:1.6}@media print{button{display:none}}</style></head><body><h1>CZ Efeitos Especiais</h1><small>Pedido de venda PDV</small><div class="info"><b>Pedido:</b> ${esc(venda.numero)}<br><b>Data:</b> ${esc(venda.dataHora)}<br><b>Cliente:</b> ${esc(venda.cliente)}<br><b>Telefone:</b> ${esc(venda.telefone||'—')}<br><b>Pagamento:</b> ${esc(venda.forma)}</div><table><thead><tr><th>Produto</th><th>Quantidade</th><th>Tabela</th><th>Valor unitário</th><th>Valor total</th></tr></thead><tbody>${linhas}</tbody></table><div class="total">Valor total: ${money(venda.total)}</div><script>window.onload=()=>{window.print()}<\/script></body></html>`);
   w.document.close();
 }
 
