@@ -225,7 +225,7 @@ function contaMaster(){
  const perfil=String(czPerfilUsuario?.perfil||'').trim().toLowerCase();
  return email===CZ_MASTER_EMAIL || perfil==='master' || perfil==='master_principal' || perfil==='master_autorizado';
 }
-async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V111';reconstruirMenuPermissoes();renderModule(0)}
+async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V112';reconstruirMenuPermissoes();renderModule(0)}
 $('#loginBtn').onclick=async()=>{const email=$('#email').value.trim(),password=$('#password').value;$('#loginMsg').textContent='Entrando...';const {data,error}=await db.auth.signInWithPassword({email,password});if(error){$('#loginMsg').textContent='Não foi possível entrar: '+error.message;return}$('#loginMsg').textContent='';showApp(data.user)};
 $('#logoutBtn').onclick=async()=>{await db.auth.signOut();showLogin()};
   async function recuperarSenha(){
@@ -274,7 +274,7 @@ function finDate(d){return d?new Date(d+'T12:00:00').toLocaleDateString('pt-BR')
 function finISODate(dt=new Date()){const y=dt.getFullYear(),m=String(dt.getMonth()+1).padStart(2,'0'),d=String(dt.getDate()).padStart(2,'0');return `${y}-${m}-${d}`}
 function finAddDays(date,n){const d=new Date(date+'T12:00:00');d.setDate(d.getDate()+n);return finISODate(d)}
 let caixaCache=[],caixaErro='',caixaImportado=false;
-function movimentoCaixaLocal(x){let obs=x.observacao||null;if(x.tipo==='saida'&&x.status==='pago'&&!String(obs||'').includes('[CAIXA_CONFIRMADO]'))obs=((obs||'')+' [CAIXA_CONFIRMADO]').trim();return {origem_id:'fin:'+x.id,tipo:x.tipo,data:x.data||x.vencimento||finISODate(),valor:Number(x.valor||0),cliente_nome:x.cliente||null,proposta_numero:x.tipo==='entrada'?(String(x.descricao||'').match(/proposta\s+(\S+)/i)?.[1]||null):null,orcamento_id:x.orcamento_id||null,descricao:x.descricao||x.descricao_base||null,categoria:x.categoria||null,forma:x.forma||null,observacao:obs}}
+function movimentoCaixaLocal(x){let obs=x.observacao||null;if(x.conta&&!String(obs||'').includes('[CONTA:'))obs=((obs||'')+` [CONTA:${x.conta}]`).trim();if(x.tipo==='saida'&&x.status==='pago'&&!String(obs||'').includes('[CAIXA_CONFIRMADO]'))obs=((obs||'')+' [CAIXA_CONFIRMADO]').trim();return {origem_id:'fin:'+x.id,tipo:x.tipo,data:x.data||x.vencimento||finISODate(),valor:Number(x.valor||0),cliente_nome:x.cliente||null,proposta_numero:x.tipo==='entrada'?(String(x.descricao||'').match(/proposta\s+(\S+)/i)?.[1]||null):null,orcamento_id:x.orcamento_id||null,descricao:x.descricao||x.descricao_base||null,categoria:x.categoria||null,forma:x.forma||null,observacao:obs}}
 async function carregarCaixa(){
   try{
     if(!caixaImportado){
@@ -513,7 +513,7 @@ function novaDespesa(){
    if(!d.descricao?.trim()){erro.textContent='Informe a descrição.';return}if(!Number.isFinite(valor)||valor<=0){erro.textContent='Informe um valor válido.';return}if(!d.categoria){erro.textContent='Selecione ou adicione uma categoria.';return}
    if(d.condicao==='À vista'&&d.status==='Pago'&&!d.conta){erro.textContent='Selecione a conta de onde saiu o pagamento.';return}
    const contaObs=d.conta?`[CONTA:${d.conta}]`:'';
-   const a=finLoad(FIN_MOV_KEY),novos=[],grupo=crypto.randomUUID(),agora=new Date().toISOString(),comum={tipo:'saida',descricao_base:d.descricao.trim(),categoria:d.categoria,veiculo_evento:d.veiculo_evento||'',forma:d.forma||'',condicao:d.condicao||'À vista',grupo_parcelas:grupo,criado_em:agora,observacao:contaObs};
+   const a=finLoad(FIN_MOV_KEY),novos=[],grupo=crypto.randomUUID(),agora=new Date().toISOString(),comum={tipo:'saida',descricao_base:d.descricao.trim(),categoria:d.categoria,veiculo_evento:d.veiculo_evento||'',forma:d.forma||'',condicao:d.condicao||'À vista',grupo_parcelas:grupo,criado_em:agora,conta:d.conta||'',observacao:contaObs};
    if(d.condicao==='Parcelado'){
      if(!validarSoma()){erro.textContent='A soma das parcelas precisa ser exatamente igual ao valor total.';return}
      const rows=[...box.querySelectorAll('.parc-row')],q=rows.length;
