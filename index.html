@@ -78,7 +78,7 @@
 </style>
 </head><body>
 <section id="login" class="login"><div class="loginbox"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><h3>Acesso ao sistema</h3><div class="field"><label>E-mail</label><input id="email" type="email"></div><div class="field"><label>Senha</label><input id="password" type="password"></div><button id="loginBtn" class="btn primary full" style="margin-top:18px">ENTRAR</button><button type="button" class="btn secondary full" style="margin-top:8px" onclick="recuperarSenha()">Esqueci minha senha</button><div id="loginMsg" class="msg"></div></div></section>
-<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><div class="muted" style="font-size:12px">Sistema de gestão CZ · v90</div></div><div><span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
+<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><div class="muted" style="font-size:12px">Sistema de gestão CZ · V95</div></div><div><span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
 <div id="clientModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="modalTitle">Novo cliente</h2><button class="btn secondary" onclick="closeClient()">Fechar</button></div>
   <input id="clientId" type="hidden"><div class="muted" id="clientOpenedAt" style="font-size:13px">Data de abertura: será definida ao salvar</div>
   <div class="row"><div class="field"><label>Nome / Razão social *</label><input id="clientName" autocomplete="name"></div><div class="field"><label>Telefone *</label><input id="clientPhone" type="tel" inputmode="tel" autocomplete="tel"></div></div>
@@ -223,9 +223,9 @@ let currentAuthUser=null;
 function contaMaster(){
  const email=String(currentAuthUser?.email||'').trim().toLowerCase();
  const perfil=String(czPerfilUsuario?.perfil||'').trim().toLowerCase();
- return email===CZ_MASTER_EMAIL || perfil==='master_principal' || perfil==='master_autorizado';
+ return email===CZ_MASTER_EMAIL || perfil==='master' || perfil==='master_principal' || perfil==='master_autorizado';
 }
-async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V94';reconstruirMenuPermissoes();renderModule(0)}
+async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V95';reconstruirMenuPermissoes();renderModule(0)}
 $('#loginBtn').onclick=async()=>{const email=$('#email').value.trim(),password=$('#password').value;$('#loginMsg').textContent='Entrando...';const {data,error}=await db.auth.signInWithPassword({email,password});if(error){$('#loginMsg').textContent='Não foi possível entrar: '+error.message;return}$('#loginMsg').textContent='';showApp(data.user)};
 $('#logoutBtn').onclick=async()=>{await db.auth.signOut();showLogin()};
   async function recuperarSenha(){
@@ -2344,7 +2344,7 @@ async function concluirOSManutencao(id){const a=czOsLoad(),os=a.find(x=>x.id===i
 async function relCustosManutencao(){const a=czOsLoad().filter(x=>relNoPeriodo(String(x.criado_em||'').slice(0,10)));const nomes=[...new Set(czOsLoad().map(x=>x.equipamento).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));const atual=window.relManAtivo||'';const f=a.filter(x=>!atual||x.equipamento===atual),tot=f.reduce((s,x)=>s+czOsTotal(x),0);$('#content').innerHTML=relTopo('🛠️ Relatório de Custos de Manutenção','Custos técnicos das OS — não gera movimentação financeira')+relFiltroPeriodo('relCustosManutencao')+`<div class="card"><label style="display:block;margin-bottom:8px">Nome do ativo</label><select onchange="window.relManAtivo=this.value;relCustosManutencao()"><option value="">Todos</option>${nomes.map(n=>`<option ${atual===n?'selected':''}>${esc(n)}</option>`).join('')}</select></div><div class="card"><b>Total gasto em manutenção no período: ${money(tot)}</b><div class="muted">A compra/reposição das peças deve ser lançada separadamente em Financeiro → Nova despesa.</div></div><div class="tablewrap"><table><thead><tr><th>Data</th><th>OS</th><th>Ativo</th><th>Qtd.</th><th>Ocorrência</th><th>Status</th><th>Custo técnico</th></tr></thead><tbody>${f.map(x=>`<tr><td>${new Date(x.criado_em).toLocaleDateString('pt-BR')}</td><td>${esc(x.numero)}</td><td>${esc(x.equipamento)}</td><td>${x.quantidade}</td><td>${esc(x.ocorrencia)}</td><td>${x.status}</td><td>${money(czOsTotal(x))}</td></tr>`).join('')||'<tr><td colspan="7">Nenhuma manutenção no período.</td></tr>'}</tbody></table></div>`}
 
 
-// ===== V94 · ACESSOS SIMPLIFICADOS =====
+// ===== V95 · ACESSOS SIMPLIFICADOS =====
 // Existem somente dois tipos visíveis no sistema:
 // 1) Master -> acesso completo.
 // 2) Frente de separação -> somente Eventos e Retorno de evento.
@@ -2355,8 +2355,8 @@ function czPermTudo(){const p=czPermPadrao();Object.values(p).forEach(x=>CZ_ACOE
 function czPermFrente(){const p=czPermPadrao();['Eventos','Retorno de evento'].forEach(m=>{if(p[m])CZ_ACOES.forEach(a=>p[m][a]=true)});return p}
 async function carregarPermissoesUsuario(){
  const email=String(currentAuthUser?.email||'').trim().toLowerCase();
- if(email===CZ_MASTER_EMAIL){czPerfilUsuario={email,nome:'Luiz Fernando Caloi',perfil:'master_principal',ativo:true,permissoes:czPermTudo()};return}
- try{const {data,error}=await db.from('usuarios_sistema').select('*').eq('user_id',currentAuthUser.id).maybeSingle();if(error)throw error;czPerfilUsuario=data||{email,perfil:'usuario',ativo:false,permissoes:czPermFrente()}}catch(e){czPerfilUsuario={email,perfil:'usuario',ativo:false,permissoes:czPermFrente()}}
+ if(email===CZ_MASTER_EMAIL){czPerfilUsuario={email,nome:'Luiz Fernando Caloi',perfil:'master',ativo:true,permissoes:czPermTudo()};return}
+ try{let {data,error}=await db.from('usuarios_sistema').select('*').eq('user_id',currentAuthUser.id).maybeSingle();if(error)throw error;if(!data){const r=await db.from('usuarios_sistema').select('*').ilike('email',email).maybeSingle();if(r.error)throw r.error;data=r.data;if(data&&!data.user_id){await db.from('usuarios_sistema').update({user_id:currentAuthUser.id,atualizado_em:new Date().toISOString()}).eq('id',data.id);data.user_id=currentAuthUser.id}}czPerfilUsuario=data||{email,perfil:'usuario',ativo:false,permissoes:czPermFrente()}}catch(e){console.error('Erro ao carregar perfil CZ:',e);czPerfilUsuario={email,perfil:'usuario',ativo:false,permissoes:czPermFrente()}}
  if(czPerfilUsuario?.ativo===false){await czAlert('Seu usuário está inativo. Procure o Master do sistema.','Acesso bloqueado');await db.auth.signOut();showLogin();throw new Error('Usuário inativo')}
  // Migração compatível: perfis master antigos continuam sendo Master; qualquer outro perfil vira Frente.
  if(contaMaster()) czPerfilUsuario.permissoes=czPermTudo(); else czPerfilUsuario.permissoes=czPermFrente();
@@ -2366,22 +2366,22 @@ function reconstruirMenuPermissoes(){const botoes=ordemMenu.filter(i=>czPode(mod
 const _renderModulePerm=renderModule;
 renderModule=async function(i){const mod=modules[i];if(!czPode(mod,'ver')){await czAlert('A Frente de separação não tem acesso a este módulo.','Acesso restrito');return}return _renderModulePerm(i)};
 function czPermCheck(mod,acao){if(czPode(mod,acao))return true;czAlert('A Frente de separação não tem permissão para esta ação.','Acesso restrito');return false}
-function czTipoAcesso(u){return String(u?.email||'').toLowerCase()===CZ_MASTER_EMAIL||['master_principal','master_autorizado'].includes(String(u?.perfil||''))?'Master':'Frente de separação'}
+function czTipoAcesso(u){return String(u?.email||'').toLowerCase()===CZ_MASTER_EMAIL||['master','master_principal','master_autorizado'].includes(String(u?.perfil||''))?'Master':'Frente de separação'}
 async function renderUsuariosPermissoes(){
  if(!contaMaster())return czAlert('Somente Master pode administrar logins.','Acesso restrito');
  const {data,error}=await db.from('usuarios_sistema').select('*').order('nome',{ascending:true});
  if(error){$('#content').innerHTML=`<div class="msg">Erro ao carregar usuários: ${esc(error.message)}</div>`;return}
  const us=data||[];
- $('#content').innerHTML=`<div class="sectionhead"><div><h2>👥 Usuários</h2><div class="muted">V94 • Tipos de acesso: Master ou Frente de separação.</div></div><button class="btn primary" onclick="novoUsuarioSistema()">+ Novo usuário</button></div><div class="card" style="margin-bottom:16px"><b>Master protegido:</b> ${esc(CZ_MASTER_EMAIL)}<div class="muted" style="margin-top:6px">Este login não pode ser excluído.</div></div><div class="tablewrap"><table><thead><tr><th>Nome</th><th>E-mail</th><th>Tipo de acesso</th><th>Status</th><th>Ações</th></tr></thead><tbody>${us.map(u=>{const principal=String(u.email||'').toLowerCase()===CZ_MASTER_EMAIL;return `<tr><td>${esc(u.nome||'—')}</td><td>${esc(u.email||'')}</td><td><b>${czTipoAcesso(u)}</b></td><td>${u.ativo?'🟢 Ativo':'🔴 Inativo'}</td><td><button class="btn secondary" onclick="editarPermissoesUsuario('${u.id}')">Editar</button>${principal?'':` <button class="btn danger" onclick="excluirLoginSistema('${u.id}','${String(u.email||'').replace(/'/g,"\\'")}')">Excluir login</button>`}</td></tr>`}).join('')||'<tr><td colspan="5">Nenhum usuário cadastrado.</td></tr>'}</tbody></table></div>`;
+ $('#content').innerHTML=`<div class="sectionhead"><div><h2>👥 Usuários</h2><div class="muted">V95 • Tipos de acesso: Master ou Frente de separação.</div></div><button class="btn primary" onclick="novoUsuarioSistema()">+ Novo usuário</button></div><div class="card" style="margin-bottom:16px"><b>Master protegido:</b> ${esc(CZ_MASTER_EMAIL)}<div class="muted" style="margin-top:6px">Este login não pode ser excluído.</div></div><div class="tablewrap"><table><thead><tr><th>Nome</th><th>E-mail</th><th>Tipo de acesso</th><th>Status</th><th>Ações</th></tr></thead><tbody>${us.map(u=>{const principal=String(u.email||'').toLowerCase()===CZ_MASTER_EMAIL;return `<tr><td>${esc(u.nome||'—')}</td><td>${esc(u.email||'')}</td><td><b>${czTipoAcesso(u)}</b></td><td>${u.ativo?'🟢 Ativo':'🔴 Inativo'}</td><td><button class="btn secondary" onclick="editarPermissoesUsuario('${u.id}')">Editar</button>${principal?'':` <button class="btn danger" onclick="excluirLoginSistema('${u.id}','${String(u.email||'').replace(/'/g,"\\'")}')">Excluir login</button>`}</td></tr>`}).join('')||'<tr><td colspan="5">Nenhum usuário cadastrado.</td></tr>'}</tbody></table></div>`;
 }
 async function novoUsuarioSistema(){
  if(!contaMaster())return czAlert('Somente Master pode criar novos logins.','Acesso restrito');
  finModal('Novo usuário do sistema',[{name:'nome',label:'Nome do usuário',required:true,full:true},{name:'email',label:'E-mail / Login',type:'email',required:true,full:true},{name:'senha',label:'Senha inicial',type:'password',required:true},{name:'confirmar',label:'Confirmar senha',type:'password',required:true},{name:'tipo',label:'Tipo de acesso',type:'select',options:['Master','Frente de separação'],required:true,full:true}],async d=>{
   const nome=String(d.nome||'').trim(),email=String(d.email||'').trim().toLowerCase(),senha=String(d.senha||''),confirmar=String(d.confirmar||'');
   if(!nome)throw new Error('Informe o nome do usuário.');if(!email||!email.includes('@'))throw new Error('Informe um e-mail válido.');if(senha.length<6)throw new Error('A senha inicial precisa ter pelo menos 6 caracteres.');if(senha!==confirmar)throw new Error('As senhas não são iguais.');
-  const perfil=d.tipo==='Master'?'master_autorizado':'usuario';
+  const perfil=d.tipo==='Master'?'master':'frente_separacao';
   const {data,error}=await db.functions.invoke('cz-criar-usuario',{body:{nome,email,senha,perfil}});if(error)throw new Error(error.message||'Não foi possível criar o login.');if(data?.error)throw new Error(data.error);
-  if(perfil==='usuario'){const {error:pe}=await db.from('usuarios_sistema').update({permissoes:czPermFrente()}).eq('email',email);if(pe)throw new Error('Login criado, mas houve erro ao definir Frente de separação: '+pe.message)}
+  const {error:pe}=await db.from('usuarios_sistema').update({permissoes:perfil==='master'?czPermTudo():czPermFrente()}).eq('email',email);if(pe)throw new Error('Login criado, mas houve erro ao definir o acesso: '+pe.message)
   document.getElementById('finModalOverlay')?.remove();await czAlert('Login criado com sucesso.','Usuário criado');await renderUsuariosPermissoes();return false;
  });
  setTimeout(()=>{const form=document.getElementById('finModalForm');if(form){const btn=form.querySelector('button[type=submit]');if(btn)btn.textContent='Criar login'}},20);
@@ -2394,7 +2394,7 @@ async function editarPermissoesUsuario(id){
 }
 async function salvarPermissoesUsuario(id){
  const {data:u,error}=await db.from('usuarios_sistema').select('*').eq('id',id).single();if(error||!u)return czAlert(error?.message||'Usuário não encontrado.');
- const principal=String(u.email||'').toLowerCase()===CZ_MASTER_EMAIL;const tipo=principal?'master':$('#permPerfil').value;const perfil=principal?'master_principal':tipo==='master'?'master_autorizado':'usuario';const ativo=principal?true:$('#permAtivo').checked;const permissoes=tipo==='master'?czPermTudo():czPermFrente();
+ const principal=String(u.email||'').toLowerCase()===CZ_MASTER_EMAIL;const tipo=principal?'master':$('#permPerfil').value;const perfil=principal?'master':tipo==='master'?'master':'frente_separacao';const ativo=principal?true:$('#permAtivo').checked;const permissoes=tipo==='master'?czPermTudo():czPermFrente();
  const {error:er}=await db.from('usuarios_sistema').update({nome:$('#permNome').value.trim(),perfil,ativo,permissoes,atualizado_em:new Date().toISOString()}).eq('id',id);if(er)return czAlert(er.message,'Erro ao salvar');document.getElementById('permModal')?.remove();await czAlert('Usuário atualizado com sucesso.','Usuário atualizado');renderUsuariosPermissoes();
 }
 async function excluirLoginSistema(id,email){
