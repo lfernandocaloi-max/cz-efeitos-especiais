@@ -225,7 +225,7 @@ function contaMaster(){
  const perfil=String(czPerfilUsuario?.perfil||'').trim().toLowerCase();
  return email===CZ_MASTER_EMAIL || perfil==='master' || perfil==='master_principal' || perfil==='master_autorizado';
 }
-async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V110';reconstruirMenuPermissoes();renderModule(0)}
+async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V111';reconstruirMenuPermissoes();renderModule(0)}
 $('#loginBtn').onclick=async()=>{const email=$('#email').value.trim(),password=$('#password').value;$('#loginMsg').textContent='Entrando...';const {data,error}=await db.auth.signInWithPassword({email,password});if(error){$('#loginMsg').textContent='Não foi possível entrar: '+error.message;return}$('#loginMsg').textContent='';showApp(data.user)};
 $('#logoutBtn').onclick=async()=>{await db.auth.signOut();showLogin()};
   async function recuperarSenha(){
@@ -274,7 +274,7 @@ function finDate(d){return d?new Date(d+'T12:00:00').toLocaleDateString('pt-BR')
 function finISODate(dt=new Date()){const y=dt.getFullYear(),m=String(dt.getMonth()+1).padStart(2,'0'),d=String(dt.getDate()).padStart(2,'0');return `${y}-${m}-${d}`}
 function finAddDays(date,n){const d=new Date(date+'T12:00:00');d.setDate(d.getDate()+n);return finISODate(d)}
 let caixaCache=[],caixaErro='',caixaImportado=false;
-function movimentoCaixaLocal(x){return {origem_id:'fin:'+x.id,tipo:x.tipo,data:x.data||x.vencimento||finISODate(),valor:Number(x.valor||0),cliente_nome:x.cliente||null,proposta_numero:x.tipo==='entrada'?(String(x.descricao||'').match(/proposta\s+(\S+)/i)?.[1]||null):null,orcamento_id:x.orcamento_id||null,descricao:x.descricao||x.descricao_base||null,categoria:x.categoria||null,forma:x.forma||null,observacao:x.observacao||null}}
+function movimentoCaixaLocal(x){let obs=x.observacao||null;if(x.tipo==='saida'&&x.status==='pago'&&!String(obs||'').includes('[CAIXA_CONFIRMADO]'))obs=((obs||'')+' [CAIXA_CONFIRMADO]').trim();return {origem_id:'fin:'+x.id,tipo:x.tipo,data:x.data||x.vencimento||finISODate(),valor:Number(x.valor||0),cliente_nome:x.cliente||null,proposta_numero:x.tipo==='entrada'?(String(x.descricao||'').match(/proposta\s+(\S+)/i)?.[1]||null):null,orcamento_id:x.orcamento_id||null,descricao:x.descricao||x.descricao_base||null,categoria:x.categoria||null,forma:x.forma||null,observacao:obs}}
 async function carregarCaixa(){
   try{
     if(!caixaImportado){
@@ -308,12 +308,14 @@ async function excluirContaCaixa(id){
 function renderCaixaContas(){
   const area=$('#caixaAreaContas');if(!area)return;
   const lista=caixaContas();
-  const confirmados=(caixaCache||[]).filter(x=>x.tipo==='entrada'&&caixaConfirmado(x));
-  const totalGeral=confirmados.reduce((s,x)=>s+Number(x.valor||0),0);
-  const totalConta=nome=>confirmados.filter(x=>caixaContaMovimento(x)===nome).reduce((s,x)=>s+Number(x.valor||0),0);
-  area.innerHTML=`<div class="card"><div class="sectionhead"><div><h3 style="margin:0">Contas de recebimento</h3><div class="muted">Cadastre bancos, dinheiro e máquinas de cartão e acompanhe quanto entrou em cada conta.</div></div><button class="btn primary" onclick="abrirCadastroContaCaixa()">+ Nova conta</button></div>
-  <div class="tablewrap">${lista.length?`<table><thead><tr><th>Conta</th><th>Tipo</th><th>Total recebido</th><th>Ação</th></tr></thead><tbody>${lista.map(x=>`<tr><td>${esc(x.nome)}</td><td>${esc(x.tipo)}</td><td><b>${money(totalConta(x.nome))}</b></td><td><button class="btn danger" onclick="excluirContaCaixa('${x.id}')">Excluir</button></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhuma conta cadastrada. Exemplos: Bradesco, PagSeguro, Caixa Dinheiro.</div>'}</div>
-  <div style="display:flex;justify-content:flex-end;margin-top:16px"><div class="card" style="min-width:280px;margin:0"><div class="muted">Total em todas as contas</div><div style="font-size:28px;font-weight:900">${money(totalGeral)}</div></div></div></div>`;
+  const confirmados=(caixaCache||[]).filter(x=>caixaConfirmado(x));
+  const entradas=confirmados.filter(x=>x.tipo==='entrada'),saidas=confirmados.filter(x=>x.tipo==='saida');
+  const totalEntradas=entradas.reduce((s,x)=>s+Number(x.valor||0),0),totalSaidas=saidas.reduce((s,x)=>s+Number(x.valor||0),0);
+  const recebidoConta=nome=>entradas.filter(x=>caixaContaMovimento(x)===nome).reduce((s,x)=>s+Number(x.valor||0),0);
+  const saidaConta=nome=>saidas.filter(x=>caixaContaMovimento(x)===nome).reduce((s,x)=>s+Number(x.valor||0),0);
+  area.innerHTML=`<div class="card"><div class="sectionhead"><div><h3 style="margin:0">Contas de recebimento</h3><div class="muted">Entradas em verde, saídas em vermelho e saldo por conta.</div></div><button class="btn primary" onclick="abrirCadastroContaCaixa()">+ Nova conta</button></div>
+  <div class="tablewrap">${lista.length?`<table><thead><tr><th>Conta</th><th>Tipo</th><th>Total recebido</th><th>Total saiu</th><th>Saldo</th><th>Ação</th></tr></thead><tbody>${lista.map(x=>{const e=recebidoConta(x.nome),s=saidaConta(x.nome);return `<tr><td>${esc(x.nome)}</td><td>${esc(x.tipo)}</td><td style="color:#55d884;font-weight:900">${money(e)}</td><td style="color:#ff7474;font-weight:900">${money(s)}</td><td><b>${money(e-s)}</b></td><td><button class="btn danger" onclick="excluirContaCaixa('${x.id}')">Excluir</button></td></tr>`}).join('')}</tbody></table>`:'<div class="empty">Nenhuma conta cadastrada. Exemplos: Bradesco, PagSeguro, Caixa Dinheiro.</div>'}</div>
+  <div class="cards" style="margin-top:16px"><div class="card"><div class="muted">Total recebido</div><div class="n" style="color:#55d884">${money(totalEntradas)}</div></div><div class="card"><div class="muted">Total saiu</div><div class="n" style="color:#ff7474">${money(totalSaidas)}</div></div><div class="card"><div class="muted">Saldo total das contas</div><div class="n">${money(totalEntradas-totalSaidas)}</div></div></div></div>`;
 }
 function mostrarCaixaMovimentos(){ $('#caixaAreaMovimentos')?.classList.remove('hidden');$('#caixaAreaContas')?.classList.add('hidden'); }
 function mostrarCaixaContas(){ $('#caixaAreaMovimentos')?.classList.add('hidden');$('#caixaAreaContas')?.classList.remove('hidden');renderCaixaContas(); }
@@ -456,7 +458,7 @@ function novaDespesa(){
  <label><span class="finlbl">Forma de pagamento</span><select name="forma" style="${inp}">${['PIX','Dinheiro','Débito','Crédito','Boleto','Transferência','Outro'].map(x=>`<option>${x}</option>`).join('')}</select></label>
  <label><span class="finlbl">Condição</span><select name="condicao" id="despCond" style="${inp}"><option>À vista</option><option>Parcelado</option></select></label>
  <label style="grid-column:1/-1"><span class="finlbl">Relacionar a um evento</span><input name="veiculo_evento" placeholder="Nome ou identificação do evento (opcional)" style="${inp}"></label>
- <div id="despVista" style="display:contents"><label><span class="finlbl">Data / vencimento</span><input name="vencimento" type="date" value="${finISODate()}" style="${inp}"></label><label><span class="finlbl">Situação</span><select name="status" style="${inp}"><option>A pagar</option><option>Já foi paga</option></select></label></div>
+ <div id="despVista" style="display:contents"><label><span class="finlbl">Data / vencimento</span><input name="vencimento" type="date" value="${finISODate()}" style="${inp}"></label><label><span class="finlbl">Situação</span><select name="status" style="${inp}"><option>A pagar</option><option>Pago</option></select></label><label><span class="finlbl">Conta de pagamento</span><select name="conta" style="${inp}"><option value="">Selecione a conta</option>${caixaContas().map(c=>`<option value="${esc(c.nome)}">${esc(c.nome)}</option>`).join('')}</select></label></div>
  <div id="despParc" style="display:none;grid-column:1/-1"><label style="max-width:250px;display:block"><span class="finlbl">Quantidade de parcelas</span><input name="parcelas" id="despQtd" type="number" min="2" max="60" value="2" style="${inp}"></label><div id="despParcelasLista" style="margin-top:12px"></div><div id="despSoma" style="margin-top:10px;font-size:13px;font-weight:700"></div></div>
  </div>
  <div style="margin-top:16px;display:flex;align-items:center;justify-content:flex-start"><label style="display:flex;align-items:center;gap:9px;cursor:pointer;background:#0f141d;border:1px solid #30394a;border-radius:10px;padding:10px 12px"><input type="checkbox" name="recorrente" id="despRecorrente" style="width:18px;height:18px"><span>Despesa recorrente</span></label></div>
@@ -509,16 +511,18 @@ function novaDespesa(){
  form.onsubmit=async e=>{
    e.preventDefault();const d=Object.fromEntries(new FormData(form).entries()),erro=box.querySelector('#despErro');erro.textContent='';const valor=Number(d.valor);
    if(!d.descricao?.trim()){erro.textContent='Informe a descrição.';return}if(!Number.isFinite(valor)||valor<=0){erro.textContent='Informe um valor válido.';return}if(!d.categoria){erro.textContent='Selecione ou adicione uma categoria.';return}
-   const a=finLoad(FIN_MOV_KEY),novos=[],grupo=crypto.randomUUID(),agora=new Date().toISOString(),comum={tipo:'saida',descricao_base:d.descricao.trim(),categoria:d.categoria,veiculo_evento:d.veiculo_evento||'',forma:d.forma||'',condicao:d.condicao||'À vista',grupo_parcelas:grupo,criado_em:agora};
+   if(d.condicao==='À vista'&&d.status==='Pago'&&!d.conta){erro.textContent='Selecione a conta de onde saiu o pagamento.';return}
+   const contaObs=d.conta?`[CONTA:${d.conta}]`:'';
+   const a=finLoad(FIN_MOV_KEY),novos=[],grupo=crypto.randomUUID(),agora=new Date().toISOString(),comum={tipo:'saida',descricao_base:d.descricao.trim(),categoria:d.categoria,veiculo_evento:d.veiculo_evento||'',forma:d.forma||'',condicao:d.condicao||'À vista',grupo_parcelas:grupo,criado_em:agora,observacao:contaObs};
    if(d.condicao==='Parcelado'){
      if(!validarSoma()){erro.textContent='A soma das parcelas precisa ser exatamente igual ao valor total.';return}
      const rows=[...box.querySelectorAll('.parc-row')],q=rows.length;
      rows.forEach((r,i)=>novos.push({...comum,id:crypto.randomUUID(),descricao:`${d.descricao.trim()} • Parcela ${i+1}/${q}`,valor:Number(r.querySelector('.parc-valor').value||0),valor_total:valor,parcela:i+1,total_parcelas:q,vencimento:r.querySelector('.parc-data').value,status:'pendente',data:null}));
    }else if(rec.checked){
-     const rid=crypto.randomUUID(),dt=d.vencimento||finISODate(),pago=d.status==='Já foi paga';
+     const rid=crypto.randomUUID(),dt=d.vencimento||finISODate(),pago=d.status==='Pago';
      for(let i=0;i<60;i++)novos.push({...comum,id:crypto.randomUUID(),descricao:d.descricao.trim(),valor,valor_total:valor,parcela:1,total_parcelas:1,vencimento:finAddMonths(dt,i),status:(i===0&&pago)?'pago':'pendente',data:(i===0&&pago)?dt:null,recorrencia_id:rid,recorrencia_ativa:true,recorrencia_inicio:dt});
    }else{
-     const pago=d.status==='Já foi paga';novos.push({...comum,id:crypto.randomUUID(),descricao:d.descricao.trim(),valor,valor_total:valor,parcela:1,total_parcelas:1,vencimento:d.vencimento||finISODate(),status:pago?'pago':'pendente',data:pago?(d.vencimento||finISODate()):null});
+     const pago=d.status==='Pago';novos.push({...comum,id:crypto.randomUUID(),descricao:d.descricao.trim(),valor,valor_total:valor,parcela:1,total_parcelas:1,vencimento:d.vencimento||finISODate(),status:pago?'pago':'pendente',data:pago?(d.vencimento||finISODate()):null});
    }
    const pagos=novos.filter(x=>x.status==='pago');
    salvar.disabled=true;
