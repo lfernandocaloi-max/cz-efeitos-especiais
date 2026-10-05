@@ -127,7 +127,7 @@ function czAlert(mensagem,titulo='Aviso'){return czDialog({titulo,mensagem,tipo:
 function czConfirm(mensagem,titulo='Confirmação',confirmar='Confirmar'){return czDialog({titulo,mensagem,tipo:'confirmar',confirmar,cancelar:'Cancelar'})}
 function czPrompt(mensagem,valor='',titulo='Preenchimento'){return czDialog({titulo,mensagem,tipo:'prompt',valor,confirmar:'Continuar',cancelar:'Cancelar'})}
 window.alert=(m)=>{czAlert(m)};
-const modules=['Dashboard','Clientes','Orçamentos','Contratos','Eventos','Retorno de evento','Estoque','Ativos / Equipamentos','Colaboradores','Manutenção','Financeiro / DRE','Agenda','Relatórios','Configurações','Lista de compra','Veículos','Caixa'];
+const modules=['Dashboard','Clientes','Orçamentos','Contratos','Eventos','Retorno de evento','Estoque','Ativos / Equipamentos','Colaboradores','Manutenção','Financeiro / DRE','Agenda','Relatórios','Configurações','Lista de compra','Veículos','Caixa','PDV'];
 const ordemMenu=[...modules.keys()].filter(i=>i!==16);
 ordemMenu.splice(11,0,16);
 $('#nav').innerHTML=ordemMenu.map(i=>`<button data-i="${i}" class="${i===0?'active':''}">${modules[i]}</button>`).join('');
@@ -225,7 +225,7 @@ function contaMaster(){
  const perfil=String(czPerfilUsuario?.perfil||'').trim().toLowerCase();
  return email===CZ_MASTER_EMAIL || perfil==='master' || perfil==='master_principal' || perfil==='master_autorizado';
 }
-async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V98';reconstruirMenuPermissoes();renderModule(0)}
+async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V100';reconstruirMenuPermissoes();renderModule(0)}
 $('#loginBtn').onclick=async()=>{const email=$('#email').value.trim(),password=$('#password').value;$('#loginMsg').textContent='Entrando...';const {data,error}=await db.auth.signInWithPassword({email,password});if(error){$('#loginMsg').textContent='Não foi possível entrar: '+error.message;return}$('#loginMsg').textContent='';showApp(data.user)};
 $('#logoutBtn').onclick=async()=>{await db.auth.signOut();showLogin()};
   async function recuperarSenha(){
@@ -241,7 +241,7 @@ $('#logoutBtn').onclick=async()=>{await db.auth.signOut();showLogin()};
     ? 'Erro: '+error.message
     : 'Link de recuperação enviado para seu e-mail.';
 }
-async function renderModule(i){$('#pageTitle').textContent=modules[i];if(i===0)return renderDashboard();if(i===1)return renderClients();if(i===2)return renderOrcamentos();if(i===4)return renderEventos();if(i===5)return renderRetornoEventos();if(i===6)return renderProducts();if(i===7)return renderAssets();if(i===8)return renderColaboradores();if(i===9)return renderManutencao();if(i===10)return renderFinanceiro();if(i===11)return renderAgenda();if(i===12)return renderRelatorios();if(i===13)return renderUsuariosPermissoes();if(i===14)return renderShoppingList();if(i===15)return renderVehicles();if(i===16)return renderCaixa();$('#content').innerHTML=`<div class="sectionhead"><h2>${modules[i]}</h2></div><div class="placeholder">Módulo já previsto no banco de dados. A tela operacional será ativada nas próximas versões sem precisar recriar sua estrutura.</div>`}
+async function renderModule(i){$('#pageTitle').textContent=modules[i];if(i===0)return renderDashboard();if(i===1)return renderClients();if(i===2)return renderOrcamentos();if(i===4)return renderEventos();if(i===5)return renderRetornoEventos();if(i===6)return renderProducts();if(i===7)return renderAssets();if(i===8)return renderColaboradores();if(i===9)return renderManutencao();if(i===10)return renderFinanceiro();if(i===11)return renderAgenda();if(i===12)return renderRelatorios();if(i===13)return renderUsuariosPermissoes();if(i===14)return renderShoppingList();if(i===15)return renderVehicles();if(i===16)return renderCaixa();if(i===17)return renderPDV();$('#content').innerHTML=`<div class="sectionhead"><h2>${modules[i]}</h2></div><div class="placeholder">Módulo já previsto no banco de dados. A tela operacional será ativada nas próximas versões sem precisar recriar sua estrutura.</div>`}
 let agendaMesRef=null,agendaConsulta=0;
 const AGENDA_COMP_KEY='cz_agenda_compromissos_v1';
 function agendaISO(data){return `${data.getFullYear()}-${String(data.getMonth()+1).padStart(2,'0')}-${String(data.getDate()).padStart(2,'0')}`}
@@ -2361,6 +2361,136 @@ async function carregarPermissoesUsuario(){
  // Migração compatível: perfis master antigos continuam sendo Master; qualquer outro perfil vira Frente.
  if(contaMaster()) czPerfilUsuario.permissoes=czPermTudo(); else czPerfilUsuario.permissoes=czPermFrente();
 }
+
+// ========================= PDV =========================
+let pdvProdutos=[], pdvCarrinho=[];
+
+async function renderPDV(){
+  $('#pageTitle').textContent='PDV';
+  $('#content').innerHTML='<div class="sectionhead"><div><h2>🛒 PDV</h2><div class="muted">Venda rápida com baixa automática do estoque e lançamento no Caixa.</div></div></div><div class="muted">Carregando produtos...</div>';
+  const {data,error}=await db.from('produtos').select('id,nome,codigo_barras,estoque_atual,valor_varejo,unidade').order('nome');
+  if(error){$('#content').innerHTML=`<div class="msg">Erro ao carregar o PDV: ${esc(error.message)}</div>`;return}
+  pdvProdutos=data||[];pdvCarrinho=[];
+  pdvMontarTela();
+}
+
+function pdvMontarTela(){
+  $('#content').innerHTML=`
+    <div class="sectionhead">
+      <div><h2>🛒 PDV</h2><div class="muted">Venda normal • baixa no estoque • lançamento financeiro • impressão do pedido</div></div>
+      <button type="button" class="btn secondary" onclick="pdvLimpar()">Nova venda</button>
+    </div>
+    <div class="card" style="margin-bottom:16px">
+      <h3 style="margin-top:0">Cliente</h3>
+      <div class="row">
+        <div class="field"><label>Nome *</label><input id="pdvClienteNome" placeholder="Nome do cliente"></div>
+        <div class="field"><label>Telefone</label><input id="pdvClienteTelefone" type="tel" inputmode="tel" placeholder="Telefone / WhatsApp"></div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:16px">
+      <h3 style="margin-top:0">Adicionar produto</h3>
+      <div class="row">
+        <div class="field"><label>Produto</label><select id="pdvProduto"><option value="">Selecione</option>${pdvProdutos.filter(p=>Number(p.estoque_atual||0)>0).map(p=>`<option value="${esc(p.id)}">${esc(p.nome)} — estoque ${Number(p.estoque_atual||0)} — ${money(p.valor_varejo)}</option>`).join('')}</select></div>
+        <div class="field"><label>Quantidade</label><input id="pdvQtd" type="number" min="1" step="1" value="1"></div>
+      </div>
+      <div class="actions"><button type="button" class="btn primary" onclick="pdvAdicionar()">+ Adicionar item</button></div>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">Pedido</h3>
+      <div id="pdvCarrinho"></div>
+      <div class="row" style="margin-top:14px">
+        <div class="field"><label>Forma de pagamento</label><select id="pdvForma"><option>Pix</option><option>Dinheiro</option><option>Cartão de débito</option><option>Cartão de crédito</option></select></div>
+        <div class="field"><label>Total da venda</label><div id="pdvTotal" style="font-size:28px;font-weight:900;padding:8px 0">${money(0)}</div></div>
+      </div>
+      <div id="pdvMsg" class="msg"></div>
+      <div class="actions"><button type="button" class="btn primary" onclick="pdvFinalizar()">Finalizar venda e imprimir pedido</button></div>
+    </div>`;
+  pdvAtualizarCarrinho();
+}
+
+function pdvAdicionar(){
+  const id=$('#pdvProduto')?.value,qtd=Math.max(1,Math.floor(Number($('#pdvQtd')?.value||1)));
+  const p=pdvProdutos.find(x=>String(x.id)===String(id));
+  if(!p)return czAlert('Selecione um produto.','PDV');
+  const existente=pdvCarrinho.find(x=>String(x.id)===String(id));
+  const novaQtd=(existente?.qtd||0)+qtd;
+  if(novaQtd>Number(p.estoque_atual||0))return czAlert(`Estoque insuficiente. Disponível: ${Number(p.estoque_atual||0)}.`,'PDV');
+  if(existente)existente.qtd=novaQtd;
+  else pdvCarrinho.push({id:p.id,nome:p.nome,qtd,valor:Number(p.valor_varejo||0),estoque:Number(p.estoque_atual||0),unidade:p.unidade||'un'});
+  $('#pdvQtd').value=1;$('#pdvProduto').value='';pdvAtualizarCarrinho();
+}
+
+function pdvRemover(i){pdvCarrinho.splice(i,1);pdvAtualizarCarrinho()}
+
+function pdvAtualizarCarrinho(){
+  const area=$('#pdvCarrinho');if(!area)return;
+  const total=pdvCarrinho.reduce((s,x)=>s+x.qtd*x.valor,0);
+  area.innerHTML=pdvCarrinho.length?`<div class="tablewrap"><table><thead><tr><th>Produto</th><th>Qtd.</th><th>Valor unitário</th><th>Total</th><th></th></tr></thead><tbody>${pdvCarrinho.map((x,i)=>`<tr><td>${esc(x.nome)}</td><td>${x.qtd}</td><td>${money(x.valor)}</td><td><b>${money(x.qtd*x.valor)}</b></td><td><button type="button" class="btn danger" onclick="pdvRemover(${i})">Remover</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Nenhum produto adicionado.</div>';
+  if($('#pdvTotal'))$('#pdvTotal').textContent=money(total);
+}
+
+function pdvLimpar(){pdvCarrinho=[];pdvMontarTela()}
+
+function pdvImprimirPedido(venda){
+  const linhas=venda.itens.map(x=>`<tr><td>${esc(x.nome)}</td><td style="text-align:center">${x.qtd}</td><td style="text-align:right">${money(x.valor)}</td><td style="text-align:right">${money(x.qtd*x.valor)}</td></tr>`).join('');
+  const w=window.open('','_blank','width=820,height=900');
+  if(!w){czAlert('O navegador bloqueou a janela de impressão. Libere pop-ups para imprimir o pedido.','Impressão');return}
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Pedido PDV</title><style>body{font-family:Arial,sans-serif;color:#111;padding:28px;max-width:760px;margin:auto}h1{margin:0}small{color:#555}table{width:100%;border-collapse:collapse;margin-top:22px}th,td{padding:9px;border-bottom:1px solid #ccc;text-align:left}th{background:#eee}.total{font-size:22px;font-weight:bold;text-align:right;margin-top:18px}.info{margin-top:16px;line-height:1.6}@media print{button{display:none}}</style></head><body><h1>CZ Efeitos Especiais</h1><small>Pedido de venda PDV</small><div class="info"><b>Pedido:</b> ${esc(venda.numero)}<br><b>Data:</b> ${esc(venda.dataHora)}<br><b>Cliente:</b> ${esc(venda.cliente)}<br><b>Telefone:</b> ${esc(venda.telefone||'—')}<br><b>Pagamento:</b> ${esc(venda.forma)}</div><table><thead><tr><th>Produto</th><th>Qtd.</th><th>Valor unitário</th><th>Total</th></tr></thead><tbody>${linhas}</tbody></table><div class="total">Valor total: ${money(venda.total)}</div><script>window.onload=()=>{window.print()}<\/script></body></html>`);
+  w.document.close();
+}
+
+async function pdvFinalizar(){
+  const nome=$('#pdvClienteNome')?.value.trim(),telefone=$('#pdvClienteTelefone')?.value.trim()||'',forma=$('#pdvForma')?.value||'Pix';
+  if(!nome)return czAlert('Informe o nome do cliente.','PDV');
+  if(!pdvCarrinho.length)return czAlert('Adicione pelo menos um produto ao pedido.','PDV');
+  const total=pdvCarrinho.reduce((s,x)=>s+x.qtd*x.valor,0);
+  if(total<=0)return czAlert('O valor total da venda precisa ser maior que zero.','PDV');
+  if(!await czConfirm(`Finalizar a venda de ${money(total)} para ${nome}? O estoque será baixado, a venda irá para o Caixa e o cliente será vinculado à base de Clientes.`,'Finalizar venda','Finalizar'))return;
+  const msg=$('#pdvMsg');msg.textContent='Finalizando venda...';
+  const alterados=[];
+  try{
+    // Vincula o PDV à base de clientes sem duplicar telefone.
+    // Compara somente os números para aceitar telefones formatados de maneiras diferentes.
+    const telNormalizado=String(telefone||'').replace(/\D/g,'');
+    let clienteExistente=null;
+    if(telNormalizado){
+      const {data:listaClientes,error:ce}=await db.from('clientes').select('*').limit(10000);
+      if(ce)throw ce;
+      clienteExistente=(listaClientes||[]).find(c=>String(c.telefone||'').replace(/\D/g,'')===telNormalizado)||null;
+    }
+    if(!clienteExistente){
+      const novoCliente={
+        nome,
+        telefone:telefone||null,
+        origem:'PDV',
+        observacoes:'Cliente criado automaticamente pelo PDV.'
+      };
+      const {error:ci}=await db.from('clientes').insert(novoCliente);
+      if(ci)throw ci;
+    }
+    for(const item of pdvCarrinho){
+      const {data:p,error:pe}=await db.from('produtos').select('estoque_atual').eq('id',item.id).single();
+      if(pe)throw pe;
+      const atual=Number(p?.estoque_atual||0);
+      if(atual<item.qtd)throw new Error(`Estoque insuficiente para ${item.nome}. Disponível: ${atual}.`);
+      const novo=atual-item.qtd;
+      const {error:ue}=await db.from('produtos').update({estoque_atual:novo,atualizado_em:new Date().toISOString()}).eq('id',item.id);
+      if(ue)throw ue;
+      alterados.push({id:item.id,estoque:atual});
+    }
+    const agora=new Date(),numero='PDV-'+String(agora.getFullYear())+String(agora.getMonth()+1).padStart(2,'0')+String(agora.getDate()).padStart(2,'0')+'-'+String(agora.getTime()).slice(-6);
+    await registrarCaixa({origem_id:'pdv:'+crypto.randomUUID(),tipo:'entrada',data:finISODate(agora),valor:total,cliente_nome:nome,proposta_numero:numero,orcamento_id:null,descricao:'Venda PDV',categoria:'Venda PDV',forma,observacao:telefone?('Telefone: '+telefone):null});
+    const venda={numero,dataHora:agora.toLocaleString('pt-BR'),cliente:nome,telefone,forma,total,itens:pdvCarrinho.map(x=>({...x}))};
+    await czAlert('Venda concluída. O estoque foi baixado e o valor lançado no Caixa.','Venda concluída');
+    pdvImprimirPedido(venda);
+    await renderPDV();
+  }catch(e){
+    for(const a of alterados){try{await db.from('produtos').update({estoque_atual:a.estoque,atualizado_em:new Date().toISOString()}).eq('id',a.id)}catch(_){}}
+    msg.textContent='Erro: '+e.message;
+  }
+}
+// ======================= FIM PDV =======================
+
 function czPode(modulo,acao='ver'){if(contaMaster())return true;return !!czPerfilUsuario?.permissoes?.[modulo]?.[acao]}
 function reconstruirMenuPermissoes(){const botoes=ordemMenu.filter(i=>czPode(modules[i],'ver'));$('#nav').innerHTML=botoes.map((i,k)=>`<button data-i="${i}" class="${k===0?'active':''}">${modules[i]}</button>`).join('')}
 const _renderModulePerm=renderModule;
