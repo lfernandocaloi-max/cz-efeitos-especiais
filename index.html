@@ -107,6 +107,25 @@ const SUPABASE_URL='https://locvpksjntwnlqrytqqx.supabase.co';
 const SUPABASE_KEY='sb_publishable_UN34ALY6Oxc1_V863pgq3Q_hNj7tuIQ';
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const $=s=>document.querySelector(s); let clients=[],products=[],assets=[],purchaseIds=new Set();
+// Janelas próprias CZ: substituem alert/confirm/prompt do navegador.
+function czDialog({titulo='CZ Efeitos Especiais',mensagem='',tipo='alerta',valor='',placeholder='',confirmar='OK',cancelar='Cancelar'}={}){
+ return new Promise(resolve=>{
+  document.getElementById('czDialogOverlay')?.remove();
+  const ov=document.createElement('div');ov.id='czDialogOverlay';ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:200000;display:flex;align-items:center;justify-content:center;padding:18px';
+  const box=document.createElement('div');box.style.cssText='width:min(520px,100%);background:#151b26;border:1px solid #30394a;border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.55);padding:22px;color:#fff';
+  const campo=tipo==='prompt'?`<input id="czDialogInput" value="${esc(String(valor??''))}" placeholder="${esc(placeholder||'')}" style="width:100%;margin-top:14px;box-sizing:border-box;background:#0f141d;color:#fff;border:1px solid #384254;border-radius:10px;padding:12px;font-size:14px;outline:none">`:'';
+  box.innerHTML=`<div style="font-size:12px;color:#ff641f;font-weight:900;letter-spacing:.8px">CZ EFEITOS ESPECIAIS</div><h3 style="margin:5px 0 12px;font-size:21px">${esc(titulo)}</h3><div style="white-space:pre-wrap;line-height:1.5;color:#dce2eb">${esc(String(mensagem||''))}</div>${campo}<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px">${tipo!=='alerta'?`<button id="czDialogCancelar" class="btn secondary" type="button">${esc(cancelar)}</button>`:''}<button id="czDialogOk" class="btn primary" type="button">${esc(confirmar)}</button></div>`;
+  ov.appendChild(box);document.body.appendChild(ov);
+  const fechar=v=>{ov.remove();resolve(v)};box.querySelector('#czDialogOk').onclick=()=>fechar(tipo==='prompt'?(box.querySelector('#czDialogInput')?.value??''):true);box.querySelector('#czDialogCancelar')?.addEventListener('click',()=>fechar(tipo==='prompt'?null:false));
+  ov.onclick=e=>{if(e.target===ov&&tipo!=='alerta')fechar(tipo==='prompt'?null:false)};
+  const inp=box.querySelector('#czDialogInput');if(inp){setTimeout(()=>{inp.focus();inp.select()},30);inp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();box.querySelector('#czDialogOk').click()}if(e.key==='Escape')box.querySelector('#czDialogCancelar')?.click()}}
+  else setTimeout(()=>box.querySelector('#czDialogOk')?.focus(),30);
+ });
+}
+function czAlert(mensagem,titulo='Aviso'){return czDialog({titulo,mensagem,tipo:'alerta',confirmar:'OK'})}
+function czConfirm(mensagem,titulo='Confirmação',confirmar='Confirmar'){return czDialog({titulo,mensagem,tipo:'confirmar',confirmar,cancelar:'Cancelar'})}
+function czPrompt(mensagem,valor='',titulo='Preenchimento'){return czDialog({titulo,mensagem,tipo:'prompt',valor,confirmar:'Continuar',cancelar:'Cancelar'})}
+window.alert=(m)=>{czAlert(m)};
 const modules=['Dashboard','Clientes','Orçamentos','Contratos','Eventos','Retorno de evento','Estoque','Ativos / Equipamentos','Colaboradores','Manutenção','Financeiro / DRE','Agenda','Relatórios','Configurações','Lista de compra','Veículos','Caixa'];
 const ordemMenu=[...modules.keys()].filter(i=>i!==16);
 ordemMenu.splice(11,0,16);
@@ -233,7 +252,7 @@ function agendaSalvarComp(d,id=''){const a=agendaComps(),obj={id:id||crypto.rand
 function agendaCamposComp(x={},data=''){return [{name:'tipo',label:'Tipo',value:x.tipo||'',placeholder:'Digite ou escolha: Visita técnica, Reunião de alinhamento, Outro',full:true},{name:'descricao',label:'Descrição',value:x.descricao||'',full:true},{name:'participante_nome',label:'Nome do participante',value:x.participante_nome||''},{name:'participante_telefone',label:'Telefone / WhatsApp',value:x.participante_telefone||'',placeholder:'Ex.: 17999999999'},{name:'data',label:'Data',type:'date',value:x.data||data,required:true},{name:'horario',label:'Horário',type:'time',value:x.horario||''},{name:'local',label:'Local',value:x.local||'',full:true},{name:'anotacao',label:'Anotação',type:'textarea',value:x.anotacao||'',full:true}]}
 function agendaAplicarSugestoesTipo(){setTimeout(()=>{const input=document.querySelector('#finModalForm [name=tipo]');if(!input)return;const dl=document.createElement('datalist');dl.id='agendaTiposFixos';['Visita técnica','Reunião de alinhamento','Outro'].forEach(v=>{const o=document.createElement('option');o.value=v;dl.appendChild(o)});document.body.appendChild(dl);input.setAttribute('list',dl.id)},20)}
 function agendaNovoComp(data){finModal('Novo compromisso',agendaCamposComp({},data),d=>{if(!d.tipo?.trim())throw new Error('Informe o tipo do compromisso.');agendaSalvarComp(d);return true});agendaAplicarSugestoesTipo()}
-function agendaExcluirComp(id){if(!confirm('Deseja realmente excluir este agendamento?'))return;const x=agendaComps().find(v=>v.id===id),a=agendaComps().filter(v=>v.id!==id);finSave(AGENDA_COMP_KEY,a);document.getElementById('finModalOverlay')?.remove();renderAgenda(new Date((x?.data||finISODate())+'T12:00:00'))}
+async function agendaExcluirComp(id){if(!await czConfirm('Deseja realmente excluir este agendamento?','Excluir agendamento','Excluir'))return;const x=agendaComps().find(v=>v.id===id),a=agendaComps().filter(v=>v.id!==id);finSave(AGENDA_COMP_KEY,a);document.getElementById('finModalOverlay')?.remove();renderAgenda(new Date((x?.data||finISODate())+'T12:00:00'))}
 function agendaWhatsComp(id){const x=agendaComps().find(v=>v.id===id);if(!x)return;const tel=String(x.participante_telefone||'').replace(/\D/g,'');if(!tel){alert('Preencha o telefone/WhatsApp do participante e salve o compromisso primeiro.');return}const numero=(tel.startsWith('55')?tel:'55'+tel);const data=x.data?new Date(x.data+'T12:00:00').toLocaleDateString('pt-BR'):'';let msg=`Olá${x.participante_nome?', '+x.participante_nome:''}, tudo bem? Segue agendamento de ${x.tipo||x.descricao||'compromisso'} para o dia ${data}${x.horario?' às '+x.horario:''}${x.local?' no local '+x.local:''}.`;window.open('https://wa.me/'+numero+'?text='+encodeURIComponent(msg),'_blank')}
 function agendaAbrirComp(id){const x=agendaComps().find(v=>v.id===id);if(!x)return;finModal('Compromisso',agendaCamposComp(x),d=>{if(!d.tipo?.trim())throw new Error('Informe o tipo do compromisso.');agendaSalvarComp(d,id);return true});agendaAplicarSugestoesTipo();setTimeout(()=>{const form=document.getElementById('finModalForm');if(!form)return;const actions=form.lastElementChild;if(!actions)return;const wa=document.createElement('button');wa.type='button';wa.className='btn secondary';wa.textContent='WhatsApp';wa.onclick=()=>agendaWhatsComp(id);const del=document.createElement('button');del.type='button';del.className='btn secondary';del.style.cssText='border-color:#8f4345;color:#ffb4b4';del.textContent='Excluir agendamento';del.onclick=()=>agendaExcluirComp(id);actions.insertBefore(del,actions.firstChild);actions.insertBefore(wa,actions.firstChild)},30)}
 async function renderAgenda(mes){
@@ -443,8 +462,8 @@ function novaDespesa(){
    a.push(...novos);finSave(FIN_MOV_KEY,a);fechar();renderFinanceiro();
  };setTimeout(()=>form.descricao.focus(),50);
 }
-function finalizarRecorrencia(rid){
- if(!confirm('Finalizar esta despesa recorrente? Os meses já lançados permanecem no histórico e os próximos lançamentos serão cancelados.'))return;
+async function finalizarRecorrencia(rid){
+ if(!await czConfirm('Finalizar esta despesa recorrente? Os meses já lançados permanecem no histórico e os próximos lançamentos serão cancelados.','Finalizar despesa recorrente','Finalizar'))return;
  const hoje=finISODate(),a=finLoad(FIN_MOV_KEY),novo=a.filter(x=>!(x.recorrencia_id===rid&&x.status!=='pago'&&String(x.vencimento||'')>hoje));
  novo.forEach(x=>{if(x.recorrencia_id===rid)x.recorrencia_ativa=false});
  finSave(FIN_MOV_KEY,novo);renderFinanceiro();
@@ -706,7 +725,7 @@ async function renderColaboradores(){
   $('#colStatus').onclick=async()=>{
     const id=$('#colId').value,c=colaboradores.find(x=>String(x.id)===id),botao=$('#colStatus');if(!c)return;
     const proximo=!c.ativo;
-    if(!confirm(`${proximo?'Ativar':'Inativar'} ${c.nome}? ${proximo?'Ele voltará a aparecer na escolha da equipe.':'O cadastro e o histórico serão mantidos.'}`))return;
+    if(!await czConfirm(`${proximo?'Ativar':'Inativar'} ${c.nome}? ${proximo?'Ele voltará a aparecer na escolha da equipe.':'O cadastro e o histórico serão mantidos.'}`,'Alterar colaborador',proximo?'Ativar':'Inativar'))return;
     botao.disabled=true;msg.textContent='Atualizando situação...';
     const {data,error}=await db.from('colaboradores').update({ativo:proximo,atualizado_em:new Date().toISOString()}).eq('id',id).eq('ativo',c.ativo).select('id');
     botao.disabled=false;
@@ -717,7 +736,7 @@ async function renderColaboradores(){
   $('#colExcluir').onclick=async()=>{
     const id=$('#colId').value,c=colaboradores.find(x=>String(x.id)===id),botao=$('#colExcluir');
     if(!id||!c)return;
-    if(!confirm(`Excluir definitivamente o cadastro de ${c.nome} e os PDFs enviados?`))return;
+    if(!await czConfirm(`Excluir definitivamente o cadastro de ${c.nome} e os PDFs enviados?`,'Excluir colaborador','Excluir'))return;
     botao.disabled=true;$('#colSalvar').disabled=true;msg.textContent='Excluindo colaborador...';
     try{
       const {data,error}=await db.from('colaboradores').delete().eq('id',id).select('id');
@@ -1448,7 +1467,7 @@ Obrigado!`;
     window.open('https://wa.me/'+tel+'?text='+encodeURIComponent(msg),'_blank','noopener');
   }
   async function excluirProposta(id){
-    if(!confirm('Excluir esta proposta? Se existir um evento vinculado e ele ainda não estiver FINALIZADO, todo o processo operacional desse orçamento também será excluído. Eventos finalizados serão preservados.'))return;
+    if(!await czConfirm('Excluir esta proposta? Se existir um evento vinculado e ele ainda não estiver FINALIZADO, todo o processo operacional desse orçamento também será excluído. Eventos finalizados serão preservados.','Excluir proposta','Excluir'))return;
     try{
       const {data:orc,error:eo}=await db.from('orcamentos').select('id,dados').eq('id',id).single();
       if(eo)throw eo;
@@ -1569,7 +1588,7 @@ $('#saveClientBtn').onclick=async()=>{
   const {error}=await(id?db.from('clientes').update(payload).eq('id',id):db.from('clientes').insert({...payload,criado_em:new Date().toISOString()}));
   botao.disabled=false;if(error){$('#clientMsg').textContent='Erro ao salvar: '+error.message;return}closeClient();renderClients()
 };
-async function deleteClient(id){if(!confirm('Excluir este cliente?'))return;const {error}=await db.from('clientes').delete().eq('id',id);if(error){alert('Não foi possível excluir: '+error.message);return}closeClient();renderClients()}
+async function deleteClient(id){if(!await czConfirm('Excluir este cliente?','Excluir cliente','Excluir'))return;const {error}=await db.from('clientes').delete().eq('id',id);if(error){alert('Não foi possível excluir: '+error.message);return}closeClient();renderClients()}
 function safeHttpUrl(v){try{const u=new URL(v);return ['http:','https:'].includes(u.protocol)?u.href:null}catch{return null}}
 function money(v){return Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
   function calcularPrecosProduto(){
@@ -1748,7 +1767,7 @@ $('#deleteProductBtn').onclick=async()=>{
   const id=$('#productId').value;
   if(!id)return;
   const nome=$('#productName').value.trim()||'este produto';
-  if(!confirm(`Excluir definitivamente o produto "${nome}"? Esta ação não poderá ser desfeita.`))return;
+  if(!await czConfirm(`Excluir definitivamente o produto "${nome}"? Esta ação não poderá ser desfeita.`,'Excluir produto','Excluir'))return;
   const botao=$('#deleteProductBtn');botao.disabled=true;$('#productMsg').textContent='Excluindo produto...';
   try{
     const {data,error}=await db.from('produtos').delete().eq('id',id).select('id');
@@ -1765,7 +1784,7 @@ async function excluirAtivo(id){
  if(!contaMaster()){alert('Somente a conta Master pode excluir equipamentos.');return}
  const ativo=assets.find(a=>String(a.id)===String(id));
  const nome=ativo?.nome||'este equipamento';
- if(!confirm(`Excluir definitivamente ${nome}? Esta ação não poderá ser desfeita.`))return;
+ if(!await czConfirm(`Excluir definitivamente ${nome}? Esta ação não poderá ser desfeita.`,'Excluir definitivamente','Excluir'))return;
  const {error}=await db.from('ativos').delete().eq('id',id);
  if(error){alert('Não foi possível excluir o equipamento: '+error.message);return}
  renderAssets();
@@ -1812,7 +1831,7 @@ function configurarEditorProjeto(shapes){
   const desenhar=()=>{svg.innerHTML=projetoExecucaoMarkup(preview?[...shapes,preview]:shapes);if(selecionado>=0)svg.querySelector(`[data-shape-index="${selecionado}"]`)?.setAttribute('stroke','#1671a8')};
   const ponto=ev=>{const p=svg.createSVGPoint();p.x=ev.clientX;p.y=ev.clientY;const t=p.matrixTransform(svg.getScreenCTM().inverse());return {x:Math.max(0,Math.min(900,Math.round(t.x))),y:Math.max(0,Math.min(500,Math.round(t.y)))}};
   const figura=(a,b)=>ferramenta==='retangulo'?{tipo:'retangulo',x:Math.min(a.x,b.x),y:Math.min(a.y,b.y),w:Math.max(12,Math.abs(a.x-b.x)),h:Math.max(12,Math.abs(a.y-b.y))}:ferramenta==='linha'?{tipo:'linha',x1:a.x,y1:a.y,x2:b.x,y2:b.y}:{tipo:'circulo',cx:a.x,cy:a.y,r:Math.max(8,Math.min(250,Math.hypot(a.x-b.x,a.y-b.y)))};
-  svg.onpointerdown=ev=>{const alvo=ev.target.closest('[data-shape-index]');if(ferramenta==='selecionar'){selecionado=alvo?Number(alvo.dataset.shapeIndex):-1;desenhar();return}if(ferramenta==='texto'){const label=prompt('Escreva o nome ou observação neste ponto:');if(label?.trim()){const p=ponto(ev);shapes.push({tipo:'texto',x:p.x,y:p.y,texto:label.trim().slice(0,120)});desenhar()}return}inicio=ponto(ev);svg.setPointerCapture(ev.pointerId)};
+  svg.onpointerdown=async ev=>{const alvo=ev.target.closest('[data-shape-index]');if(ferramenta==='selecionar'){selecionado=alvo?Number(alvo.dataset.shapeIndex):-1;desenhar();return}if(ferramenta==='texto'){const label=await czPrompt('Escreva o nome ou observação neste ponto:','','Texto do projeto');if(label?.trim()){const p=ponto(ev);shapes.push({tipo:'texto',x:p.x,y:p.y,texto:label.trim().slice(0,120)});desenhar()}return}inicio=ponto(ev);svg.setPointerCapture(ev.pointerId)};
   svg.onpointermove=ev=>{if(inicio){preview=figura(inicio,ponto(ev));desenhar()}};
   svg.onpointerup=ev=>{if(!inicio)return;const fim=ponto(ev);if(Math.abs(fim.x-inicio.x)<4&&Math.abs(fim.y-inicio.y)<4){fim.x=Math.min(900,inicio.x+80);fim.y=Math.min(500,inicio.y+60)}shapes.push(figura(inicio,fim));inicio=null;preview=null;desenhar()};
   svg.onpointercancel=()=>{inicio=null;preview=null;desenhar()};
@@ -1888,7 +1907,7 @@ async function mostrarTecnicaEvento(p,info,existente=null,materiaisExistentes=[]
       msg.textContent=status==='pendente'?'Rascunho salvo.':'Evento aguardando evento.';await renderEventos();
     }catch(err){if(novo&&eventoId){await db.from('evento_materiais').delete().eq('evento_id',eventoId);await db.from('eventos_operacionais').delete().eq('id',eventoId);eventoId=null}msg.textContent='Erro ao salvar evento: '+err.message;btns.forEach(b=>b.disabled=false)}
   }
-  $('#tecRascunho').onclick=()=>salvar('pendente');$('#tecCriar').onclick=()=>{if(!confirm('Concluir fechamento e gerar o Financeiro?\n\nAo gerar o evento, esta proposta será considerada fechada e passará a aparecer no Financeiro.'))return;salvar('pronto')};listar();
+  $('#tecRascunho').onclick=()=>salvar('pendente');$('#tecCriar').onclick=async()=>{if(!await czConfirm('Concluir fechamento e gerar o Financeiro?\n\nAo gerar o evento, esta proposta será considerada fechada e passará a aparecer no Financeiro.','Concluir fechamento','Gerar Evento'))return;salvar('pronto')};listar();
 }
 
 function iconeOlhoEvento(){return '<svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="2.5" fill="currentColor"/></svg>'}
@@ -2050,8 +2069,8 @@ async function abrirEvento(id){
 async function adicionarMaterialEvento(eventoId){
  const [pr,ar]=await Promise.all([db.from('produtos').select('id,nome,codigo_barras').order('nome'),db.from('ativos').select('id,nome,codigo_barras,codigo_interno,status').order('nome')]);
  const op=[...(pr.data||[]).map(x=>({tipo:'produto',...x,codigo:x.codigo_barras||''})),...(ar.data||[]).map(x=>({tipo:'ativo',...x,codigo:x.codigo_barras||x.codigo_interno||''}))];
- const escolha=prompt('Digite parte do nome ou código do material:');if(!escolha)return;const q=textoFiltro(escolha);const achados=op.filter(x=>textoFiltro(x.nome).includes(q)||textoFiltro(x.codigo).includes(q));if(!achados.length){alert('Material não encontrado.');return}let item=achados[0];if(achados.length>1){const lista=achados.slice(0,10).map((x,i)=>`${i+1} - ${x.nome} (${x.codigo||'sem código'})`).join('\n');const n=Number(prompt('Escolha o número:\n'+lista));if(!n||!achados[n-1])return;item=achados[n-1]}
- const qtd=Number(prompt('Quantidade necessária:',1));if(!Number.isInteger(qtd)||qtd<=0){alert('Informe uma quantidade inteira maior que zero.');return}
+ const escolha=await czPrompt('Digite parte do nome ou código do material:','','Adicionar material');if(!escolha)return;const q=textoFiltro(escolha);const achados=op.filter(x=>textoFiltro(x.nome).includes(q)||textoFiltro(x.codigo).includes(q));if(!achados.length){alert('Material não encontrado.');return}let item=achados[0];if(achados.length>1){const lista=achados.slice(0,10).map((x,i)=>`${i+1} - ${x.nome} (${x.codigo||'sem código'})`).join('\n');const n=Number(await czPrompt('Escolha o número:\n'+lista,'','Escolher material'));if(!n||!achados[n-1])return;item=achados[n-1]}
+ const qtd=Number(await czPrompt('Quantidade necessária:','1','Quantidade'));if(!Number.isInteger(qtd)||qtd<=0){alert('Informe uma quantidade inteira maior que zero.');return}
  const {error}=await db.from('evento_materiais').insert({evento_id:eventoId,tipo:item.tipo,item_id:item.id,nome_item:item.nome,codigo:item.codigo||null,quantidade_necessaria:qtd,quantidade_bipada:0,origem:'extra'});if(error){alert('Erro: '+error.message);return}abrirEvento(eventoId);
 }
 function normalizarCodigoEvento(v){return String(v??'').replace(/[\r\n\t ]+/g,'').trim().toUpperCase()}
@@ -2181,7 +2200,7 @@ async function excluirEvento(id,origem='eventos'){
  if(evErro){alert('Não foi possível verificar o evento: '+evErro.message);return}
  if(ev?.saida_baixada_em){alert('Este evento já movimentou o estoque. Mantenha o histórico para preservar as quantidades.');return}
  const nome=ev?.nome_evento||'este evento';
- if(!confirm(`Excluir definitivamente ${nome}? Esta ação não poderá ser desfeita.`))return;
+ if(!await czConfirm(`Excluir definitivamente ${nome}? Esta ação não poderá ser desfeita.`,'Excluir definitivamente','Excluir'))return;
  const {error:merr}=await db.from('evento_materiais').delete().eq('evento_id',id);
  if(merr){alert('Não foi possível excluir os materiais do evento: '+merr.message);return}
  const {error}=await db.from('eventos_operacionais').delete().eq('id',id);
@@ -2212,7 +2231,7 @@ async function biparRetornoEvento(eventoId){
  if(m.tipo==='ativo'&&m.item_id)await db.from('ativos').update({status:'disponivel'}).eq('id',m.item_id);c.value='';abrirRetornoEvento(eventoId)
 }
 async function registrarOcorrenciaRetorno(eventoId,mid,ativoId,tipo){
- if(tipo==='perda'&&!confirm('Confirmar este ativo como perda?'))return;
+ if(tipo==='perda'&&!await czConfirm('Confirmar este ativo como perda?','Registrar perda','Confirmar perda'))return;
  const {data:e,error:evErro}=await db.from('eventos_operacionais').select('saida_baixada_em').eq('id',eventoId).single();if(evErro){alert(evErro.message);return}
  if(e.saida_baixada_em){const {error}=await db.rpc('cz_ocorrencia_retorno_ativo',{p_evento_id:eventoId,p_material_id:mid,p_ocorrencia:tipo});if(error){alert(error.message);return}abrirRetornoEvento(eventoId);return}
  const r=retornoInfo(mid);r.status=tipo;salvarRetorno(mid,r);
@@ -2224,7 +2243,7 @@ function marcarPerdaRetorno(eventoId,mid,ativoId){return registrarOcorrenciaReto
 async function finalizarRetornoEvento(id){
  const {data:e,error:evErro}=await db.from('eventos_operacionais').select('saida_baixada_em').eq('id',id).single();if(evErro){alert(evErro.message);return}
  if(e.saida_baixada_em){
-   if(!confirm('Concluir o retorno e finalizar este evento?'))return;
+   if(!await czConfirm('Concluir o retorno e finalizar este evento?','Concluir retorno','Finalizar evento'))return;
    const {error}=await db.rpc('cz_concluir_retorno_evento',{p_evento_id:id});if(error){alert(error.message);return}
    renderRetornoEventos();return;
  }
@@ -2232,11 +2251,11 @@ async function finalizarRetornoEvento(id){
  const ativos=(m||[]).filter(x=>x.tipo==='ativo'&&Number(x.quantidade_bipada||0)>0);
  const pend=ativos.filter(x=>{const r=retornoInfo(x.id);return Number(r.qtd||0)<Number(x.quantidade_bipada||0)&&!['perda','manutencao'].includes(r.status)});
  if(pend.length){alert('Ainda existem ativos sem retorno. Bipe o ativo ou marque a ocorrência como Manutenção ou Perda.');return}
- if(!confirm('Concluir o retorno e finalizar este evento?'))return;
+ if(!await czConfirm('Concluir o retorno e finalizar este evento?','Concluir retorno','Finalizar evento'))return;
  const {error:up}=await db.from('eventos_operacionais').update({status:'finalizado',atualizado_em:new Date().toISOString()}).eq('id',id);
  if(up){alert(up.message);return}renderRetornoEventos()
 }
-async function removerMaterialEvento(id,eventoId){if(!confirm('Remover este material do evento?'))return;const {error}=await db.from('evento_materiais').delete().eq('id',id);if(error){alert(error.message);return}abrirEvento(eventoId)}
+async function removerMaterialEvento(id,eventoId){if(!await czConfirm('Remover este material do evento?','Remover material','Remover'))return;const {error}=await db.from('evento_materiais').delete().eq('id',id);if(error){alert(error.message);return}abrirEvento(eventoId)}
 async function mudarStatusEvento(id,status){const {error}=await db.from('eventos_operacionais').update({status,atualizado_em:new Date().toISOString()}).eq('id',id);if(error){alert(error.message);return}abrirEvento(id)}
 
 
@@ -2250,12 +2269,12 @@ async function czAjustarQuantidadeAtivo(ativoId,delta,status){if(!ativoId)return
 async function czCriarOS(eventoId,m,ativoId,qtd,ocorrencia){let ativo={};if(ativoId){const r=await db.from('ativos').select('*').eq('id',ativoId).maybeSingle();ativo=r.data||{}}const os={id:crypto.randomUUID(),numero:czOsNumero(),evento_id:eventoId,material_id:m.id,ativo_id:ativoId||'',equipamento:m.nome_item||ativo.nome||'Ativo',codigo:m.codigo||ativo.codigo_barras||ativo.codigo_interno||'',fabricante:ativo.fabricante||'',marca:ativo.marca||'',quantidade:qtd,ocorrencia,criado_em:new Date().toISOString(),status:'aguardando',inicio_em:'',conclusao_em:'',pecas:[],servico:''};const a=czOsLoad();a.push(os);czOsSave(a);return os}
 async function registrarOcorrenciaRetorno(eventoId,mid,ativoId,tipo){
  const mr=await db.from('evento_materiais').select('*').eq('id',mid).single();if(mr.error){alert(mr.error.message);return}const m=mr.data,esperado=Number(m.quantidade_bipada||0),r=retornoInfo(mid),jaDev=Number(r.qtd||0),jaOc=Number(r.qtd_perda||0)+Number(r.qtd_manutencao||0),restante=Math.max(0,esperado-jaDev-jaOc);if(restante<=0){alert('Toda a quantidade deste ativo já foi tratada no retorno.');return}
- const qtd=Number(prompt(`Quantidade para ${tipo==='perda'?'PERDA':'MANUTENÇÃO'} (máximo ${restante}):`,'1'));if(!Number.isInteger(qtd)||qtd<=0||qtd>restante){alert('Informe uma quantidade inteira entre 1 e '+restante+'.');return}
- if(tipo==='perda'&&!confirm(`Confirmar a perda de ${qtd} unidade(s)?`))return;
- let ocorrencia='';if(tipo==='manutencao'){ocorrencia=prompt('Ocorrência / o que aconteceu com o equipamento:','')||'';if(!ocorrencia.trim()){alert('Informe a ocorrência para gerar a ordem de manutenção.');return}}
+ const qtd=Number(await czPrompt(`Quantidade para ${tipo==='perda'?'PERDA':'MANUTENÇÃO'} (máximo ${restante}):`,'1',tipo==='perda'?'Registrar perda':'Enviar para manutenção'));if(!Number.isInteger(qtd)||qtd<=0||qtd>restante){alert('Informe uma quantidade inteira entre 1 e '+restante+'.');return}
+ if(tipo==='perda'&&!await czConfirm(`Confirmar a perda de ${qtd} unidade(s)?`,'Registrar perda','Confirmar perda'))return;
+ let ocorrencia='';if(tipo==='manutencao'){ocorrencia=(await czPrompt('Ocorrência / o que aconteceu com o equipamento:','','Ocorrência de manutenção'))||'';if(!ocorrencia.trim()){alert('Informe a ocorrência para gerar a ordem de manutenção.');return}}
  if(!(await czAjustarQuantidadeAtivo(ativoId,-qtd,tipo==='perda'?'perdido':'manutencao')))return;
  if(tipo==='perda')r.qtd_perda=Number(r.qtd_perda||0)+qtd;else r.qtd_manutencao=Number(r.qtd_manutencao||0)+qtd;r.status=(jaDev+Number(r.qtd_perda||0)+Number(r.qtd_manutencao||0)>=esperado)?tipo:'parcial';salvarRetorno(mid,r);
- if(tipo==='manutencao'){const os=await czCriarOS(eventoId,m,ativoId,qtd,ocorrencia);if(confirm(`${os.numero} gerada. Deseja imprimir a ordem agora?`))imprimirOSManutencao(os.id)}
+ if(tipo==='manutencao'){const os=await czCriarOS(eventoId,m,ativoId,qtd,ocorrencia);if(await czConfirm(`${os.numero} gerada. Deseja imprimir a ordem agora?`,'Ordem de manutenção','Imprimir ordem'))imprimirOSManutencao(os.id)}
  abrirRetornoEvento(eventoId)
 }
 async function marcarManutencaoRetorno(eventoId,mid,ativoId){
@@ -2293,7 +2312,7 @@ function adicionarPecaOS(id){const os=czOsLoad().find(x=>x.id===id);if(!os)retur
 function aguardarMaterialOS(id){const a=czOsLoad(),os=a.find(x=>x.id===id);if(!os)return;os.servico=$('#osServico')?.value||os.servico||'';os.status='aguardando_material';os.aguardando_material_em=new Date().toISOString();czOsSave(a);abrirOSManutencao(id)}
 function continuarOSManutencao(id){const a=czOsLoad(),os=a.find(x=>x.id===id);if(!os)return;os.status='andamento';os.reinicio_em=new Date().toISOString();czOsSave(a);abrirOSManutencao(id)}
 function salvarServicoOS(id){const a=czOsLoad(),os=a.find(x=>x.id===id);if(!os)return;os.servico=$('#osServico')?.value||'';czOsSave(a);abrirOSManutencao(id)}
-async function concluirOSManutencao(id){const a=czOsLoad(),os=a.find(x=>x.id===id);if(!os||os.status==='concluida')return;if(!confirm(`Concluir ${os.numero} e devolver ${os.quantidade} unidade(s) ao estoque disponível?`))return;os.servico=$('#osServico')?.value||os.servico||'';if(!(await czAjustarQuantidadeAtivo(os.ativo_id,Number(os.quantidade||0),'disponivel')))return;os.status='concluida';os.conclusao_em=new Date().toISOString();czOsSave(a);renderManutencao('historico')}
+async function concluirOSManutencao(id){const a=czOsLoad(),os=a.find(x=>x.id===id);if(!os||os.status==='concluida')return;if(!await czConfirm(`Concluir ${os.numero} e devolver ${os.quantidade} unidade(s) ao estoque disponível?`,'Concluir manutenção','Concluir'))return;os.servico=$('#osServico')?.value||os.servico||'';if(!(await czAjustarQuantidadeAtivo(os.ativo_id,Number(os.quantidade||0),'disponivel')))return;os.status='concluida';os.conclusao_em=new Date().toISOString();czOsSave(a);renderManutencao('historico')}
 async function relCustosManutencao(){const a=czOsLoad().filter(x=>relNoPeriodo(String(x.criado_em||'').slice(0,10)));const nomes=[...new Set(czOsLoad().map(x=>x.equipamento).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));const atual=window.relManAtivo||'';const f=a.filter(x=>!atual||x.equipamento===atual),tot=f.reduce((s,x)=>s+czOsTotal(x),0);$('#content').innerHTML=relTopo('🛠️ Relatório de Custos de Manutenção','Custos técnicos das OS — não gera movimentação financeira')+relFiltroPeriodo('relCustosManutencao')+`<div class="card"><label style="display:block;margin-bottom:8px">Nome do ativo</label><select onchange="window.relManAtivo=this.value;relCustosManutencao()"><option value="">Todos</option>${nomes.map(n=>`<option ${atual===n?'selected':''}>${esc(n)}</option>`).join('')}</select></div><div class="card"><b>Total gasto em manutenção no período: ${money(tot)}</b><div class="muted">A compra/reposição das peças deve ser lançada separadamente em Financeiro → Nova despesa.</div></div><div class="tablewrap"><table><thead><tr><th>Data</th><th>OS</th><th>Ativo</th><th>Qtd.</th><th>Ocorrência</th><th>Status</th><th>Custo técnico</th></tr></thead><tbody>${f.map(x=>`<tr><td>${new Date(x.criado_em).toLocaleDateString('pt-BR')}</td><td>${esc(x.numero)}</td><td>${esc(x.equipamento)}</td><td>${x.quantidade}</td><td>${esc(x.ocorrencia)}</td><td>${x.status}</td><td>${money(czOsTotal(x))}</td></tr>`).join('')||'<tr><td colspan="7">Nenhuma manutenção no período.</td></tr>'}</tbody></table></div>`}
 
 boot();
