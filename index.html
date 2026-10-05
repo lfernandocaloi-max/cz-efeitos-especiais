@@ -225,7 +225,7 @@ function contaMaster(){
  const perfil=String(czPerfilUsuario?.perfil||'').trim().toLowerCase();
  return email===CZ_MASTER_EMAIL || perfil==='master' || perfil==='master_principal' || perfil==='master_autorizado';
 }
-async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V107';reconstruirMenuPermissoes();renderModule(0)}
+async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V109';reconstruirMenuPermissoes();renderModule(0)}
 $('#loginBtn').onclick=async()=>{const email=$('#email').value.trim(),password=$('#password').value;$('#loginMsg').textContent='Entrando...';const {data,error}=await db.auth.signInWithPassword({email,password});if(error){$('#loginMsg').textContent='Não foi possível entrar: '+error.message;return}$('#loginMsg').textContent='';showApp(data.user)};
 $('#logoutBtn').onclick=async()=>{await db.auth.signOut();showLogin()};
   async function recuperarSenha(){
@@ -286,6 +286,47 @@ async function carregarCaixa(){
     caixaCache=todos;caixaErro='';return caixaCache;
   }catch(err){caixaErro=err.message;caixaCache=finLoad(FIN_MOV_KEY).filter(x=>x.status==='pago'&&['entrada','saida'].includes(x.tipo)).map(movimentoCaixaLocal);return caixaCache}
 }
+
+const CAIXA_CONTAS_KEY='cz_caixa_contas_recebimento_v1';
+function caixaContas(){try{return JSON.parse(localStorage.getItem(CAIXA_CONTAS_KEY)||'[]')}catch(_){return []}}
+function salvarCaixaContas(v){localStorage.setItem(CAIXA_CONTAS_KEY,JSON.stringify(v))}
+function caixaConfirmado(x){return String(x?.observacao||'').includes('[CAIXA_CONFIRMADO]')}
+function caixaPrecisaConfirmar(x){return x?.tipo==='entrada'&&!caixaConfirmado(x)}
+function caixaContaMovimento(x){const m=String(x?.observacao||'').match(/\[CONTA:([^\]]+)\]/);return m?m[1].trim():'—'}
+function abrirCadastroContaCaixa(){
+  const nome=prompt('Nome da conta ou máquina de cartão. Ex.: Bradesco, PagSeguro, Caixa Dinheiro');
+  if(!nome||!nome.trim())return;
+  const tipo=prompt('Tipo: Banco, Máquina de cartão, Dinheiro ou Outro','Banco')||'Outro';
+  const lista=caixaContas();
+  if(lista.some(x=>x.nome.toLowerCase()===nome.trim().toLowerCase()))return czAlert('Essa conta já está cadastrada.','Contas de recebimento');
+  lista.push({id:crypto.randomUUID(),nome:nome.trim(),tipo:tipo.trim()});salvarCaixaContas(lista);renderCaixaContas();
+}
+async function excluirContaCaixa(id){
+  if(!await czConfirm('Excluir esta conta de recebimento?','Excluir conta','Excluir'))return;
+  salvarCaixaContas(caixaContas().filter(x=>x.id!==id));renderCaixaContas();
+}
+function renderCaixaContas(){
+  const area=$('#caixaAreaContas');if(!area)return;const lista=caixaContas();
+  area.innerHTML=`<div class="card"><div class="sectionhead"><div><h3 style="margin:0">Contas de recebimento</h3><div class="muted">Cadastre bancos, dinheiro e máquinas de cartão para identificar onde cada pagamento caiu.</div></div><button class="btn primary" onclick="abrirCadastroContaCaixa()">+ Nova conta</button></div><div class="tablewrap">${lista.length?`<table><thead><tr><th>Conta</th><th>Tipo</th><th>Ação</th></tr></thead><tbody>${lista.map(x=>`<tr><td>${esc(x.nome)}</td><td>${esc(x.tipo)}</td><td><button class="btn danger" onclick="excluirContaCaixa('${x.id}')">Excluir</button></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhuma conta cadastrada. Exemplos: Bradesco, PagSeguro, Caixa Dinheiro.</div>'}</div></div>`;
+}
+function mostrarCaixaMovimentos(){ $('#caixaAreaMovimentos')?.classList.remove('hidden');$('#caixaAreaContas')?.classList.add('hidden'); }
+function mostrarCaixaContas(){ $('#caixaAreaMovimentos')?.classList.add('hidden');$('#caixaAreaContas')?.classList.remove('hidden');renderCaixaContas(); }
+async function confirmarEntradaCaixa(id){
+ const x=caixaCache.find(m=>String(m.id)===String(id));if(!x)return;
+ const contas=caixaContas();
+ if(!contas.length){await czAlert('Cadastre primeiro uma conta de recebimento, por exemplo Bradesco, PagSeguro ou Caixa Dinheiro.','Conta de recebimento');mostrarCaixaContas();return}
+ const opcoes=contas.map((c,i)=>`${i+1} - ${c.nome} (${c.tipo})`).join('\n');
+ const escolha=prompt(`Em qual conta este pagamento caiu?\n\n${opcoes}\n\nDigite o número da conta:`);
+ if(!escolha)return;
+ const conta=contas[Number(escolha)-1];
+ if(!conta)return czAlert('Conta inválida.','Confirmar recebimento');
+ if(!await czConfirm(`Confirmar ${money(x.valor)} na conta "${conta.nome}"?`,'Confirmar recebimento','Confirmar caixa'))return;
+ const limpo=String(x.observacao||'').replace(/\s*\[CAIXA_CONFIRMADO\]\s*/g,' ').replace(/\s*\[CONTA:[^\]]+\]\s*/g,' ').trim();
+ const obs=(limpo+' [CONTA:'+conta.nome+'] [CAIXA_CONFIRMADO]').trim();
+ const {error}=await db.from('caixa_movimentacoes').update({observacao:obs}).eq('id',id);
+ if(error)return czAlert('Erro ao confirmar: '+error.message,'Caixa');
+ await renderCaixa();
+}
 async function registrarCaixa(mov){const {error}=await db.from('caixa_movimentacoes').insert(mov);if(error)throw new Error('Não foi possível registrar no Caixa: '+error.message)}
 function finPagamentos(orcId){return caixaCache.filter(x=>x.tipo==='entrada'&&String(x.orcamento_id||'')===String(orcId||''))}
 function finPagoOrc(orcId){return finPagamentos(orcId).reduce((s,x)=>s+Number(x.valor||0),0)}
@@ -301,14 +342,24 @@ function finDespesas(){return finLoad(FIN_MOV_KEY).filter(x=>x.tipo==='saida')}
 function finResumoMes(receb,desp){const hoje=finISODate(),ym=hoje.slice(0,7);return {hoje,receberHoje:receb.filter(x=>x.saldo>0&&x.vencimento===hoje).reduce((s,x)=>s+x.saldo,0),receberMes:receb.filter(x=>x.saldo>0&&x.vencimento>hoje&&x.vencimento.startsWith(ym)).reduce((s,x)=>s+x.saldo,0),pagarHoje:desp.filter(x=>x.status!=='pago'&&x.vencimento===hoje).reduce((s,x)=>s+Number(x.valor||0),0),pagarMes:desp.filter(x=>x.status!=='pago'&&x.vencimento>hoje&&String(x.vencimento||'').startsWith(ym)).reduce((s,x)=>s+Number(x.valor||0),0),vencidos:receb.filter(x=>x.saldo>0&&x.vencimento<hoje).reduce((s,x)=>s+x.saldo,0),cobrancas:finLoad(FIN_COB_KEY).filter(x=>x.proxima_data===hoje)}}
 async function abrirFinanceFiltro(tipo){await renderFinanceiro(tipo)}
 async function renderCaixa(filtro='todos'){
-  const movimentos=await carregarCaixa(),entradas=movimentos.filter(x=>x.tipo==='entrada').reduce((s,x)=>s+Number(x.valor||0),0),saidas=movimentos.filter(x=>x.tipo==='saida').reduce((s,x)=>s+Number(x.valor||0),0);
-  let saldo=0;const historico=movimentos.map(m=>({...m,saldo_acumulado:(saldo+=m.tipo==='entrada'?Number(m.valor||0):-Number(m.valor||0))}));
+  const movimentos=await carregarCaixa();
+  const pendentes=movimentos.filter(caixaPrecisaConfirmar);
+  const confirmados=movimentos.filter(x=>!caixaPrecisaConfirmar(x));
+  const entradas=confirmados.filter(x=>x.tipo==='entrada').reduce((s,x)=>s+Number(x.valor||0),0);
+  const saidas=confirmados.filter(x=>x.tipo==='saida').reduce((s,x)=>s+Number(x.valor||0),0);
+  const totalPendente=pendentes.reduce((s,x)=>s+Number(x.valor||0),0);
+  let saldo=0;const historico=confirmados.map(m=>({...m,saldo_acumulado:(saldo+=m.tipo==='entrada'?Number(m.valor||0):-Number(m.valor||0))}));
   const lista=historico.filter(x=>filtro==='todos'||x.tipo===filtro).reverse();
-  $('#content').innerHTML=`<div class="sectionhead"><div><h2>💵 Caixa</h2><div class="muted">Movimentações recebidas e despesas pagas</div></div><button type="button" class="btn secondary" onclick="renderFinanceiro()">Voltar ao financeiro</button></div>
-    ${caixaErro?`<div class="msg" style="color:#ff8b78">Não foi possível sincronizar o Caixa com o Supabase: ${esc(caixaErro)}. Execute o SQL do Caixa.</div>`:''}
-    <div class="cards" style="margin-bottom:16px"><div class="card"><div class="muted">Entradas</div><div class="n" style="color:#55d884">${money(entradas)}</div></div><div class="card"><div class="muted">Saídas</div><div class="n" style="color:#ff7474">${money(saidas)}</div></div><div class="card"><div class="muted">Saldo total</div><div class="n" style="color:${entradas-saidas>=0?'#55d884':'#ff7474'}">${money(entradas-saidas)}</div></div></div>
-    <div class="card"><div class="sectionhead"><h3 style="margin:0">Histórico do Caixa</h3><div class="actions" style="margin:0"><button type="button" class="btn ${filtro==='todos'?'primary':'secondary'}" data-caixa-filtro="todos">Todos</button><button type="button" class="btn ${filtro==='entrada'?'primary':'secondary'}" data-caixa-filtro="entrada">Entradas</button><button type="button" class="btn ${filtro==='saida'?'primary':'secondary'}" data-caixa-filtro="saida">Saídas</button></div></div>
-      <div class="tablewrap">${lista.length?`<table><thead><tr><th>Data</th><th>Movimento</th><th>Cliente</th><th>Nº proposta</th><th>Descrição</th><th>Categoria</th><th>Forma de pagamento</th><th>Valor</th><th>Saldo</th></tr></thead><tbody>${lista.map(x=>`<tr><td>${finDate(x.data)}</td><td>${x.tipo==='entrada'?'Entrada':'Saída'}</td><td>${esc(x.cliente_nome||'—')}</td><td>${esc(x.proposta_numero||'—')}</td><td>${esc(x.descricao||'—')}</td><td>${esc(x.categoria||'—')}</td><td>${esc(x.forma||'—')}</td><td style="color:${x.tipo==='entrada'?'#55d884':'#ff7474'};font-weight:800">${x.tipo==='entrada'?'+':'−'} ${money(x.valor)}</td><td style="color:${x.saldo_acumulado>=0?'#55d884':'#ff7474'}">${money(x.saldo_acumulado)}</td></tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhuma movimentação neste filtro.</div>'}</div></div>`;
+  $('#content').innerHTML=`<div class="sectionhead"><div><h2>💵 Caixa</h2><div class="muted">Primeiro confira os recebimentos; somente depois eles entram no Caixa geral.</div></div><button type="button" class="btn secondary" onclick="renderFinanceiro()">Voltar ao financeiro</button></div>
+    <div style="display:flex;gap:8px;margin-bottom:16px"><button class="btn primary" onclick="mostrarCaixaMovimentos()">Caixa</button><button class="btn secondary" onclick="mostrarCaixaContas()">Contas de recebimento</button></div>
+    <div id="caixaAreaMovimentos">
+    ${caixaErro?`<div class="msg" style="color:#ff8b78">Não foi possível sincronizar o Caixa com o Supabase: ${esc(caixaErro)}.</div>`:''}
+    <div class="cards" style="margin-bottom:16px"><div class="card"><div class="muted">A confirmar</div><div class="n">${money(totalPendente)}</div></div><div class="card"><div class="muted">Entradas confirmadas</div><div class="n" style="color:#55d884">${money(entradas)}</div></div><div class="card"><div class="muted">Saídas</div><div class="n" style="color:#ff7474">${money(saidas)}</div></div><div class="card"><div class="muted">Saldo real do Caixa</div><div class="n" style="color:${entradas-saidas>=0?'#55d884':'#ff7474'}">${money(entradas-saidas)}</div></div></div>
+    <div class="card" style="margin-bottom:16px"><div class="sectionhead"><div><h3 style="margin:0">Recebimentos aguardando confirmação</h3><div class="muted">Pagamentos de eventos, PDV e outras entradas ficam aqui até você conferir sua conta.</div></div></div>
+      <div class="tablewrap">${pendentes.length?`<table><thead><tr><th>Data</th><th>Cliente</th><th>Nº proposta</th><th>Descrição</th><th>Forma</th><th>Valor</th><th>Ação</th></tr></thead><tbody>${pendentes.slice().reverse().map(x=>`<tr><td>${finDate(x.data)}</td><td>${esc(x.cliente_nome||'—')}</td><td>${esc(x.proposta_numero||'—')}</td><td>${esc(x.descricao||x.categoria||'Recebimento')}</td><td>${esc(x.forma||'—')}</td><td><b>${money(x.valor)}</b></td><td><button type="button" class="btn primary" onclick="confirmarEntradaCaixa('${x.id}')">Confirmar caixa</button></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhum recebimento aguardando confirmação.</div>'}</div></div>
+    <div class="card"><div class="sectionhead"><h3 style="margin:0">Caixa geral confirmado</h3><div class="actions" style="margin:0"><button type="button" class="btn ${filtro==='todos'?'primary':'secondary'}" data-caixa-filtro="todos">Todos</button><button type="button" class="btn ${filtro==='entrada'?'primary':'secondary'}" data-caixa-filtro="entrada">Entradas</button><button type="button" class="btn ${filtro==='saida'?'primary':'secondary'}" data-caixa-filtro="saida">Saídas</button></div></div>
+      <div class="tablewrap">${lista.length?`<table><thead><tr><th>Data</th><th>Movimento</th><th>Cliente</th><th>Nº proposta</th><th>Descrição</th><th>Categoria</th><th>Forma</th><th>Conta</th><th>Valor</th><th>Saldo</th></tr></thead><tbody>${lista.map(x=>`<tr><td>${finDate(x.data)}</td><td>${x.tipo==='entrada'?'Entrada':'Saída'}</td><td>${esc(x.cliente_nome||'—')}</td><td>${esc(x.proposta_numero||'—')}</td><td>${esc(x.descricao||'—')}</td><td>${esc(x.categoria||'—')}</td><td>${esc(x.forma||'—')}</td><td>${esc(caixaContaMovimento(x))}</td><td style="color:${x.tipo==='entrada'?'#55d884':'#ff7474'};font-weight:800">${x.tipo==='entrada'?'+':'−'} ${money(x.valor)}</td><td>${money(x.saldo_acumulado)}</td></tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhuma movimentação confirmada neste filtro.</div>'}</div></div>
+    </div><div id="caixaAreaContas" class="hidden"></div>`;
   document.querySelectorAll('[data-caixa-filtro]').forEach(b=>b.onclick=()=>renderCaixa(b.dataset.caixaFiltro));
 }
 let finFiltroAtual='todos',finDataInicio='',finDataFim='';
@@ -2682,7 +2733,7 @@ async function pdvFinalizar(orcamentoPdvId=null){
     await registrarCaixa({origem_id:'pdv:'+crypto.randomUUID(),tipo:'entrada',data:finISODate(agora),valor:total,cliente_nome:nome,proposta_numero:numero,orcamento_id:null,descricao:'Venda PDV',categoria:'Venda PDV',forma,observacao:telefone?('Telefone: '+telefone):null});
     const venda={numero,dataHora:agora.toLocaleString('pt-BR'),cliente:nome,telefone,forma,total,itens:pdvCarrinho.map(x=>({...x}))};
     if(orcamentoPdvId)pdvSalvarOrcamentos(pdvOrcamentos().filter(x=>x.id!==orcamentoPdvId));
-    await czAlert('Venda concluída. O estoque foi baixado e o valor lançado no Caixa.','Venda concluída');
+    await czAlert('Venda concluída. O estoque foi baixado e o recebimento ficou aguardando confirmação no Caixa.','Venda concluída');
     pdvImprimirPedido(venda);
     await renderPDV();
   }catch(e){
