@@ -2414,15 +2414,21 @@ async function salvarPermissoesUsuario(id){
 boot();
 
 function isMaster(){
+  // Usa a mesma regra central do sistema para evitar divergência entre
+  // Master Principal e Master Autorizado.
+  if(typeof contaMaster==='function' && contaMaster()) return true;
   const email=String(
+    currentAuthUser?.email ||
     window.currentUser?.email ||
     window.usuarioAtual?.email ||
     window.user?.email ||
+    localStorage.getItem('cz_auth_email') ||
     localStorage.getItem('user_email') ||
     localStorage.getItem('email') ||
     ''
   ).trim().toLowerCase();
   const perfil=String(
+    czPerfilUsuario?.perfil ||
     window.currentUser?.perfil ||
     window.usuarioAtual?.perfil ||
     window.user?.perfil ||
@@ -2430,6 +2436,6 @@ function isMaster(){
     localStorage.getItem('role') ||
     ''
   ).trim().toLowerCase();
-  return email===CZ_MASTER_EMAIL || perfil==='master';
+  return email===CZ_MASTER_EMAIL || ['master','master_principal','master_autorizado'].includes(perfil);
 }
 </script></body></html>
