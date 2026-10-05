@@ -78,7 +78,7 @@
 </style>
 </head><body>
 <section id="login" class="login"><div class="loginbox"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><h3>Acesso ao sistema</h3><div class="field"><label>E-mail</label><input id="email" type="email"></div><div class="field"><label>Senha</label><input id="password" type="password"></div><button id="loginBtn" class="btn primary full" style="margin-top:18px">ENTRAR</button><button type="button" class="btn secondary full" style="margin-top:8px" onclick="recuperarSenha()">Esqueci minha senha</button><div id="loginMsg" class="msg"></div></div></section>
-<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><div class="muted" style="font-size:12px">Sistema de gestão CZ · v69</div></div><div><span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
+<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><div class="muted" style="font-size:12px">Sistema de gestão CZ · v90</div></div><div><span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
 <div id="clientModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="modalTitle">Novo cliente</h2><button class="btn secondary" onclick="closeClient()">Fechar</button></div>
   <input id="clientId" type="hidden"><div class="muted" id="clientOpenedAt" style="font-size:13px">Data de abertura: será definida ao salvar</div>
   <div class="row"><div class="field"><label>Nome / Razão social *</label><input id="clientName" autocomplete="name"></div><div class="field"><label>Telefone *</label><input id="clientPhone" type="tel" inputmode="tel" autocomplete="tel"></div></div>
@@ -2367,8 +2367,37 @@ async function renderUsuariosPermissoes(){
  const {data,error}=await db.from('usuarios_sistema').select('*').order('nome',{ascending:true});
  if(error){$('#content').innerHTML=`<div class="msg">Execute primeiro o SQL de Usuários e Permissões no Supabase.<br>${esc(error.message)}</div>`;return}
  const us=data||[];
- $('#content').innerHTML=`<div class="sectionhead"><div><h2>👥 Usuários e Permissões</h2><div class="muted">Controle o que cada login pode ver e fazer.</div></div></div><div class="card" style="margin-bottom:16px"><b>Master Principal:</b> ${esc(CZ_MASTER_EMAIL)}<div class="muted" style="margin-top:6px">Protegido: não pode ser desativado nem perder o acesso Master.</div></div><div class="tablewrap"><table><thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Status</th><th>Ações</th></tr></thead><tbody>${us.map(u=>`<tr><td>${esc(u.nome||'—')}</td><td>${esc(u.email||'')}</td><td>${u.email?.toLowerCase()===CZ_MASTER_EMAIL?'Master Principal':u.perfil==='master_autorizado'?'Master Autorizado':'Usuário'}</td><td>${u.ativo?'🟢 Ativo':'🔴 Inativo'}</td><td><button class="btn secondary" onclick="editarPermissoesUsuario('${u.id}')">Permissões</button></td></tr>`).join('')||'<tr><td colspan="5">Nenhum usuário cadastrado. Crie o login no Supabase Authentication; ele aparecerá aqui automaticamente.</td></tr>'}</tbody></table></div><div class="card" style="margin-top:16px"><b>Como adicionar um novo login</b><div class="muted" style="margin-top:7px">Por segurança, a senha não fica no HTML. Crie o usuário em Supabase → Authentication → Users. Depois ele aparecerá automaticamente nesta tela para você definir as permissões.</div></div>`;
+ $('#content').innerHTML=`<div class="sectionhead"><div><h2>👥 Usuários e Permissões</h2><div class="muted">Controle o que cada login pode ver e fazer.</div></div><button class="btn primary" onclick="novoUsuarioSistema()">+ Novo usuário</button></div><div class="card" style="margin-bottom:16px"><b>Master Principal:</b> ${esc(CZ_MASTER_EMAIL)}<div class="muted" style="margin-top:6px">Protegido: não pode ser desativado nem perder o acesso Master.</div></div><div class="tablewrap"><table><thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Status</th><th>Ações</th></tr></thead><tbody>${us.map(u=>`<tr><td>${esc(u.nome||'—')}</td><td>${esc(u.email||'')}</td><td>${u.email?.toLowerCase()===CZ_MASTER_EMAIL?'Master Principal':u.perfil==='master_autorizado'?'Master Autorizado':'Usuário'}</td><td>${u.ativo?'🟢 Ativo':'🔴 Inativo'}</td><td><button class="btn secondary" onclick="editarPermissoesUsuario('${u.id}')">Permissões</button></td></tr>`).join('')||'<tr><td colspan="5">Nenhum usuário cadastrado.</td></tr>'}</tbody></table></div><div class="card" style="margin-top:16px"><b>Cadastro de login</b><div class="muted" style="margin-top:7px">Use <b>+ Novo usuário</b>. A senha inicial é enviada somente para a função segura do Supabase e não fica gravada no HTML nem na tabela de permissões.</div></div>`;
 }
+
+async function novoUsuarioSistema(){
+ if(!contaMaster())return czAlert('Somente usuários Master podem criar novos logins.','Acesso restrito');
+ finModal('Novo usuário do sistema',[
+  {name:'nome',label:'Nome do usuário',required:true,full:true},
+  {name:'email',label:'E-mail / Login',type:'email',required:true,full:true},
+  {name:'senha',label:'Senha inicial',type:'password',required:true},
+  {name:'confirmar',label:'Confirmar senha',type:'password',required:true},
+  {name:'perfil',label:'Tipo de acesso',type:'select',options:['Usuário','Master Autorizado'],required:true,full:true}
+ ],async d=>{
+  const nome=String(d.nome||'').trim(),email=String(d.email||'').trim().toLowerCase(),senha=String(d.senha||''),confirmar=String(d.confirmar||'');
+  if(!nome)throw new Error('Informe o nome do usuário.');
+  if(!email||!email.includes('@'))throw new Error('Informe um e-mail válido.');
+  if(senha.length<6)throw new Error('A senha inicial precisa ter pelo menos 6 caracteres.');
+  if(senha!==confirmar)throw new Error('As senhas não são iguais.');
+  const perfil=d.perfil==='Master Autorizado'?'master_autorizado':'usuario';
+  const {data,error}=await db.functions.invoke('cz-criar-usuario',{body:{nome,email,senha,perfil}});
+  if(error)throw new Error(error.message||'Não foi possível criar o login.');
+  if(data?.error)throw new Error(data.error);
+  document.getElementById('finModalOverlay')?.remove();
+  await czAlert('Login criado com sucesso. Agora defina as permissões deste usuário.','Usuário criado');
+  await renderUsuariosPermissoes();
+  const {data:u}=await db.from('usuarios_sistema').select('id').eq('email',email).maybeSingle();
+  if(u?.id)editarPermissoesUsuario(u.id);
+  return false;
+ });
+ setTimeout(()=>{const form=document.getElementById('finModalForm');if(!form)return;const btn=form.querySelector('button[type=submit]');if(btn)btn.textContent='Criar login'},20);
+}
+
 async function editarPermissoesUsuario(id){
  const {data:u,error}=await db.from('usuarios_sistema').select('*').eq('id',id).single();if(error||!u)return czAlert(error?.message||'Usuário não encontrado.');
  const principal=String(u.email||'').toLowerCase()===CZ_MASTER_EMAIL;const p={...czPermPadrao(),...(u.permissoes||{})};
