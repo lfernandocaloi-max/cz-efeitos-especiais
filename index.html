@@ -225,7 +225,7 @@ function contaMaster(){
  const perfil=String(czPerfilUsuario?.perfil||'').trim().toLowerCase();
  return email===CZ_MASTER_EMAIL || perfil==='master' || perfil==='master_principal' || perfil==='master_autorizado';
 }
-async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V115';reconstruirMenuPermissoes();renderModule(0)}
+async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V116';reconstruirMenuPermissoes();renderModule(0)}
 $('#loginBtn').onclick=async()=>{const email=$('#email').value.trim(),password=$('#password').value;$('#loginMsg').textContent='Entrando...';const {data,error}=await db.auth.signInWithPassword({email,password});if(error){$('#loginMsg').textContent='Não foi possível entrar: '+error.message;return}$('#loginMsg').textContent='';showApp(data.user)};
 $('#logoutBtn').onclick=async()=>{await db.auth.signOut();showLogin()};
   async function recuperarSenha(){
@@ -364,8 +364,27 @@ async function renderResumoMovimentacaoDRE(){
  const saida=confirmados.filter(x=>x.tipo==='saida').reduce((s,x)=>s+Number(x.valor||0),0);
  area.innerHTML=`<div class="card"><div style="font-weight:900;margin-bottom:12px">Total de movimentação</div><div class="grid2"><div><div class="muted">Entrada</div><div style="font-size:25px;font-weight:900;color:#55d884">${money(entrada)}</div></div><div><div class="muted">Saída</div><div style="font-size:25px;font-weight:900;color:#ff7474">${money(saida)}</div></div></div></div>`;
 }
+
+let caixaFiltroDataDe='',caixaFiltroDataAte='';
+function aplicarFiltroDatasCaixa(){
+ caixaFiltroDataDe=$('#caixaDataDe')?.value||'';
+ caixaFiltroDataAte=$('#caixaDataAte')?.value||'';
+ renderCaixa(caixaFiltroAtual||'todos');
+}
+function limparFiltroDatasCaixa(){
+ caixaFiltroDataDe='';caixaFiltroDataAte='';
+ renderCaixa(caixaFiltroAtual||'todos');
+}
+let caixaFiltroAtual='todos';
 async function renderCaixa(filtro='todos'){
-  const movimentos=await carregarCaixa();
+  caixaFiltroAtual=filtro;
+  const movimentosTodos=await carregarCaixa();
+  const movimentos=(movimentosTodos||[]).filter(x=>{
+    const d=String(x.data||'').slice(0,10);
+    if(caixaFiltroDataDe&&d<caixaFiltroDataDe)return false;
+    if(caixaFiltroDataAte&&d>caixaFiltroDataAte)return false;
+    return true;
+  });
   const pendentes=movimentos.filter(caixaPrecisaConfirmar);
   const confirmados=movimentos.filter(x=>!caixaPrecisaConfirmar(x));
   const entradas=confirmados.filter(x=>x.tipo==='entrada').reduce((s,x)=>s+Number(x.valor||0),0);
@@ -376,6 +395,7 @@ async function renderCaixa(filtro='todos'){
   $('#content').innerHTML=`<div class="sectionhead"><div><h2>💵 Caixa</h2><div class="muted">Primeiro confira os recebimentos; somente depois eles entram no Caixa geral.</div></div><button type="button" class="btn secondary" onclick="renderFinanceiro()">Voltar ao financeiro</button></div>
     <div style="display:flex;gap:8px;margin-bottom:16px"><button class="btn primary" onclick="mostrarCaixaMovimentos()">Caixa</button><button class="btn secondary" onclick="mostrarCaixaContas()">Contas de recebimento</button></div>
     <div id="caixaAreaMovimentos">
+    <div class="card" style="margin-bottom:16px"><div class="sectionhead"><div><h3 style="margin:0">Filtro por data</h3><div class="muted">Filtre todas as movimentações do Caixa pelo período desejado.</div></div></div><div class="row"><div class="field"><label>Data de</label><input id="caixaDataDe" type="date" value="${esc(caixaFiltroDataDe)}"></div><div class="field"><label>Data até</label><input id="caixaDataAte" type="date" value="${esc(caixaFiltroDataAte)}"></div></div><div class="actions" style="justify-content:flex-start"><button type="button" class="btn primary" onclick="aplicarFiltroDatasCaixa()">Filtrar</button><button type="button" class="btn secondary" onclick="limparFiltroDatasCaixa()">Limpar filtro</button></div></div>
     ${caixaErro?`<div class="msg" style="color:#ff8b78">Não foi possível sincronizar o Caixa com o Supabase: ${esc(caixaErro)}.</div>`:''}
     <div class="cards" style="margin-bottom:16px"><div class="card"><div class="muted">A confirmar</div><div class="n">${money(totalPendente)}</div></div><div class="card"><div class="muted">Entradas confirmadas</div><div class="n" style="color:#55d884">${money(entradas)}</div></div><div class="card"><div class="muted">Saídas</div><div class="n" style="color:#ff7474">${money(saidas)}</div></div><div class="card"><div class="muted">Saldo real do Caixa</div><div class="n" style="color:${entradas-saidas>=0?'#55d884':'#ff7474'}">${money(entradas-saidas)}</div></div></div>
     <div class="card" style="margin-bottom:16px"><div class="sectionhead"><div><h3 style="margin:0">Recebimentos aguardando confirmação</h3><div class="muted">Pagamentos de eventos, PDV e outras entradas ficam aqui até você conferir sua conta.</div></div></div>
