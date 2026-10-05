@@ -274,7 +274,9 @@ function finStatus(total,pago,venc){const saldo=Math.max(0,total-pago),hoje=finI
 async function finRecebiveis(){
  await carregarCaixa();
  const {data,error}=await db.from('orcamentos').select('id,numero,cliente_nome,cliente_telefone,evento_nome,data_evento,valor_total,criado_em,dados').order('criado_em',{ascending:false}).limit(300);if(error)return [];
- return (data||[]).map(o=>{const total=Number(o.valor_total||0),pago=finPagoOrc(o.id),venc=o.data_evento?finAddDays(o.data_evento,-5):String(o.criado_em||'').slice(0,10),entrada=o.dados?.pagamento?.modo==='contratual'?Number(o.dados.pagamento.entrada_valor||0):o.dados?.pagamento?.modo==='avista'?total:total*.4;return {...o,total,pago,saldo:Math.max(0,total-pago),entrada,vencimento:venc,status_fin:finStatus(total,pago,venc)}}).filter(x=>x.total>0);
+ const orcs=data||[],ids=orcs.map(o=>o.id);let fechados=new Set();
+ if(ids.length){const {data:ev,error:ee}=await db.from('eventos_operacionais').select('origem_orcamento_id,status').in('origem_orcamento_id',ids);if(ee)return [];fechados=new Set((ev||[]).filter(e=>e.status!=='pendente').map(e=>String(e.origem_orcamento_id)))}
+ return orcs.filter(o=>fechados.has(String(o.id))).map(o=>{const total=Number(o.valor_total||0),pago=finPagoOrc(o.id),venc=o.data_evento?finAddDays(o.data_evento,-5):String(o.criado_em||'').slice(0,10),entrada=o.dados?.pagamento?.modo==='contratual'?Number(o.dados.pagamento.entrada_valor||0):o.dados?.pagamento?.modo==='avista'?total:total*.4;return {...o,total,pago,saldo:Math.max(0,total-pago),entrada,vencimento:venc,status_fin:finStatus(total,pago,venc)}}).filter(x=>x.total>0);
 }
 function finDespesas(){return finLoad(FIN_MOV_KEY).filter(x=>x.tipo==='saida')}
 function finResumoMes(receb,desp){const hoje=finISODate(),ym=hoje.slice(0,7);return {hoje,receberHoje:receb.filter(x=>x.saldo>0&&x.vencimento===hoje).reduce((s,x)=>s+x.saldo,0),receberMes:receb.filter(x=>x.saldo>0&&x.vencimento>hoje&&x.vencimento.startsWith(ym)).reduce((s,x)=>s+x.saldo,0),pagarHoje:desp.filter(x=>x.status!=='pago'&&x.vencimento===hoje).reduce((s,x)=>s+Number(x.valor||0),0),pagarMes:desp.filter(x=>x.status!=='pago'&&x.vencimento>hoje&&String(x.vencimento||'').startsWith(ym)).reduce((s,x)=>s+Number(x.valor||0),0),vencidos:receb.filter(x=>x.saldo>0&&x.vencimento<hoje).reduce((s,x)=>s+x.saldo,0),cobrancas:finLoad(FIN_COB_KEY).filter(x=>x.proxima_data===hoje)}}
@@ -795,11 +797,15 @@ async function renderVehicles(){
   await carregar();
 }
 
+let orcamentosFechadosModo=false;
+function abrirOrcamentosFechados(){orcamentosFechadosModo=true;renderOrcamentos(false)}
+function abrirOrcamentosAbertos(){orcamentosFechadosModo=false;renderOrcamentos(false)}
+
 async function renderOrcamentos(novo=false){
   const itensProduto = [];
   const itensAtivo = [];
   if(!novo){
-    $('#content').innerHTML = `<div class="sectionhead"><div><h2>Orçamentos</h2><div class="muted">Propostas salvas</div></div><button class="btn primary" type="button" onclick="renderOrcamentos(true)">+ Novo orçamento</button></div><div class="card"><div id="orcPropostasSalvas"><div class="muted">Carregando...</div></div></div>`;
+    $('#content').innerHTML = `<div class="sectionhead"><div><h2>Orçamentos</h2><div class="muted">${orcamentosFechadosModo?'Orçamentos fechados':'Propostas salvas — ainda não viraram evento'}</div></div><div class="actions" style="margin:0"><button class="btn ${orcamentosFechadosModo?'secondary':'primary'}" type="button" onclick="abrirOrcamentosAbertos()">Propostas em aberto</button><button class="btn ${orcamentosFechadosModo?'primary':'secondary'}" type="button" onclick="abrirOrcamentosFechados()">Orçamentos Fechados</button><button class="btn primary" type="button" onclick="renderOrcamentos(true)">+ Novo orçamento</button></div></div><div class="card"><div id="orcPropostasSalvas"><div class="muted">Carregando...</div></div></div>`;
     await carregarPropostasSalvas();
     return;
   }
@@ -1502,18 +1508,20 @@ Obrigado!`;
     if(error){box.innerHTML='<div class="muted">Erro ao carregar propostas: '+esc(error.message)+'</div>';return}
     const ids=(data||[]).map(x=>x.id),vinculos=(data||[]).map(x=>x.dados?.evento_operacional_id).filter(Boolean);
     const [porOrigem,porId]=await Promise.all([
-      ids.length?db.from('eventos_operacionais').select('id,origem_orcamento_id').in('origem_orcamento_id',ids):Promise.resolve({data:[]}),
-      vinculos.length?db.from('eventos_operacionais').select('id,origem_orcamento_id').in('id',vinculos):Promise.resolve({data:[]})
+      ids.length?db.from('eventos_operacionais').select('id,origem_orcamento_id,status').in('origem_orcamento_id',ids):Promise.resolve({data:[]}),
+      vinculos.length?db.from('eventos_operacionais').select('id,origem_orcamento_id,status').in('id',vinculos):Promise.resolve({data:[]})
     ]);
     if(porOrigem.error||porId.error){box.innerHTML='<div class="msg">Erro ao conferir eventos vinculados: '+esc((porOrigem.error||porId.error).message)+'</div>';return}
-    const origensComEvento=new Set((porOrigem.data||[]).map(x=>String(x.origem_orcamento_id)));
-    const eventosExistentes=new Set((porId.data||[]).map(x=>String(x.id)));
-    box.innerHTML=data?.length?`<div class="tablewrap"><table class="orcamentos-lista"><thead><tr><th>Cliente</th><th>Data</th><th>Evento</th><th>Valor</th><th>Status</th><th>Nº Proposta</th><th>Ações</th></tr></thead><tbody>${data.map(x=>`<tr><td>${esc(x.cliente_nome||'')}</td><td>${x.data_evento?new Date(x.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${esc(x.evento_nome||'')}</td><td>${money(x.valor_total)}</td><td>${esc(x.status||'')}</td><td><b>${esc(x.numero||'')}</b></td><td><div style="display:flex;gap:5px;align-items:center;flex-wrap:nowrap"><button type="button" class="btn secondary btnVisualizarProposta" data-id="${esc(x.id)}" title="Visualizar proposta" aria-label="Visualizar proposta" style="padding:5px 7px;min-height:auto">${iconeOlho()}</button><button type="button" class="btn secondary btnEnviarProposta" data-id="${esc(x.id)}" title="Enviar proposta pelo WhatsApp" aria-label="Enviar proposta pelo WhatsApp" style="padding:5px 7px;min-height:auto">${iconeEnviarProposta()}</button><button type="button" class="btn secondary btnWhatsProposta" data-id="${esc(x.id)}" title="Enviar preenchimento pelo WhatsApp" aria-label="Enviar preenchimento pelo WhatsApp" style="padding:5px 7px;min-height:auto">${iconeWhats()}</button><button type="button" class="btn secondary btnEventoProposta" data-id="${esc(x.id)}" title="${origensComEvento.has(String(x.id))||eventosExistentes.has(String(x.dados?.evento_operacional_id||''))?'Evento já criado':'Virar evento'}" aria-label="${origensComEvento.has(String(x.id))||eventosExistentes.has(String(x.dados?.evento_operacional_id||''))?'Evento já criado':'Virar evento'}" style="font-size:11px;padding:5px 8px;min-height:auto;${origensComEvento.has(String(x.id))||eventosExistentes.has(String(x.dados?.evento_operacional_id||''))?'background:#23864b;color:#fff':''}">Evento</button><button type="button" class="btn danger btnExcluirProposta" data-id="${esc(x.id)}" title="Excluir proposta" aria-label="Excluir proposta" style="font-size:14px;padding:4px 8px;min-height:auto">×</button></div></td></tr>`).join('')}</tbody></table></div>`:'<div class="muted">Nenhuma proposta gerada ainda.</div>';
-    box.querySelectorAll('.btnVisualizarProposta').forEach(btn=>{btn.onclick=()=>{const p=data.find(x=>String(x.id)===String(btn.dataset.id));if(!p)return;if(!p.dados||typeof p.dados!=='object'){alert('Esta proposta não possui os dados completos salvos para visualização.');return}visualizarOrcamentoSalvo(p)}});
+    const eventosVinculados=[...(porOrigem.data||[]),...(porId.data||[])];
+    const origensComEvento=new Set(eventosVinculados.filter(x=>x.status!=='pendente').map(x=>String(x.origem_orcamento_id)).filter(Boolean));
+    const eventosExistentes=new Set(eventosVinculados.filter(x=>x.status!=='pendente').map(x=>String(x.id)));
+    const propostasExibidas=(data||[]).filter(x=>{const fechado=origensComEvento.has(String(x.id))||eventosExistentes.has(String(x.dados?.evento_operacional_id||''));return orcamentosFechadosModo?fechado:!fechado});
+    box.innerHTML=propostasExibidas.length?`<div class="tablewrap"><table class="orcamentos-lista"><thead><tr><th>Cliente</th><th>Data</th><th>Evento</th><th>Valor</th><th>Status</th><th>Nº Proposta</th><th>Ações</th></tr></thead><tbody>${propostasExibidas.map(x=>`<tr><td>${esc(x.cliente_nome||'')}</td><td>${x.data_evento?new Date(x.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${esc(x.evento_nome||'')}</td><td>${money(x.valor_total)}</td><td>${esc(x.status||'')}</td><td><b>${esc(x.numero||'')}</b></td><td><div style="display:flex;gap:5px;align-items:center;flex-wrap:nowrap"><button type="button" class="btn secondary btnVisualizarProposta" data-id="${esc(x.id)}" title="Visualizar proposta" aria-label="Visualizar proposta" style="padding:5px 7px;min-height:auto">${iconeOlho()}</button><button type="button" class="btn secondary btnEnviarProposta" data-id="${esc(x.id)}" title="Enviar proposta pelo WhatsApp" aria-label="Enviar proposta pelo WhatsApp" style="padding:5px 7px;min-height:auto">${iconeEnviarProposta()}</button><button type="button" class="btn secondary btnWhatsProposta" data-id="${esc(x.id)}" title="Enviar preenchimento pelo WhatsApp" aria-label="Enviar preenchimento pelo WhatsApp" style="padding:5px 7px;min-height:auto">${iconeWhats()}</button><button type="button" class="btn secondary btnEventoProposta" data-id="${esc(x.id)}" title="${origensComEvento.has(String(x.id))||eventosExistentes.has(String(x.dados?.evento_operacional_id||''))?'Evento já criado':'Virar evento'}" aria-label="${origensComEvento.has(String(x.id))||eventosExistentes.has(String(x.dados?.evento_operacional_id||''))?'Evento já criado':'Virar evento'}" style="font-size:11px;padding:5px 8px;min-height:auto;${origensComEvento.has(String(x.id))||eventosExistentes.has(String(x.dados?.evento_operacional_id||''))?'background:#23864b;color:#fff':''}">Evento</button><button type="button" class="btn danger btnExcluirProposta" data-id="${esc(x.id)}" title="Excluir proposta" aria-label="Excluir proposta" style="font-size:14px;padding:4px 8px;min-height:auto">×</button></div></td></tr>`).join('')}</tbody></table></div>`:'<div class="muted">Nenhuma proposta gerada ainda.</div>';
+    box.querySelectorAll('.btnVisualizarProposta').forEach(btn=>{btn.onclick=()=>{const p=propostasExibidas.find(x=>String(x.id)===String(btn.dataset.id));if(!p)return;if(!p.dados||typeof p.dados!=='object'){alert('Esta proposta não possui os dados completos salvos para visualização.');return}visualizarOrcamentoSalvo(p)}});
     box.insertAdjacentHTML('beforeend','<div id="orcEnvioMsg" class="msg" role="status"></div>');
-    box.querySelectorAll('.btnEnviarProposta').forEach(btn=>{btn.onclick=()=>{const p=data.find(x=>String(x.id)===String(btn.dataset.id));if(p)enviarPropostaWhats(p,btn)}});
-    box.querySelectorAll('.btnEventoProposta').forEach(btn=>{btn.onclick=()=>{const p=data.find(x=>String(x.id)===String(btn.dataset.id));if(p)propostaVirarEvento(p)}});
-    box.querySelectorAll('.btnWhatsProposta').forEach(btn=>{btn.onclick=()=>{const p=data.find(x=>String(x.id)===String(btn.dataset.id));if(p)abrirWhatsPreenchimento(p)}});
+    box.querySelectorAll('.btnEnviarProposta').forEach(btn=>{btn.onclick=()=>{const p=propostasExibidas.find(x=>String(x.id)===String(btn.dataset.id));if(p)enviarPropostaWhats(p,btn)}});
+    box.querySelectorAll('.btnEventoProposta').forEach(btn=>{btn.onclick=()=>{const p=propostasExibidas.find(x=>String(x.id)===String(btn.dataset.id));if(p)propostaVirarEvento(p)}});
+    box.querySelectorAll('.btnWhatsProposta').forEach(btn=>{btn.onclick=()=>{const p=propostasExibidas.find(x=>String(x.id)===String(btn.dataset.id));if(p)abrirWhatsPreenchimento(p)}});
     box.querySelectorAll('.btnExcluirProposta').forEach(btn=>{btn.onclick=()=>excluirProposta(btn.dataset.id)});
   }
   prepararItensOrcamento();
@@ -1880,7 +1888,7 @@ async function mostrarTecnicaEvento(p,info,existente=null,materiaisExistentes=[]
       msg.textContent=status==='pendente'?'Rascunho salvo.':'Evento aguardando evento.';await renderEventos();
     }catch(err){if(novo&&eventoId){await db.from('evento_materiais').delete().eq('evento_id',eventoId);await db.from('eventos_operacionais').delete().eq('id',eventoId);eventoId=null}msg.textContent='Erro ao salvar evento: '+err.message;btns.forEach(b=>b.disabled=false)}
   }
-  $('#tecRascunho').onclick=()=>salvar('pendente');$('#tecCriar').onclick=()=>salvar('pronto');listar();
+  $('#tecRascunho').onclick=()=>salvar('pendente');$('#tecCriar').onclick=()=>{if(!confirm('Concluir fechamento e gerar o Financeiro?\n\nAo gerar o evento, esta proposta será considerada fechada e passará a aparecer no Financeiro.'))return;salvar('pronto')};listar();
 }
 
 function iconeOlhoEvento(){return '<svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="2.5" fill="currentColor"/></svg>'}
@@ -1966,9 +1974,9 @@ async function renderEventos(){
   await atualizarContaMaster();
   const {data,error}=await db.from('eventos_operacionais').select('*').order('data_evento',{ascending:true});
   if(error){$('#content').innerHTML=`<div class="sectionhead"><h2>Eventos</h2></div><div class="msg">Para ativar Eventos, execute primeiro o SQL desta versão no Supabase.<br>${esc(error.message)}</div>`;return}
-  const eventos=data||[];
+  const eventos=data||[],hojeEventos=finISODate();
   const conclusao=eventos.filter(e=>['aguardando_retorno','finalizado'].includes(e.status));
-  const operacionais=eventos.filter(e=>!['aguardando_retorno','finalizado'].includes(e.status));
+  const operacionais=eventos.filter(e=>e.data_evento&&e.data_evento>=hojeEventos&&e.status!=='finalizado').sort((a,b)=>String(a.data_evento).localeCompare(String(b.data_evento)));
   $('#content').innerHTML=`
     <div class="sectionhead"><div><h2>📅 Eventos</h2><div class="muted">Agenda operacional — sem valores financeiros</div></div><button class="btn secondary" id="novoEventoBtn">Criar pelo orçamento</button></div>
     <div class="cards" style="margin-bottom:16px">
@@ -1976,7 +1984,7 @@ async function renderEventos(){
       <div class="card"><div class="muted">Aguardando evento / separação</div><div class="n">${eventos.filter(e=>['aguardando_evento','pronto','aguardando_separacao','separando','material_pronto'].includes(e.status)).length}</div></div>
       <div class="card"><div class="muted">Aguardando retorno</div><div class="n">${eventos.filter(e=>e.status==='aguardando_retorno').length}</div></div>
     </div>
-    <h3>Eventos / Separação</h3>
+    <h3>Próximos eventos — do mais próximo para o mais distante</h3>
     <div class="tablewrap">${operacionais.length?`<table><thead><tr><th>Data</th><th>Cliente</th><th>Evento</th><th>Local</th><th>Status</th><th>Projeto</th><th>Operação</th>${contaMaster()?'<th style="width:46px"></th>':''}</tr></thead><tbody>${operacionais.map(e=>`<tr><td>${e.data_evento?new Date(e.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${esc(e.cliente_nome||'')}</td><td>${esc(e.nome_evento||'')}</td><td>${esc(e.local_evento||'')}</td><td>${statusEventoLabel(e.status)}</td><td><button type="button" class="btn secondary" title="Ver projeto" aria-label="Ver projeto" onclick="visualizarProjetoEvento('${e.id}')" style="padding:5px 8px;min-height:28px">${iconeOlhoEvento()}</button></td><td><button class="btn primary" onclick="${e.status==='pendente'?`abrirTecnicaEventoExistente('${e.id}')`:`iniciarEvento('${e.id}')`}">${e.status==='pendente'?'Editar técnica':e.status==='material_pronto'?'Ver conferência':'Iniciar separação'}</button></td>${contaMaster()?`<td><button type="button" title="Excluir evento" aria-label="Excluir evento" onclick="excluirEvento('${e.id}','eventos')" style="width:28px;height:28px;border:1px solid #63303a;background:#2a151a;color:#ff7b88;border-radius:7px;font-size:14px;font-weight:900;cursor:pointer;padding:0">×</button></td>`:''}</tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhum evento em separação.</div>'}</div>
 `;
   $('#novoEventoBtn').onclick=()=>renderOrcamentos();
