@@ -2367,7 +2367,20 @@ async function renderUsuariosPermissoes(){
  const {data,error}=await db.from('usuarios_sistema').select('*').order('nome',{ascending:true});
  if(error){$('#content').innerHTML=`<div class="msg">Execute primeiro o SQL de Usuários e Permissões no Supabase.<br>${esc(error.message)}</div>`;return}
  const us=data||[];
- $('#content').innerHTML=`<div class="sectionhead"><div><h2>👥 Usuários e Permissões</h2><div class="muted">Controle o que cada login pode ver e fazer.</div></div><button class="btn primary" onclick="novoUsuarioSistema()">+ Novo usuário</button></div><div class="card" style="margin-bottom:16px"><b>Master Principal:</b> ${esc(CZ_MASTER_EMAIL)}<div class="muted" style="margin-top:6px">Protegido: não pode ser desativado nem perder o acesso Master.</div></div><div class="tablewrap"><table><thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Status</th><th>Ações</th></tr></thead><tbody>${us.map(u=>`<tr><td>${esc(u.nome||'—')}</td><td>${esc(u.email||'')}</td><td>${u.email?.toLowerCase()===CZ_MASTER_EMAIL?'Master Principal':u.perfil==='master_autorizado'?'Master Autorizado':'Usuário'}</td><td>${u.ativo?'🟢 Ativo':'🔴 Inativo'}</td><td><button class="btn secondary" onclick="editarPermissoesUsuario('${u.id}')">Permissões</button></td></tr>`).join('')||'<tr><td colspan="5">Nenhum usuário cadastrado.</td></tr>'}</tbody></table></div><div class="card" style="margin-top:16px"><b>Cadastro de login</b><div class="muted" style="margin-top:7px">Use <b>+ Novo usuário</b>. A senha inicial é enviada somente para a função segura do Supabase e não fica gravada no HTML nem na tabela de permissões.</div></div>`;
+ $('#content').innerHTML=`<div class="sectionhead"><div><h2>👥 Usuários e Permissões</h2><div class="muted">Controle o que cada login pode ver e fazer.</div></div><button class="btn primary" onclick="novoUsuarioSistema()">+ Novo usuário</button></div><div class="card" style="margin-bottom:16px"><b>Master Principal:</b> ${esc(CZ_MASTER_EMAIL)}<div class="muted" style="margin-top:6px">Protegido: não pode ser desativado nem perder o acesso Master.</div></div><div class="tablewrap"><table><thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Status</th><th>Ações</th></tr></thead><tbody>${us.map(u=>`<tr><td>${esc(u.nome||'—')}</td><td>${esc(u.email||'')}</td><td>${u.email?.toLowerCase()===CZ_MASTER_EMAIL?'Master Principal':u.perfil==='master_autorizado'?'Master Autorizado':'Usuário'}</td><td>${u.ativo?'🟢 Ativo':'🔴 Inativo'}</td><td><div class="actions"><button class="btn secondary" onclick="editarPermissoesUsuario('${u.id}')">Permissões</button>${String(currentAuthUser?.email||'').toLowerCase()===CZ_MASTER_EMAIL && String(u.email||'').toLowerCase()!==CZ_MASTER_EMAIL?`<button class="btn danger" onclick="excluirLoginSistema('${u.id}','${String(u.nome||u.email||'Usuário').replace(/'/g,"\\'")}')">Excluir login</button>`:''}</div></td></tr>`).join('')||'<tr><td colspan="5">Nenhum usuário cadastrado.</td></tr>'}</tbody></table></div><div class="card" style="margin-top:16px"><b>Cadastro de login</b><div class="muted" style="margin-top:7px">Use <b>+ Novo usuário</b>. A senha inicial é enviada somente para a função segura do Supabase e não fica gravada no HTML nem na tabela de permissões.</div></div>`;
+}
+
+async function excluirLoginSistema(id,nome){
+  const emailAtual=String(currentAuthUser?.email||'').trim().toLowerCase();
+  if(emailAtual!==CZ_MASTER_EMAIL)return czAlert('Somente o Master Principal pode excluir logins.','Acesso restrito');
+  if(!await czConfirm(`Excluir o login de ${nome}? O usuário perderá o acesso ao sistema.`,`Excluir login`,`Excluir`))return;
+  const {data:u,error:buscaErro}=await db.from('usuarios_sistema').select('id,email,perfil').eq('id',id).single();
+  if(buscaErro||!u)return czAlert(buscaErro?.message||'Usuário não encontrado.','Erro');
+  if(String(u.email||'').trim().toLowerCase()===CZ_MASTER_EMAIL)return czAlert('O Master Principal não pode ser excluído.','Protegido');
+  const {error}=await db.from('usuarios_sistema').delete().eq('id',id);
+  if(error)return czAlert(error.message,'Erro ao excluir login');
+  await czAlert('Login removido da lista de usuários e acesso ao sistema bloqueado.','Login excluído');
+  await renderUsuariosPermissoes();
 }
 
 async function novoUsuarioSistema(){
