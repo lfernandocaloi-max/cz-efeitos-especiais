@@ -223,8 +223,8 @@ let currentAuthUser=null;
 function contaMaster(){
  const u=currentAuthUser;
  const email=String(u?.email||localStorage.getItem('cz_auth_email')||'').trim().toLowerCase();
- const r=String(u?.app_metadata?.role||u?.user_metadata?.role||'').toLowerCase();
- return email==='lfernando.caloi@gmail.com'||r==='master'||u?.app_metadata?.master===true||u?.user_metadata?.master===true
+ const perfil=String(czPerfilUsuario?.perfil||'').trim().toLowerCase();
+ return email===CZ_MASTER_EMAIL||['master','master_principal','master_autorizado'].includes(perfil)
 }
 async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':'');reconstruirMenuPermissoes();renderModule(0)}
 $('#loginBtn').onclick=async()=>{const email=$('#email').value.trim(),password=$('#password').value;$('#loginMsg').textContent='Entrando...';const {data,error}=await db.auth.signInWithPassword({email,password});if(error){$('#loginMsg').textContent='Não foi possível entrar: '+error.message;return}$('#loginMsg').textContent='';showApp(data.user)};
@@ -2345,42 +2345,62 @@ async function concluirOSManutencao(id){const a=czOsLoad(),os=a.find(x=>x.id===i
 async function relCustosManutencao(){const a=czOsLoad().filter(x=>relNoPeriodo(String(x.criado_em||'').slice(0,10)));const nomes=[...new Set(czOsLoad().map(x=>x.equipamento).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));const atual=window.relManAtivo||'';const f=a.filter(x=>!atual||x.equipamento===atual),tot=f.reduce((s,x)=>s+czOsTotal(x),0);$('#content').innerHTML=relTopo('🛠️ Relatório de Custos de Manutenção','Custos técnicos das OS — não gera movimentação financeira')+relFiltroPeriodo('relCustosManutencao')+`<div class="card"><label style="display:block;margin-bottom:8px">Nome do ativo</label><select onchange="window.relManAtivo=this.value;relCustosManutencao()"><option value="">Todos</option>${nomes.map(n=>`<option ${atual===n?'selected':''}>${esc(n)}</option>`).join('')}</select></div><div class="card"><b>Total gasto em manutenção no período: ${money(tot)}</b><div class="muted">A compra/reposição das peças deve ser lançada separadamente em Financeiro → Nova despesa.</div></div><div class="tablewrap"><table><thead><tr><th>Data</th><th>OS</th><th>Ativo</th><th>Qtd.</th><th>Ocorrência</th><th>Status</th><th>Custo técnico</th></tr></thead><tbody>${f.map(x=>`<tr><td>${new Date(x.criado_em).toLocaleDateString('pt-BR')}</td><td>${esc(x.numero)}</td><td>${esc(x.equipamento)}</td><td>${x.quantidade}</td><td>${esc(x.ocorrencia)}</td><td>${x.status}</td><td>${money(czOsTotal(x))}</td></tr>`).join('')||'<tr><td colspan="7">Nenhuma manutenção no período.</td></tr>'}</tbody></table></div>`}
 
 
-// ===== v89 · Usuários e permissões =====
+// ===== v93 · Acessos simplificados: MASTER / FRENTE DE SEPARAÇÃO =====
 const CZ_ACOES=['ver','criar','editar','excluir'];
 let czPerfilUsuario=null;
 function czPermPadrao(){const p={};modules.forEach(m=>p[m]={ver:false,criar:false,editar:false,excluir:false});return p}
 function czPermTudo(){const p=czPermPadrao();Object.values(p).forEach(x=>CZ_ACOES.forEach(a=>x[a]=true));return p}
+function czNormalizarPerfil(perfil){
+ const p=String(perfil||'').trim().toLowerCase();
+ // Compatibilidade com os logins criados nas versões anteriores.
+ if(['master','master_principal','master_autorizado'].includes(p))return 'master';
+ if(['frente_separacao','frente de separação','frente de separacao','usuario'].includes(p))return 'frente_separacao';
+ return 'frente_separacao';
+}
+function czEhMasterPrincipal(){return String(currentAuthUser?.email||'').trim().toLowerCase()===CZ_MASTER_EMAIL}
 async function carregarPermissoesUsuario(){
  const email=String(currentAuthUser?.email||'').trim().toLowerCase();
- if(email===CZ_MASTER_EMAIL){czPerfilUsuario={email,nome:'Luiz Fernando Caloi',perfil:'master_principal',ativo:true,permissoes:czPermTudo()};return}
- try{const {data,error}=await db.from('usuarios_sistema').select('*').eq('user_id',currentAuthUser.id).maybeSingle();if(error)throw error;czPerfilUsuario=data||{email,perfil:'usuario',ativo:false,permissoes:czPermPadrao()}}catch(e){czPerfilUsuario={email,perfil:'usuario',ativo:false,permissoes:czPermPadrao()}}
+ if(email===CZ_MASTER_EMAIL){czPerfilUsuario={email,nome:'Luiz Fernando Caloi',perfil:'master',ativo:true,permissoes:czPermTudo()};return}
+ try{
+  const {data,error}=await db.from('usuarios_sistema').select('*').eq('user_id',currentAuthUser.id).maybeSingle();
+  if(error)throw error;
+  czPerfilUsuario=data||{email,perfil:'frente_separacao',ativo:false,permissoes:{}};
+  czPerfilUsuario.perfil=czNormalizarPerfil(czPerfilUsuario.perfil);
+ }catch(e){czPerfilUsuario={email,perfil:'frente_separacao',ativo:false,permissoes:{}}}
  if(czPerfilUsuario?.ativo===false){await czAlert('Seu usuário está inativo. Procure o Master do sistema.','Acesso bloqueado');await db.auth.signOut();showLogin();throw new Error('Usuário inativo')}
 }
-function contaMaster(){const email=String(currentAuthUser?.email||'').trim().toLowerCase();return email===CZ_MASTER_EMAIL||['master_principal','master_autorizado'].includes(String(czPerfilUsuario?.perfil||''))}
-function czPode(modulo,acao='ver'){if(contaMaster())return true;return !!czPerfilUsuario?.permissoes?.[modulo]?.[acao]}
+function contaMaster(){return czEhMasterPrincipal()||czNormalizarPerfil(czPerfilUsuario?.perfil)==='master'}
+function czPode(modulo,acao='ver'){
+ if(contaMaster())return true;
+ // Frente de separação: somente operação de separação e retorno.
+ if(czNormalizarPerfil(czPerfilUsuario?.perfil)==='frente_separacao')return ['Eventos','Retorno de evento'].includes(modulo);
+ return false;
+}
 function reconstruirMenuPermissoes(){const botoes=ordemMenu.filter(i=>czPode(modules[i],'ver'));$('#nav').innerHTML=botoes.map((i,k)=>`<button data-i="${i}" class="${k===0?'active':''}">${modules[i]}</button>`).join('')}
 const _renderModulePerm=renderModule;
-renderModule=async function(i){const mod=modules[i];if(!czPode(mod,'ver')){await czAlert('Seu usuário não tem permissão para visualizar este módulo.','Acesso restrito');return}return _renderModulePerm(i)};
-function czPermCheck(mod,acao){if(czPode(mod,acao))return true;czAlert(`Seu usuário não tem permissão para ${acao} em ${mod}.`,'Acesso restrito');return false}
+renderModule=async function(i){const mod=modules[i];if(!czPode(mod,'ver')){await czAlert('Seu login não tem acesso a este módulo.','Acesso restrito');return}return _renderModulePerm(i)};
+function czPermCheck(mod,acao){if(czPode(mod,acao))return true;czAlert(`Seu login não tem acesso a esta função em ${mod}.`,'Acesso restrito');return false}
+
 async function renderUsuariosPermissoes(){
- if(!contaMaster()){return czAlert('Somente usuários Master podem administrar usuários e permissões.','Acesso restrito')}
+ if(!contaMaster())return czAlert('Somente usuários Master podem administrar logins.','Acesso restrito');
  const {data,error}=await db.from('usuarios_sistema').select('*').order('nome',{ascending:true});
- if(error){$('#content').innerHTML=`<div class="msg">Execute primeiro o SQL de Usuários e Permissões no Supabase.<br>${esc(error.message)}</div>`;return}
+ if(error){$('#content').innerHTML=`<div class="msg">Erro ao carregar usuários.<br>${esc(error.message)}</div>`;return}
  const us=data||[];
- $('#content').innerHTML=`<div class="sectionhead"><div><h2>👥 Usuários e Permissões</h2><div class="muted">Controle o que cada login pode ver e fazer.</div></div><button class="btn primary" onclick="novoUsuarioSistema()">+ Novo usuário</button></div><div class="card" style="margin-bottom:16px"><b>Master Principal:</b> ${esc(CZ_MASTER_EMAIL)}<div class="muted" style="margin-top:6px">Protegido: não pode ser desativado nem perder o acesso Master.</div></div><div class="tablewrap"><table><thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Status</th><th>Ações</th></tr></thead><tbody>${us.map(u=>`<tr><td>${esc(u.nome||'—')}</td><td>${esc(u.email||'')}</td><td>${u.email?.toLowerCase()===CZ_MASTER_EMAIL?'Master Principal':u.perfil==='master_autorizado'?'Master Autorizado':'Usuário'}</td><td>${u.ativo?'🟢 Ativo':'🔴 Inativo'}</td><td><div class="actions"><button class="btn secondary" onclick="editarPermissoesUsuario('${u.id}')">Permissões</button>${String(currentAuthUser?.email||'').toLowerCase()===CZ_MASTER_EMAIL && String(u.email||'').toLowerCase()!==CZ_MASTER_EMAIL?`<button class="btn danger" onclick="excluirLoginSistema('${u.id}','${String(u.nome||u.email||'Usuário').replace(/'/g,"\\'")}')">Excluir login</button>`:''}</div></td></tr>`).join('')||'<tr><td colspan="5">Nenhum usuário cadastrado.</td></tr>'}</tbody></table></div><div class="card" style="margin-top:16px"><b>Cadastro de login</b><div class="muted" style="margin-top:7px">Use <b>+ Novo usuário</b>. A senha inicial é enviada somente para a função segura do Supabase e não fica gravada no HTML nem na tabela de permissões.</div></div>`;
+ $('#content').innerHTML=`<div class="sectionhead"><div><h2>👥 Usuários do sistema</h2><div class="muted">Agora existem somente dois tipos de acesso: Master e Frente de separação.</div></div><button class="btn primary" onclick="novoUsuarioSistema()">+ Novo usuário</button></div>
+ <div class="card" style="margin-bottom:16px"><b>Master protegido:</b> ${esc(CZ_MASTER_EMAIL)}<div class="muted" style="margin-top:6px">Este login não pode ser excluído nem rebaixado.</div></div>
+ <div class="tablewrap"><table><thead><tr><th>Nome</th><th>E-mail</th><th>Tipo de acesso</th><th>Status</th><th>Ações</th></tr></thead><tbody>${us.map(u=>{const principal=String(u.email||'').toLowerCase()===CZ_MASTER_EMAIL;const tipo=principal||czNormalizarPerfil(u.perfil)==='master'?'Master':'Frente de separação';return `<tr><td>${esc(u.nome||'—')}</td><td>${esc(u.email||'')}</td><td><b>${tipo}</b></td><td>${u.ativo?'🟢 Ativo':'🔴 Inativo'}</td><td><div class="actions"><button class="btn secondary" onclick="editarPermissoesUsuario('${u.id}')">Editar acesso</button>${!principal?`<button class="btn danger" onclick="excluirLoginSistema('${u.id}','${String(u.nome||u.email||'Usuário').replace(/'/g,"\\'")}')">Excluir login</button>`:''}</div></td></tr>`}).join('')||'<tr><td colspan="5">Nenhum usuário cadastrado.</td></tr>'}</tbody></table></div>`;
 }
 
 async function excluirLoginSistema(id,nome){
-  const emailAtual=String(currentAuthUser?.email||'').trim().toLowerCase();
-  if(emailAtual!==CZ_MASTER_EMAIL)return czAlert('Somente o Master Principal pode excluir logins.','Acesso restrito');
-  if(!await czConfirm(`Excluir o login de ${nome}? O usuário perderá o acesso ao sistema.`,`Excluir login`,`Excluir`))return;
-  const {data:u,error:buscaErro}=await db.from('usuarios_sistema').select('id,email,perfil').eq('id',id).single();
-  if(buscaErro||!u)return czAlert(buscaErro?.message||'Usuário não encontrado.','Erro');
-  if(String(u.email||'').trim().toLowerCase()===CZ_MASTER_EMAIL)return czAlert('O Master Principal não pode ser excluído.','Protegido');
-  const {error}=await db.from('usuarios_sistema').delete().eq('id',id);
-  if(error)return czAlert(error.message,'Erro ao excluir login');
-  await czAlert('Login removido da lista de usuários e acesso ao sistema bloqueado.','Login excluído');
-  await renderUsuariosPermissoes();
+ if(!contaMaster())return czAlert('Somente um Master pode excluir logins.','Acesso restrito');
+ if(!await czConfirm(`Excluir o login de ${nome}? O usuário perderá o acesso ao sistema.`,`Excluir login`,`Excluir`))return;
+ const {data:u,error:buscaErro}=await db.from('usuarios_sistema').select('id,email,perfil').eq('id',id).single();
+ if(buscaErro||!u)return czAlert(buscaErro?.message||'Usuário não encontrado.','Erro');
+ if(String(u.email||'').trim().toLowerCase()===CZ_MASTER_EMAIL)return czAlert('O Master protegido não pode ser excluído.','Protegido');
+ const {error}=await db.from('usuarios_sistema').delete().eq('id',id);
+ if(error)return czAlert(error.message,'Erro ao excluir login');
+ await czAlert('Login excluído do sistema.','Login excluído');
+ await renderUsuariosPermissoes();
 }
 
 async function novoUsuarioSistema(){
@@ -2390,38 +2410,49 @@ async function novoUsuarioSistema(){
   {name:'email',label:'E-mail / Login',type:'email',required:true,full:true},
   {name:'senha',label:'Senha inicial',type:'password',required:true},
   {name:'confirmar',label:'Confirmar senha',type:'password',required:true},
-  {name:'perfil',label:'Tipo de acesso',type:'select',options:['Usuário','Master Autorizado'],required:true,full:true}
+  {name:'perfil',label:'Tipo de acesso',type:'select',options:['Master','Frente de separação'],required:true,full:true}
  ],async d=>{
   const nome=String(d.nome||'').trim(),email=String(d.email||'').trim().toLowerCase(),senha=String(d.senha||''),confirmar=String(d.confirmar||'');
   if(!nome)throw new Error('Informe o nome do usuário.');
   if(!email||!email.includes('@'))throw new Error('Informe um e-mail válido.');
   if(senha.length<6)throw new Error('A senha inicial precisa ter pelo menos 6 caracteres.');
   if(senha!==confirmar)throw new Error('As senhas não são iguais.');
-  const perfil=d.perfil==='Master Autorizado'?'master_autorizado':'usuario';
+  // A Edge Function antiga aceita master_autorizado/usuario; gravamos nesses valores por compatibilidade.
+  const perfil=d.perfil==='Master'?'master_autorizado':'usuario';
   const {data,error}=await db.functions.invoke('cz-criar-usuario',{body:{nome,email,senha,perfil}});
   if(error)throw new Error(error.message||'Não foi possível criar o login.');
   if(data?.error)throw new Error(data.error);
   document.getElementById('finModalOverlay')?.remove();
-  await czAlert('Login criado com sucesso. Agora defina as permissões deste usuário.','Usuário criado');
+  await czAlert('Login criado com sucesso.','Usuário criado');
   await renderUsuariosPermissoes();
-  const {data:u}=await db.from('usuarios_sistema').select('id').eq('email',email).maybeSingle();
-  if(u?.id)editarPermissoesUsuario(u.id);
   return false;
  });
  setTimeout(()=>{const form=document.getElementById('finModalForm');if(!form)return;const btn=form.querySelector('button[type=submit]');if(btn)btn.textContent='Criar login'},20);
 }
 
 async function editarPermissoesUsuario(id){
- const {data:u,error}=await db.from('usuarios_sistema').select('*').eq('id',id).single();if(error||!u)return czAlert(error?.message||'Usuário não encontrado.');
- const principal=String(u.email||'').toLowerCase()===CZ_MASTER_EMAIL;const p={...czPermPadrao(),...(u.permissoes||{})};
+ const {data:u,error}=await db.from('usuarios_sistema').select('*').eq('id',id).single();
+ if(error||!u)return czAlert(error?.message||'Usuário não encontrado.');
+ const principal=String(u.email||'').toLowerCase()===CZ_MASTER_EMAIL;
+ const atual=principal||czNormalizarPerfil(u.perfil)==='master'?'Master':'Frente de separação';
  const ov=document.createElement('div');ov.id='permModal';ov.className='modal';
- ov.innerHTML=`<div class="modalbox" style="width:min(900px,100%)"><div class="sectionhead"><div><h2>Permissões — ${esc(u.nome||u.email)}</h2><div class="muted">${esc(u.email||'')}</div></div><button class="btn secondary" onclick="document.getElementById('permModal')?.remove()">Fechar</button></div><div class="row"><div class="field"><label>Nome</label><input id="permNome" value="${esc(u.nome||'')}"></div><div class="field"><label>Perfil</label><select id="permPerfil" ${principal?'disabled':''}><option value="usuario" ${u.perfil==='usuario'?'selected':''}>Usuário com permissões personalizadas</option><option value="master_autorizado" ${u.perfil==='master_autorizado'?'selected':''}>Master Autorizado</option>${principal?'<option selected value="master_principal">Master Principal</option>':''}</select></div></div><div class="field"><label class="client-switch"><input id="permAtivo" type="checkbox" ${u.ativo?'checked':''} ${principal?'disabled':''}> Usuário ativo</label></div><div class="tablewrap" style="margin-top:14px"><table><thead><tr><th>Módulo</th><th>Ver</th><th>Criar</th><th>Editar</th><th>Excluir</th></tr></thead><tbody>${modules.map(m=>`<tr><td><b>${esc(m)}</b></td>${CZ_ACOES.map(a=>`<td style="text-align:center"><input type="checkbox" data-pmod="${esc(m)}" data-pacao="${a}" ${p[m]?.[a]?'checked':''} ${principal?'disabled':''}></td>`).join('')}</tr>`).join('')}</tbody></table></div><div class="actions"><button class="btn secondary" onclick="document.getElementById('permModal')?.remove()">Cancelar</button><button class="btn primary" onclick="salvarPermissoesUsuario('${u.id}')">Salvar permissões</button></div></div>`;document.body.appendChild(ov);
- const sel=$('#permPerfil');if(sel&&!principal)sel.onchange=()=>{const master=sel.value==='master_autorizado';ov.querySelectorAll('[data-pmod]').forEach(c=>{if(master)c.checked=true;c.disabled=master})};
+ ov.innerHTML=`<div class="modalbox" style="width:min(620px,100%)"><div class="sectionhead"><div><h2>Editar acesso — ${esc(u.nome||u.email)}</h2><div class="muted">${esc(u.email||'')}</div></div><button class="btn secondary" onclick="document.getElementById('permModal')?.remove()">Fechar</button></div><div class="field"><label>Nome</label><input id="permNome" value="${esc(u.nome||'')}"></div><div class="field"><label>Tipo de acesso</label><select id="permPerfil" ${principal?'disabled':''}><option ${atual==='Master'?'selected':''}>Master</option><option ${atual==='Frente de separação'?'selected':''}>Frente de separação</option></select></div><div class="field"><label class="client-switch"><input id="permAtivo" type="checkbox" ${u.ativo?'checked':''} ${principal?'disabled':''}> Usuário ativo</label></div><div class="card" style="margin-top:12px"><b>${atual==='Master'?'Master:':'Frente de separação:'}</b> ${atual==='Master'?'acesso completo a todas as telas e funções do sistema.':'acesso somente às telas Eventos e Retorno de evento para separação, conferência, saída e retorno.'}</div><div class="actions"><button class="btn secondary" onclick="document.getElementById('permModal')?.remove()">Cancelar</button><button class="btn primary" onclick="salvarPermissoesUsuario('${u.id}')">Salvar acesso</button></div></div>`;
+ document.body.appendChild(ov);
 }
 async function salvarPermissoesUsuario(id){
- const {data:u,error}=await db.from('usuarios_sistema').select('*').eq('id',id).single();if(error||!u)return czAlert(error?.message||'Usuário não encontrado.');const principal=String(u.email||'').toLowerCase()===CZ_MASTER_EMAIL;
- const perfil=principal?'master_principal':$('#permPerfil').value,ativo=principal?true:$('#permAtivo').checked,permissoes=czPermPadrao();document.querySelectorAll('#permModal [data-pmod]').forEach(c=>{permissoes[c.dataset.pmod][c.dataset.pacao]=perfil==='master_autorizado'?true:c.checked});
- const {error:er}=await db.from('usuarios_sistema').update({nome:$('#permNome').value.trim(),perfil,ativo,permissoes,atualizado_em:new Date().toISOString()}).eq('id',id);if(er)return czAlert(er.message,'Erro ao salvar');document.getElementById('permModal')?.remove();await czAlert('Permissões atualizadas com sucesso.','Usuário atualizado');renderUsuariosPermissoes();
+ const {data:u,error}=await db.from('usuarios_sistema').select('*').eq('id',id).single();
+ if(error||!u)return czAlert(error?.message||'Usuário não encontrado.');
+ const principal=String(u.email||'').toLowerCase()===CZ_MASTER_EMAIL;
+ const tipo=principal?'Master':$('#permPerfil').value;
+ const perfil=principal?'master_principal':tipo==='Master'?'master_autorizado':'usuario';
+ const ativo=principal?true:$('#permAtivo').checked;
+ const permissoes=tipo==='Master'?czPermTudo():czPermPadrao();
+ if(tipo==='Frente de separação')for(const m of ['Eventos','Retorno de evento'])CZ_ACOES.forEach(a=>permissoes[m][a]=true);
+ const {error:er}=await db.from('usuarios_sistema').update({nome:$('#permNome').value.trim(),perfil,ativo,permissoes,atualizado_em:new Date().toISOString()}).eq('id',id);
+ if(er)return czAlert(er.message,'Erro ao salvar');
+ document.getElementById('permModal')?.remove();
+ await czAlert('Tipo de acesso atualizado com sucesso.','Usuário atualizado');
+ renderUsuariosPermissoes();
 }
 
 boot();
