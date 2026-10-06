@@ -85,12 +85,12 @@
   <div class="field"><label class="client-switch"><input id="clientIsCompany" type="checkbox"> CNPJ</label></div>
   <div class="row" id="clientPfFields"><div class="field"><label>CPF</label><input id="clientCpf" inputmode="numeric"></div><div class="field"><label>RG</label><input id="clientRg"></div></div>
   <div class="row hidden" id="clientPjFields"><div class="field"><label>CNPJ</label><input id="clientCnpj" inputmode="numeric"></div><div class="field"><label>IE (Inscrição Estadual)</label><input id="clientIe"></div></div>
-  <div class="field"><label>Endereço</label><input id="clientAddress" autocomplete="street-address"></div>
+  <div class="row"><div class="field"><label>Endereço</label><input id="clientAddress" autocomplete="street-address"></div></div>
   <div class="row"><div class="field"><label>Cidade</label><input id="clientCity" autocomplete="address-level2"></div><div class="field"><label>CEP</label><input id="clientZip" inputmode="numeric" autocomplete="postal-code"></div></div>
   <div class="field"><label>Complemento</label><input id="clientComplement"></div>
   <div class="row"><div class="field"><label>E-mail</label><input id="clientEmail" type="email" autocomplete="email"></div><div class="field"><label>Profissão</label><input id="clientProfession"></div></div>
   <div class="field"><label>Origem</label><input id="clientOrigin" value="manual"></div><div class="field"><label>Observações</label><textarea id="clientNotes"></textarea></div>
-  <div class="actions"><button class="btn secondary" onclick="closeClient()">Cancelar</button><button id="deleteClientBtn" class="btn danger hidden" type="button">Excluir cliente</button><button id="clientHistoryBtn" class="btn secondary hidden" type="button">Histórico</button><button id="saveClientBtn" class="btn primary">Salvar cliente</button></div><div id="clientHistory" class="hidden" style="margin-top:14px"></div><div id="clientMsg" class="msg"></div></div></div>
+  <div class="actions"><button class="btn secondary" onclick="closeClient()">Cancelar</button><button id="deleteClientBtn" class="btn danger hidden" type="button">Excluir cliente</button><button id="clientHistoryBtn" class="btn secondary hidden" type="button">Histórico</button><button id="saveClientBtn" class="btn primary" type="button">Salvar cliente</button></div><div id="clientHistory" class="hidden" style="margin-top:14px"></div><div id="clientMsg" class="msg"></div></div></div>
 
 <div id="productModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="productModalTitle">Novo produto</h2><button class="btn secondary" onclick="closeProduct()">Fechar</button></div><input id="productId" type="hidden"><div class="row"><div class="field"><label>Nome *</label><input id="productName"></div><div class="field"><label>Unidade *</label><select id="productUnit"><option value="">Selecione</option><option value="un">UN</option><option value="monotiro">Monotiro</option><option value="torta">Torta</option><option value="placa">Placa</option><option value="kg">Kg</option><option value="litro">Litro</option><option value="caixa">Caixa</option></select></div></div>
 <div class="field"><label class="client-switch"><input id="productConsumable" type="checkbox" checked> Consumível</label></div>
@@ -1691,7 +1691,7 @@ function atualizarTipoCliente(){const pj=$('#clientIsCompany').checked;$('#clien
 $('#clientIsCompany').onchange=atualizarTipoCliente;
 function openClient(c=null){
   $('#clientModal').classList.remove('hidden');$('#modalTitle').textContent=c?'Cliente Nº '+numeroCadastroCliente(c):'Novo cliente';
-  const campos={clientId:c?.id,clientName:c?.nome,clientPhone:c?.telefone,clientEmail:c?.email,clientAddress:c?.endereco,clientCpf:c?.cpf,clientRg:c?.rg,clientCnpj:c?.cnpj,clientIe:c?.ie,clientProfession:c?.profissao,clientCity:c?.cidade,clientZip:c?.cep,clientNumber:c?.numero,clientComplement:c?.complemento,clientOrigin:c?.origem||'manual',clientNotes:c?.observacoes};
+  const campos={clientId:c?.id,clientName:c?.nome,clientPhone:c?.telefone,clientEmail:c?.email,clientAddress:c?.endereco,clientCpf:c?.cpf,clientRg:c?.rg,clientCnpj:c?.cnpj,clientIe:c?.ie,clientProfession:c?.profissao,clientCity:c?.cidade,clientZip:c?.cep,clientComplement:c?.complemento,clientOrigin:c?.origem||'manual',clientNotes:c?.observacoes};
   for(const [id,valor] of Object.entries(campos))$('#'+id).value=valor||'';
   $('#clientIsCompany').checked=c?.tipo_pessoa==='pj'||!!c?.cnpj;atualizarTipoCliente();$('#clientOpenedAt').textContent='Data de abertura: '+(c?.criado_em?new Date(c.criado_em).toLocaleDateString('pt-BR'):'será definida ao salvar');
   $('#clientMsg').textContent='';const hb=$('#clientHistoryBtn'),dbtn=$('#deleteClientBtn'),hh=$('#clientHistory');if(hb)hb.classList.toggle('hidden',!c);if(dbtn)dbtn.classList.toggle('hidden',!c);if(hh){hh.classList.add('hidden');hh.innerHTML=''}
@@ -1705,7 +1705,7 @@ $('#deleteClientBtn').onclick=()=>{const id=$('#clientId').value;if(id)deleteCli
 $('#saveClientBtn').onclick=async()=>{
   const id=$('#clientId').value,pj=$('#clientIsCompany').checked;
   const val=x=>$('#'+x).value.trim()||null;
-  const payload={nome:val('clientName'),telefone:val('clientPhone'),tipo_pessoa:pj?'pj':'pf',email:val('clientEmail'),endereco:val('clientAddress'),numero:val('clientNumber'),complemento:val('clientComplement'),cidade:val('clientCity'),cep:val('clientZip'),profissao:val('clientProfession'),cpf:pj?null:val('clientCpf'),rg:pj?null:val('clientRg'),cnpj:pj?val('clientCnpj'):null,ie:pj?val('clientIe'):null,origem:val('clientOrigin')||'manual',observacoes:val('clientNotes'),atualizado_em:new Date().toISOString()};
+  const payload={nome:val('clientName'),telefone:val('clientPhone'),tipo_pessoa:pj?'pj':'pf',email:val('clientEmail'),endereco:val('clientAddress'),complemento:val('clientComplement'),cidade:val('clientCity'),cep:val('clientZip'),profissao:val('clientProfession'),cpf:pj?null:val('clientCpf'),rg:pj?null:val('clientRg'),cnpj:pj?val('clientCnpj'):null,ie:pj?val('clientIe'):null,origem:val('clientOrigin')||'manual',observacoes:val('clientNotes'),atualizado_em:new Date().toISOString()};
   if(!payload.nome||!payload.telefone){$('#clientMsg').textContent='Informe nome e telefone para cadastrar o cliente.';return}
   const botao=$('#saveClientBtn');botao.disabled=true;$('#clientMsg').textContent='Salvando...';
   const {error}=await(id?db.from('clientes').update(payload).eq('id',id):db.from('clientes').insert({...payload,criado_em:new Date().toISOString()}));
