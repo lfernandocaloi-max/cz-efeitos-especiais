@@ -1453,78 +1453,70 @@ atualizarEquipe();
   function gerarPdfProposta(d,numero,paraEnvio=false){
     if(!window.jspdf?.jsPDF)throw new Error('Não foi possível carregar o gerador de PDF.');
     const pdf=new window.jspdf.jsPDF({unit:'mm',format:'a4'});
-    const W=210,H=297; let y=0;
+    const W=210,H=297;
+    const produtos=Array.isArray(d.produtos)?d.produtos:[];
+    const equipamentos=Array.isArray(d.equipamentos)?d.equipamentos:[];
     const imagemA4=(data)=>{
-      // A imagem é aplicada em modo cover para preencher a página inteira sem deformar.
       const img=pdf.getImageProperties(data),rImg=img.width/img.height,rPag=W/H;
       let w,h,x,z;
       if(rImg>rPag){h=H;w=H*rImg;x=(W-w)/2;z=0}else{w=W;h=W/rImg;x=0;z=(H-h)/2}
       pdf.addImage(data,'JPEG',x,z,w,h,undefined,'FAST');
     };
     const marcaDagua=()=>{pdf.addImage(CZ_ORCAMENTO_MARCA_DAGUA,'JPEG',0,0,W,H,undefined,'FAST')};
-    const cabecalho=(capa=true)=>{
-      pdf.setFillColor(18,22,28);pdf.rect(0,0,W,capa?42:25,'F');
-      pdf.setTextColor(212,170,76);pdf.setFont('helvetica','bold');pdf.setFontSize(capa?20:14);pdf.text('CZ EFEITOS ESPECIAIS',15,capa?18:15);
-      pdf.setTextColor(255,255,255);pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.text('PROPOSTA COMERCIAL',15,capa?27:20);
-      pdf.setTextColor(80,80,80);
+    const ouro=[178,125,47],preto=[28,28,28],cinza=[115,115,115];
+    const linhaTitulo=(n,titulo,y)=>{
+      pdf.setTextColor(...preto);pdf.setFont('times','italic');pdf.setFontSize(16);
+      pdf.text(n+'.  '+titulo,15,y);
+      pdf.setDrawColor(...ouro);pdf.setLineWidth(.35);pdf.line(15,y+3,195,y+3);
+      return y+12;
     };
-    const novaPagina=()=>{pdf.addPage();marcaDagua();cabecalho(false);y=34};
-    // Página 1: capa escolhida pelo usuário + nome automático do cliente.
+    const campo=(rotulo,valor,y)=>{
+      pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.setTextColor(...preto);pdf.text(rotulo+':',20,y);
+      pdf.setTextColor(75,75,75);pdf.text(String(valor||'—'),58,y);
+      pdf.setDrawColor(205,205,205);pdf.setLineWidth(.2);pdf.line(58,y+1,193,y+1);
+      return y+8;
+    };
+    // CAPA: mantém a capa atual e apenas insere o nome automático do cadastro do cliente.
     imagemA4(CZ_ORCAMENTO_CAPA);
     const nomeClienteCapa=String(d.cliente||'').trim();
     if(nomeClienteCapa){
-      // Nome centralizado com aparência elegante de convite.
-      pdf.setFont('times','italic');
-      pdf.setFontSize(nomeClienteCapa.length>34?19:nomeClienteCapa.length>24?23:27);
+      pdf.setFont('times','italic');pdf.setFontSize(nomeClienteCapa.length>34?19:nomeClienteCapa.length>24?23:27);
       pdf.setTextColor(255,255,255);
-      const nomeLinhas=pdf.splitTextToSize(nomeClienteCapa,160);
-      const centroY=151-((nomeLinhas.length-1)*5);
+      const nomeLinhas=pdf.splitTextToSize(nomeClienteCapa,160),centroY=151-((nomeLinhas.length-1)*5);
       nomeLinhas.forEach((linha,i)=>pdf.text(linha,W/2,centroY+(i*10),{align:'center'}));
     }
-    // Página 2 em diante: mantém o orçamento no padrão comercial, sem valores unitários.
-    pdf.addPage();marcaDagua();cabecalho(true); y=52;
-    pdf.setFont('helvetica','bold');pdf.setFontSize(15);pdf.setTextColor(25,25,25);pdf.text('Proposta '+numero,15,y); y+=9;
-    pdf.setFont('helvetica','normal');pdf.setFontSize(10);
+    // PÁGINA 2: modelo 2 escolhido — sem Deslocamento, sem Equipe e sem valores individuais.
+    pdf.addPage();marcaDagua();
+    pdf.setDrawColor(...ouro);pdf.setLineWidth(.45);pdf.line(12,15,198,15);
+    pdf.setTextColor(...preto);pdf.setFont('times','italic');pdf.setFontSize(19);pdf.text('Proposta Comercial',15,29);
+    pdf.setFont('helvetica','bold');pdf.setFontSize(9);pdf.setTextColor(...ouro);pdf.text('ORÇAMENTO Nº '+String(numero),195,24,{align:'right'});
+    pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(...preto);
+    pdf.text('DATA: '+new Date().toLocaleDateString('pt-BR'),195,30,{align:'right'});
+    pdf.text('VALIDADE: '+(d.validade_orcamento?finDate(d.validade_orcamento):'—'),195,35,{align:'right'});
+    let y=49;
+    y=linhaTitulo('1','Dados do Evento',y);
     const dataFmt=d.data_evento?new Date(d.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—';
-    const infos=[['Orçamento',d.evento],['Validade',finDate(d.validade_orcamento)],['Data do evento',dataFmt],['Cidade',d.cidade_evento||'—'],['Local',d.local_evento||'—'],['Horário',d.horario||'—']];
-    infos.forEach(([a,b])=>{pdf.setFont('helvetica','bold');pdf.text(a+':',15,y);pdf.setFont('helvetica','normal');pdf.text(String(b),48,y);y+=7});
-    y+=4;pdf.setDrawColor(212,170,76);pdf.line(15,y,195,y);y+=10;
-    pdf.setFont('helvetica','bold');pdf.setFontSize(12);pdf.text('Serviços, produtos e equipamentos',15,y);y+=8;
-    const linhas=[...d.produtos.map(x=>({nome:x.nome,qtd:x.quantidade,tipo:'Produto / serviço'})),...d.equipamentos.map(x=>({nome:x.nome,qtd:x.quantidade,tipo:'Equipamento'}))];
-    pdf.setFontSize(9);pdf.setFillColor(242,242,242);pdf.rect(15,y-5,180,8,'F');pdf.text('Descrição',18,y);pdf.text('Tipo',135,y);pdf.text('Qtd.',185,y,{align:'right'});y+=8;
-    pdf.setFont('helvetica','normal');
-    linhas.forEach(x=>{if(y>265){novaPagina()} const nome=pdf.splitTextToSize(String(x.nome),108);pdf.text(nome,18,y);pdf.text(x.tipo,135,y);pdf.text(String(x.qtd),185,y,{align:'right'});y+=Math.max(7,nome.length*5);pdf.setDrawColor(230);pdf.line(15,y-3,195,y-3)});
-    if(y>245){novaPagina()}
-    y+=8;pdf.setFillColor(18,22,28);pdf.roundedRect(15,y,180,28,3,3,'F');
-    pdf.setTextColor(255,255,255);pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.text('INVESTIMENTO TOTAL',22,y+9);
-    pdf.setTextColor(212,170,76);pdf.setFont('helvetica','bold');pdf.setFontSize(19);pdf.text(money(d.total),22,y+21);
-    y+=39;
-    const linhaPagamentoPDF=(texto,destaque=false)=>{
-      if(y>270)novaPagina();
-      pdf.setTextColor(45,45,45);pdf.setFont('helvetica',destaque?'bold':'normal');pdf.setFontSize(destaque?10:9);
-      const partes=pdf.splitTextToSize(String(texto),180);
-      for(const parte of partes){if(y>275)novaPagina();pdf.text(parte,15,y);y+=5.5}
-    };
-    y+=2;linhaPagamentoPDF('Forma e condição de pagamento',true);
-    const pg=d.pagamento||{};
-    if(pg.modo==='contratual'){
-      linhaPagamentoPDF('Parcelamento contratual');
-      linhaPagamentoPDF('Entrada: '+finDate(pg.data_entrada)+' • '+(pg.forma_entrada||'—'));
-      (pg.parcelas_detalhes||[]).forEach(parcela=>linhaPagamentoPDF(String(parcela.numero)+'ª parcela: '+finDate(parcela.data)+' • '+(parcela.forma||'—')));
-    }else if(pg.modo==='avista'){
-      linhaPagamentoPDF('À vista • '+(pg.forma||'—'));
-      if(pg.forma==='Cartão de crédito'){
-        const n=Math.max(1,Math.min(10,Number(pg.parcelas||1)));
-        linhaPagamentoPDF('Cartão de crédito em '+n+'x');
-      }
-    }else{
-      linhaPagamentoPDF('Forma: '+(pg.forma||'—'));
-      linhaPagamentoPDF('Condição padrão: entrada de 40%');
-      linhaPagamentoPDF('Saldo: vencimento em '+finDate(pg.vencimento_saldo));
+    y=campo('Data do evento',dataFmt,y); y=campo('Local',d.local_evento||'—',y); y=campo('Cidade',d.cidade_evento||'—',y); y=campo('Horário',d.horario||'—',y); y=campo('Evento',d.evento||'—',y);
+    y+=7;y=linhaTitulo('2','Produtos e Equipamentos',y);
+    const linhas=[...produtos.map(x=>({nome:x.nome,qtd:x.quantidade})),...equipamentos.map(x=>({nome:x.nome,qtd:x.quantidade}))];
+    pdf.setFillColor(246,239,227);pdf.rect(15,y-5,180,8,'F');pdf.setTextColor(...preto);pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.text('Descrição',105,y,{align:'center'});y+=8;
+    const maxLinhas=Math.min(linhas.length,10);
+    for(let i=0;i<Math.max(maxLinhas,5);i++){
+      const x=linhas[i];
+      if(x){const texto=(Number(x.qtd||0)>1?String(x.qtd)+'x ':'')+String(x.nome||'');pdf.text(pdf.splitTextToSize(texto,168)[0],19,y);}
+      pdf.setDrawColor(210,210,210);pdf.line(15,y+3,195,y+3);y+=8;
     }
-    y+=4;if(y>275)novaPagina();
-    pdf.setTextColor(75,75,75);pdf.setFont('helvetica','normal');pdf.setFontSize(8);
-    pdf.text('CZ Efeitos Especiais • Proposta gerada em '+new Date().toLocaleString('pt-BR'),15,y);
+    if(linhas.length>10){pdf.setFontSize(8);pdf.setTextColor(...cinza);pdf.text('+'+(linhas.length-10)+' itens adicionais conforme proposta.',19,y);y+=7;}
+    y+=5;y=linhaTitulo('3','Observações',y);
+    pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.setTextColor(80,80,80);
+    const obs=String(d.observacoes||d.observacao||'').trim();
+    if(obs){const partes=pdf.splitTextToSize(obs,175).slice(0,4);pdf.text(partes,18,y);y+=Math.max(18,partes.length*6);}else{for(let i=0;i<3;i++){pdf.setDrawColor(210,210,210);pdf.line(18,y,193,y);y+=9;}}
+    // Único valor destacado: total do investimento. Tarja curta, discreta e somente atrás do valor.
+    const totalY=270;
+    pdf.setTextColor(...preto);pdf.setFont('times','italic');pdf.setFontSize(18);pdf.text('Total de Investimento:',128,totalY,{align:'right'});
+    pdf.setFillColor(55,55,55);pdf.roundedRect(132,totalY-10,63,15,2,2,'F');
+    pdf.setTextColor(235,203,145);pdf.setFont('helvetica','bold');pdf.setFontSize(15);pdf.text(money(d.total),190,totalY,{align:'right'});
+    pdf.setDrawColor(...ouro);pdf.setLineWidth(.45);pdf.line(12,286,198,286);
     const nomeArquivo='proposta-'+String(numero).replace(/[^a-zA-Z0-9_-]/g,'-')+'-'+String(d.cliente||'cliente').replace(/[^a-zA-Z0-9_-]/g,'-')+'.pdf';
     if(paraEnvio)return {blob:pdf.output('blob'),nomeArquivo};
     pdf.save(nomeArquivo);
