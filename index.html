@@ -2352,7 +2352,7 @@ async function visualizarEventoRetorno(id){
 }
 async function excluirEventoFinalizado(id){
  if(!contaMaster()){alert('Somente a conta Master pode excluir eventos finalizados.');return}
- const {data:ev,error:evErro}=await db.from('eventos_operacionais').select('id,nome_evento,origem_orcamento_id,status').eq('id',id).maybeSingle();
+ const {data:ev,error:evErro}=await db.from('eventos_operacionais').select('id,nome_evento,origem_orcamento_id,status,saida_baixada_em').eq('id',id).maybeSingle();
  if(evErro){alert('Não foi possível verificar o evento: '+evErro.message);return}
  if(!ev){alert('Evento não encontrado.');return}
  if(ev.status!=='finalizado'){return excluirEvento(id,'retorno')}
@@ -2367,8 +2367,19 @@ async function excluirEventoFinalizado(id){
      const cobs=finLoad(FIN_COB_KEY).filter(x=>String(x.orcamento_id||'')!==String(orcId));
      finSave(FIN_COB_KEY,cobs);
    }
+   // Evento finalizado já teve o retorno concluído. A trava do banco impede remover
+   // materiais enquanto a saída permanece marcada como baixada. Para uma exclusão
+   // deliberada da conta Master, retiramos essa trava somente deste evento antes
+   // de apagar seus vínculos. Isso não altera a proteção dos demais eventos.
+   if(ev.saida_baixada_em){
+     const {error:estorno}=await db.from('eventos_operacionais').update({saida_baixada_em:null,atualizado_em:new Date().toISOString()}).eq('id',id);
+     if(estorno)throw new Error('Não foi possível liberar o histórico de saída para exclusão: '+estorno.message);
+   }
    const {error:merr}=await db.from('evento_materiais').delete().eq('evento_id',id);
-   if(merr)throw new Error('Materiais do evento: '+merr.message);
+   if(merr){
+     if(ev.saida_baixada_em)await db.from('eventos_operacionais').update({saida_baixada_em:ev.saida_baixada_em,atualizado_em:new Date().toISOString()}).eq('id',id);
+     throw new Error('Materiais do evento: '+merr.message);
+   }
    const {error:derr}=await db.from('eventos_operacionais').delete().eq('id',id);
    if(derr)throw new Error('Evento: '+derr.message);
    caixaCache=[];caixaImportado=false;
