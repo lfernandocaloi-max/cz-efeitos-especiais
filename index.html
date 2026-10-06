@@ -2333,7 +2333,7 @@ async function renderRetornoEventos(historico=retornoHistorico){
  if(retornoFiltroEvento)es=es.filter(e=>norm(e.nome_evento).includes(norm(retornoFiltroEvento)));
  $('#content').innerHTML=`<div class="sectionhead"><div><h2>↩️ Retorno de evento</h2><div class="muted">${retornoHistorico?'Histórico dos retornos já concluídos.':'Somente eventos aguardando conferência de retorno.'}</div></div><div class="actions" style="margin:0"><button class="btn ${retornoHistorico?'primary':'secondary'}" onclick="renderRetornoEventos(${!retornoHistorico})">${retornoHistorico?'Retornos em aberto':'Histórico'}</button><button class="btn secondary" onclick="renderEventos()">Voltar aos eventos</button></div></div>
  <div class="filters" style="margin-bottom:16px;align-items:end"><div class="field"><label>Data de</label><input id="retFiltroDataInicio" type="date" value="${esc(retornoFiltroDataInicio)}"></div><div class="field"><label>Data até</label><input id="retFiltroDataFim" type="date" value="${esc(retornoFiltroDataFim)}"></div><div class="field"><label>Cliente</label><input id="retFiltroCliente" value="${esc(retornoFiltroCliente)}" placeholder="Nome do cliente"></div><div class="field"><label>Nº proposta</label><input id="retFiltroProposta" value="${esc(retornoFiltroProposta)}" placeholder="Ex.: 001"></div><div class="field"><label>Evento</label><input id="retFiltroEvento" value="${esc(retornoFiltroEvento)}" placeholder="Nome do evento"></div><div style="display:flex;gap:8px"><button class="btn primary" onclick="retornoAplicarFiltros()">Filtrar</button><button class="btn secondary" onclick="retornoLimparFiltros()">Limpar</button></div></div>
- <div class="tablewrap">${es.length?`<table><thead><tr><th>Data</th><th>Cliente</th><th>Evento</th><th>Nº Proposta</th><th>Status</th><th>Visualizar</th><th>Operação</th>${contaMaster()&&!retornoHistorico?'<th style="width:46px"></th>':''}</tr></thead><tbody>${es.map(e=>`<tr><td>${e.data_evento?new Date(e.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${esc(e.cliente_nome||'')}</td><td>${esc(e.nome_evento||'')}</td><td><b>${esc(e.numero_proposta||'—')}</b></td><td>${statusEventoLabel(e.status)}</td><td><button type="button" class="btn secondary" title="Visualizar evento" aria-label="Visualizar evento" onclick="visualizarEventoRetorno('${e.id}')" style="padding:5px 8px;min-height:28px">${iconeOlhoEvento()}</button></td><td><button class="btn ${retornoHistorico?'secondary':'primary'}" onclick="abrirRetornoEvento('${e.id}')">${retornoHistorico?'Ver retorno':'Iniciar retorno'}</button></td>${contaMaster()&&!retornoHistorico?`<td><button type="button" title="Excluir evento" aria-label="Excluir evento" onclick="excluirEvento('${e.id}','retorno')" style="width:28px;height:28px;border:1px solid #63303a;background:#2a151a;color:#ff7b88;border-radius:7px;font-size:14px;font-weight:900;cursor:pointer;padding:0">×</button></td>`:''}</tr>`).join('')}</tbody></table>`:`<div class="empty">${retornoHistorico?'Nenhum retorno concluído neste filtro.':'Nenhum evento aguardando retorno neste filtro.'}</div>`}</div>`;
+ <div class="tablewrap">${es.length?`<table><thead><tr><th>Data</th><th>Cliente</th><th>Evento</th><th>Nº Proposta</th><th>Status</th><th>Visualizar</th><th>Operação</th>${contaMaster()?'<th style="width:46px"></th>':''}</tr></thead><tbody>${es.map(e=>`<tr><td>${e.data_evento?new Date(e.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${esc(e.cliente_nome||'')}</td><td>${esc(e.nome_evento||'')}</td><td><b>${esc(e.numero_proposta||'—')}</b></td><td>${statusEventoLabel(e.status)}</td><td><button type="button" class="btn secondary" title="Visualizar evento" aria-label="Visualizar evento" onclick="visualizarEventoRetorno('${e.id}')" style="padding:5px 8px;min-height:28px">${iconeOlhoEvento()}</button></td><td><button class="btn ${retornoHistorico?'secondary':'primary'}" onclick="abrirRetornoEvento('${e.id}')">${retornoHistorico?'Ver retorno':'Iniciar retorno'}</button></td>${contaMaster()?`<td><button type="button" title="${retornoHistorico?'Excluir evento finalizado e desfazer financeiro':'Excluir evento'}" aria-label="Excluir evento" onclick="${retornoHistorico?`excluirEventoFinalizado('${e.id}')`:`excluirEvento('${e.id}','retorno')`}" style="width:28px;height:28px;border:1px solid #63303a;background:#2a151a;color:#ff7b88;border-radius:7px;font-size:14px;font-weight:900;cursor:pointer;padding:0">×</button></td>`:''}</tr>`).join('')}</tbody></table>`:`<div class="empty">${retornoHistorico?'Nenhum retorno concluído neste filtro.':'Nenhum evento aguardando retorno neste filtro.'}</div>`}</div>`;
  ['retFiltroCliente','retFiltroProposta','retFiltroEvento'].forEach(id=>document.getElementById(id)?.addEventListener('keydown',e=>{if(e.key==='Enter')retornoAplicarFiltros()}));
 }
 async function visualizarEventoRetorno(id){
@@ -2349,6 +2349,33 @@ async function visualizarEventoRetorno(id){
     <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">Materiais e devolução</h3><div class="tablewrap"><table><thead><tr><th>Material</th><th>Cód. de barras</th><th>Qtd. saída</th><th>Devolvido</th><th>Situação</th></tr></thead><tbody>${materiais.map(m=>{const esperado=Number(m.quantidade_bipada||0),r=retornoInfoMaterial(m,e),q=Math.min(Number(r.qtd||0),esperado);return `<tr><td>${esc(m.nome_item)}</td><td>${esc(m.codigo||'—')}</td><td>${esperado}</td><td>${q}</td><td>${r.status==='perda'?'⚠️ Perda':r.status==='manutencao'?'🛠️ Manutenção':esperado>0&&q>=esperado?'✅ Devolvido':esperado>0?'🟥 Pendente':'—'}</td></tr>`}).join('')||'<tr><td colspan="5">Nenhum material cadastrado.</td></tr>'}</tbody></table></div></div>
     <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">Projeto de execução</h3><svg class="projeto-canvas" viewBox="0 0 900 500" xmlns="http://www.w3.org/2000/svg">${projetoExecucaoMarkup(e.projeto_execucao)}</svg></div>
     <div class="card"><h3 style="margin-top:0">Anotação técnica</h3><div style="white-space:pre-wrap">${esc(e.anotacao_tecnica||'—')}</div></div>`;
+}
+async function excluirEventoFinalizado(id){
+ if(!contaMaster()){alert('Somente a conta Master pode excluir eventos finalizados.');return}
+ const {data:ev,error:evErro}=await db.from('eventos_operacionais').select('id,nome_evento,origem_orcamento_id,status').eq('id',id).maybeSingle();
+ if(evErro){alert('Não foi possível verificar o evento: '+evErro.message);return}
+ if(!ev){alert('Evento não encontrado.');return}
+ if(ev.status!=='finalizado'){return excluirEvento(id,'retorno')}
+ const nome=ev.nome_evento||'este evento',orcId=ev.origem_orcamento_id||null;
+ if(!await czConfirm(`Excluir definitivamente ${nome}?\n\nTambém serão desfeitas as movimentações financeiras vinculadas a este evento. Esta ação não poderá ser desfeita.`,'Excluir evento finalizado','Excluir e desfazer financeiro'))return;
+ try{
+   if(orcId){
+     const {error:cx}=await db.from('caixa_movimentacoes').delete().eq('orcamento_id',orcId);
+     if(cx)throw new Error('Financeiro/Caixa: '+cx.message);
+     const movs=finLoad(FIN_MOV_KEY).filter(x=>String(x.orcamento_id||'')!==String(orcId));
+     finSave(FIN_MOV_KEY,movs);
+     const cobs=finLoad(FIN_COB_KEY).filter(x=>String(x.orcamento_id||'')!==String(orcId));
+     finSave(FIN_COB_KEY,cobs);
+   }
+   const {error:merr}=await db.from('evento_materiais').delete().eq('evento_id',id);
+   if(merr)throw new Error('Materiais do evento: '+merr.message);
+   const {error:derr}=await db.from('eventos_operacionais').delete().eq('id',id);
+   if(derr)throw new Error('Evento: '+derr.message);
+   caixaCache=[];caixaImportado=false;
+   await carregarCaixa();
+   alert('Evento finalizado excluído e financeiro vinculado desfeito.');
+   renderRetornoEventos(true);
+ }catch(err){alert('Não foi possível excluir o evento finalizado: '+err.message)}
 }
 async function excluirEvento(id,origem='eventos'){
  if(!contaMaster()){alert('Somente a conta Master pode excluir eventos.');return}
