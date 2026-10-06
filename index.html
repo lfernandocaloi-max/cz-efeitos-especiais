@@ -592,6 +592,7 @@ async function renderRelatorios(){
   ['financeiro','💰','Financeiro','Entradas, recebimentos, valores em aberto e movimentações financeiras.'],
   ['dre','📊','DRE','Resumo de receitas, despesas e resultado por período.'],
   ['estoque','📦','Estoque','Posição de estoque, custo dos produtos e itens abaixo do mínimo.'],
+  ['ativos','🧰','Ativos / Equipamentos','Valor total investido em ativos, lista completa e impressão para conferência física.'],
   ['vendas','🧾','Vendas','Propostas geradas, faturamento e valores recebidos.'],
   ['clientes','👥','Clientes','Clientes cadastrados, eventos e histórico comercial.'],
   ['despesas','💸','Despesas','Gastos por categoria, pagamentos realizados e contas em aberto.'],
@@ -605,6 +606,7 @@ async function abrirRelatorio(tipo){
  if(tipo==='financeiro')return relFinanceiro();
  if(tipo==='dre')return relDRE();
  if(tipo==='estoque')return relEstoque();
+ if(tipo==='ativos')return relAtivos();
  if(tipo==='vendas')return relVendas();
  if(tipo==='clientes')return relClientes();
  if(tipo==='despesas')return relDespesas();
@@ -643,6 +645,26 @@ async function abrirFechamentoEvento(id){
 async function relFinanceiro(){const r=(await finRecebiveis()).filter(x=>relNoPeriodo(x.vencimento));await carregarCaixa();const mov=caixaCache.filter(x=>relNoPeriodo(relDataMov(x))),entradas=mov.filter(x=>x.tipo==='entrada').reduce((s,x)=>s+Number(x.valor||0),0),aberto=r.reduce((s,x)=>s+x.saldo,0);$('#content').innerHTML=relTopo('💰 Relatório Financeiro','Visão geral dos recebimentos')+relFiltroPeriodo('relFinanceiro')+`<div class="cards"><div class="card"><div class="muted">Recebido</div><div class="n">${money(entradas)}</div></div><div class="card"><div class="muted">A receber</div><div class="n">${money(aberto)}</div></div><div class="card"><div class="muted">Propostas com saldo</div><div class="n">${r.filter(x=>x.saldo>0).length}</div></div></div>`}
 async function relDRE(){await carregarCaixa();const a=caixaCache.filter(x=>relNoPeriodo(relDataMov(x))),ent=a.filter(x=>x.tipo==='entrada').reduce((s,x)=>s+Number(x.valor||0),0),sai=a.filter(x=>x.tipo==='saida').reduce((s,x)=>s+Number(x.valor||0),0);$('#content').innerHTML=relTopo('📊 DRE','Demonstrativo simplificado com base no Caixa')+relFiltroPeriodo('relDRE')+`<div class="card"><div class="tablewrap"><table><tbody><tr><td>Receitas</td><td>${money(ent)}</td></tr><tr><td>Despesas</td><td>${money(sai)}</td></tr><tr><td><b>Resultado</b></td><td><b>${money(ent-sai)}</b></td></tr></tbody></table></div></div>`}
 async function relEstoque(){const {data}=await db.from('produtos').select('nome,estoque_atual,estoque_minimo,valor_custo,data_compra').order('nome');const a=(data||[]).filter(x=>relNoPeriodo(x.data_compra)),valor=a.reduce((s,x)=>s+Number(x.estoque_atual||0)*Number(x.valor_custo||0),0);$('#content').innerHTML=relTopo('📦 Relatório de Estoque','Posição dos produtos por período de compra')+relFiltroPeriodo('relEstoque')+`<div class="card"><b>Valor de custo em estoque: ${money(valor)}</b></div><div class="tablewrap"><table><thead><tr><th>Produto</th><th>Estoque</th><th>Mínimo</th><th>Custo un.</th><th>Custo total</th></tr></thead><tbody>${a.map(x=>`<tr><td>${esc(x.nome)}</td><td>${x.estoque_atual??0}</td><td>${x.estoque_minimo??0}</td><td>${money(x.valor_custo)}</td><td>${money(Number(x.estoque_atual||0)*Number(x.valor_custo||0))}</td></tr>`).join('')}</tbody></table></div>`}
+async function relAtivos(){
+ const {data,error}=await db.from('ativos').select('*').order('nome');
+ if(error){$('#content').innerHTML=relTopo('🧰 Relatório de Ativos')+`<div class="msg">${esc(error.message)}</div>`;return}
+ const a=data||[];
+ const totalUnidades=a.reduce((s,x)=>s+Number(x.quantidade??1),0);
+ const valorTotal=a.reduce((s,x)=>s+(Number(x.quantidade??1)*Number(x.valor_compra||0)),0);
+ $('#content').innerHTML=relTopo('🧰 Relatório de Ativos','Patrimônio em equipamentos e lista para conferência física')+`<div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(210px,1fr));margin-bottom:16px"><div class="card"><div class="muted">Modelos de ativos</div><div class="n">${a.length}</div></div><div class="card"><div class="muted">Quantidade total</div><div class="n">${totalUnidades}</div></div><div class="card"><div class="muted">Valor total em ativos</div><div class="n">${money(valorTotal)}</div></div></div><div class="card"><div class="sectionhead"><div><h3 style="margin:0">Lista de ativos</h3><div class="muted">Valor total calculado por quantidade × valor de compra.</div></div><button type="button" class="btn primary" onclick="relImprimirAtivos()">🖨 Imprimir lista para conferência</button></div><div class="tablewrap">${a.length?`<table><thead><tr><th>Ativo / Equipamento</th><th>Código</th><th>Cód. barras</th><th>Qtd.</th><th>Valor un.</th><th>Valor total</th><th>Status</th></tr></thead><tbody>${a.map(x=>`<tr><td><b>${esc(x.nome||'—')}</b></td><td>${esc(x.codigo_interno||'—')}</td><td>${esc(x.codigo_barras||'—')}</td><td>${Number(x.quantidade??1)}</td><td>${money(x.valor_compra)}</td><td>${money(Number(x.quantidade??1)*Number(x.valor_compra||0))}</td><td>${esc(x.status||'—')}</td></tr>`).join('')}</tbody><tfoot><tr><td colspan="5" style="text-align:right"><b>VALOR TOTAL EM ATIVOS</b></td><td><b>${money(valorTotal)}</b></td><td></td></tr></tfoot></table>`:'<div class="empty">Nenhum ativo cadastrado.</div>'}</div></div>`;
+ window.relAtivosDados=a;
+}
+function relImprimirAtivos(){
+ const a=window.relAtivosDados||[];
+ if(!a.length){czAlert('Nenhum ativo cadastrado para imprimir.','Relatório de Ativos');return}
+ const totalUnidades=a.reduce((s,x)=>s+Number(x.quantidade??1),0);
+ const valorTotal=a.reduce((s,x)=>s+(Number(x.quantidade??1)*Number(x.valor_compra||0)),0);
+ const linhas=a.map(x=>`<tr><td class="check">□</td><td>${esc(x.nome||'—')}</td><td>${esc(x.codigo_interno||'—')}</td><td>${esc(x.codigo_barras||'—')}</td><td class="num">${Number(x.quantidade??1)}</td><td>${esc(x.status||'—')}</td><td class="obs"></td></tr>`).join('');
+ const w=window.open('','_blank','width=1100,height=800');
+ if(!w){czAlert('O navegador bloqueou a janela de impressão. Libere pop-ups para este site.','Impressão');return}
+ w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Conferência de Ativos - CZ Efeitos Especiais</title><style>body{font-family:Arial,sans-serif;color:#111;margin:28px}h1{margin:0 0 4px;font-size:22px}.sub{margin-bottom:18px;color:#444}.resumo{display:flex;gap:30px;margin:14px 0 20px;font-size:14px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #777;padding:7px;vertical-align:middle}th{background:#eee;text-align:left}.check{width:28px;text-align:center;font-size:20px}.num{text-align:center}.obs{width:190px;height:25px}.assinatura{margin-top:38px;display:flex;gap:50px}.linha{flex:1;border-top:1px solid #222;padding-top:6px;text-align:center;font-size:12px}@media print{button{display:none}body{margin:10mm}}</style></head><body><h1>CZ Efeitos Especiais — Conferência de Ativos</h1><div class="sub">Lista para conferência física dos equipamentos</div><div class="resumo"><b>Modelos: ${a.length}</b><b>Quantidade total: ${totalUnidades}</b><b>Valor patrimonial: ${money(valorTotal)}</b><b>Data: ${new Date().toLocaleDateString('pt-BR')}</b></div><table><thead><tr><th>Conf.</th><th>Ativo / Equipamento</th><th>Código</th><th>Cód. barras</th><th>Qtd.</th><th>Status</th><th>Observação</th></tr></thead><tbody>${linhas}</tbody></table><div class="assinatura"><div class="linha">Responsável pela conferência</div><div class="linha">Data / assinatura</div></div><script>window.onload=()=>{window.print()}<\/script></body></html>`);
+ w.document.close();
+}
 async function relVendas(){
  await carregarCaixa();
  const {data}=await db.from('orcamentos').select('id,numero,cliente_nome,evento_nome,data_evento,valor_total,status').order('data_evento',{ascending:false}).limit(1000);
