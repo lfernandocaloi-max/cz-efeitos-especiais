@@ -251,7 +251,7 @@ $('#logoutBtn').onclick=async()=>{await db.auth.signOut();showLogin()};
     ? 'Erro: '+error.message
     : 'Link de recuperação enviado para seu e-mail.';
 }
-async function renderModule(i){$('#pageTitle').textContent=modules[i];if(i===0)return renderDashboard();if(i===1)return renderClients();if(i===2)return renderOrcamentos();if(i===3)return renderContratosV137();if(i===4)return renderEventos();if(i===5)return renderRetornoEventos();if(i===6)return renderProducts();if(i===7)return renderAssets();if(i===8)return renderColaboradores();if(i===9)return renderManutencao();if(i===10)return renderFinanceiro();if(i===11)return renderAgenda();if(i===12)return renderRelatorios();if(i===13)return renderUsuariosPermissoes();if(i===14)return renderShoppingList();if(i===15)return renderVehicles();if(i===16)return renderCaixa();if(i===17)return renderPDV();if(i===18)return renderSairEventoV135();if(i===19)return renderOficinaV135();if(i===20)return renderInventarioV135();$('#content').innerHTML=`<div class="sectionhead"><h2>${modules[i]}</h2></div><div class="placeholder">Módulo já previsto no banco de dados. A tela operacional será ativada nas próximas versões sem precisar recriar sua estrutura.</div>`}
+async function renderModule(i){$('#pageTitle').textContent=modules[i];if(i===0)return renderDashboard();if(i===1)return renderClients();if(i===2)return renderOrcamentos();if(i===3)return renderContratosOficialCZ();if(i===4)return renderEventos();if(i===5)return renderRetornoEventos();if(i===6)return renderProducts();if(i===7)return renderAssets();if(i===8)return renderColaboradores();if(i===9)return renderManutencao();if(i===10)return renderFinanceiro();if(i===11)return renderAgenda();if(i===12)return renderRelatorios();if(i===13)return renderUsuariosPermissoes();if(i===14)return renderShoppingList();if(i===15)return renderVehicles();if(i===16)return renderCaixa();if(i===17)return renderPDV();if(i===18)return renderSairEventoV135();if(i===19)return renderOficinaV135();if(i===20)return renderInventarioV135();$('#content').innerHTML=`<div class="sectionhead"><h2>${modules[i]}</h2></div><div class="placeholder">Módulo já previsto no banco de dados. A tela operacional será ativada nas próximas versões sem precisar recriar sua estrutura.</div>`}
 let agendaMesRef=null,agendaConsulta=0;
 const AGENDA_COMP_KEY='cz_agenda_compromissos_v1';
 function agendaISO(data){return `${data.getFullYear()}-${String(data.getMonth()+1).padStart(2,'0')}-${String(data.getDate()).padStart(2,'0')}`}
@@ -3143,85 +3143,99 @@ async function relatorioCampoV135(id){
 }
 
 
-/* ===== CZ V137 — CONTRATOS + FINANCEIRO + RESERVAS ===== */
-const CZ137_CONTRATOS='cz_v137_contratos';
-function c137Load(){try{return JSON.parse(localStorage.getItem(CZ137_CONTRATOS)||'{}')}catch(_){return {}}}
-function c137Save(v){localStorage.setItem(CZ137_CONTRATOS,JSON.stringify(v||{}))}
-function c137Get(id){return c137Load()[String(id)]||null}
-function c137Set(id,p){const a=c137Load(),k=String(id);a[k]={...(a[k]||{}),...p,orcamento_id:id};c137Save(a);return a[k]}
-function c137Status(c){return c?.status||'Não gerado'}
-function c137Badge(s){const cor=s==='Assinado'||s==='Confirmado'?'#2f9b5f':s==='Enviado'?'#b38b32':s==='Gerado'?'#3975aa':'#7d8792';return `<span style="display:inline-block;padding:4px 8px;border-radius:999px;background:${cor}22;border:1px solid ${cor};font-size:12px">${esc(s)}</span>`}
-async function c137Orcamentos(){const {data,error}=await db.from('orcamentos').select('*').order('criado_em',{ascending:false}).limit(300);if(error)throw error;return data||[]}
-
-async function renderContratosV137(){
+/* ===== V137 — CONTRATO OFICIAL CZ (base V136 estável) ===== */
+const CZ_CONTRATOS_OFICIAL_KEY='cz_contratos_oficial_v137';
+function coLoad(){try{return JSON.parse(localStorage.getItem(CZ_CONTRATOS_OFICIAL_KEY)||'{}')}catch(_){return {}}}
+function coSave(v){localStorage.setItem(CZ_CONTRATOS_OFICIAL_KEY,JSON.stringify(v||{}))}
+function coGet(id){return coLoad()[String(id)]||null}
+function coSet(id,p){const a=coLoad(),k=String(id);a[k]={...(a[k]||{}),...p,orcamento_id:id};coSave(a);return a[k]}
+function coBrDate(v){if(!v)return '____/____/________';try{return new Date(v+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'})}catch(_){return v}}
+function coEsc(v){return esc(v==null?'':String(v))}
+async function coOrcs(){const {data,error}=await db.from('orcamentos').select('*').order('criado_em',{ascending:false}).limit(300);if(error)throw error;return data||[]}
+async function coCliente(p){
+ if(!p?.cliente_id)return {};
+ const {data}=await db.from('clientes').select('*').eq('id',p.cliente_id).maybeSingle();return data||{};
+}
+function coProdutos(p){
+ const d=p?.dados||{}, arr=d.produtos||d.itens||[];
+ if(Array.isArray(arr)&&arr.length)return arr.map(x=>({nome:x.nome||x.descricao||x.produto_nome||'Produto/serviço',qtd:x.quantidade||x.qtd||1,cor:x.cor||''}));
+ return [];
+}
+function coStatusBadge(st){
+ const c=st==='Assinado'||st==='Confirmado'?'#45b879':st==='Enviado'?'#d7a73b':st==='Gerado'?'#4f8fd1':'#7b8794';
+ return `<span style="border:1px solid ${c};background:${c}22;padding:4px 9px;border-radius:999px;font-size:12px">${coEsc(st||'Não gerado')}</span>`;
+}
+async function renderContratosOficialCZ(){
  $('#pageTitle').textContent='Contratos';
  try{
-  const orcs=await c137Orcamentos(),map=c137Load();
-  $('#content').innerHTML=`<div class="sectionhead"><div><h2>Contratos</h2><div class="muted">Contrato ligado à proposta. Ao confirmar, Financeiro, Evento, Agenda e reserva entram no fluxo automaticamente.</div></div></div>
-  <div class="cards"><div class="card"><div class="muted">Propostas</div><div class="n">${orcs.length}</div></div><div class="card"><div class="muted">Contratos confirmados</div><div class="n">${Object.values(map).filter(x=>['Assinado','Confirmado'].includes(x.status)).length}</div></div></div>
-  <div class="tablewrap">${orcs.length?`<table><thead><tr><th>Proposta</th><th>Cliente</th><th>Evento</th><th>Data</th><th>Total</th><th>Contrato</th><th>Ações</th></tr></thead><tbody>${orcs.map(p=>{const c=map[String(p.id)]||{};return `<tr><td><b>${esc(p.numero||'—')}</b></td><td>${esc(p.cliente_nome||'')}</td><td>${esc(p.evento_nome||'')}</td><td>${finDate(p.data_evento)}</td><td>${money(p.valor_total)}</td><td>${c137Badge(c137Status(c))}</td><td><div class="actions"><button class="btn secondary" onclick="abrirContratoV137('${p.id}')">${c.status?'Abrir':'Gerar contrato'}</button>${c.status&&!['Assinado','Confirmado'].includes(c.status)?`<button class="btn primary" onclick="confirmarContratoV137('${p.id}')">Confirmar contrato</button>`:''}</div></td></tr>`}).join('')}</tbody></table>`:'<div class="empty">Nenhuma proposta encontrada.</div>'}</div>`;
- }catch(e){$('#content').innerHTML=`<div class="msg">Erro ao carregar contratos: ${esc(e.message)}</div>`}
+  const os=await coOrcs(),map=coLoad();
+  $('#content').innerHTML=`<div class="sectionhead"><div><h2>Contratos</h2><div class="muted">Modelo oficial CZ • contrato vinculado à proposta e ao cliente.</div></div></div>
+  <div class="tablewrap">${os.length?`<table><thead><tr><th>Proposta</th><th>Cliente</th><th>Evento</th><th>Data</th><th>Contrato</th><th>Ação</th></tr></thead><tbody>${os.map(p=>{const c=map[String(p.id)]||{};return `<tr><td><b>${coEsc(p.numero||'—')}</b></td><td>${coEsc(p.cliente_nome||'')}</td><td>${coEsc(p.evento_nome||'')}</td><td>${finDate(p.data_evento)}</td><td>${coStatusBadge(c.status)}</td><td><button class="btn primary" onclick="abrirContratoOficialCZ('${p.id}')">${c.status?'Abrir contrato':'Preencher contrato'}</button></td></tr>`}).join('')}</tbody></table>`:'<div class="empty">Nenhuma proposta encontrada.</div>'}</div>`;
+ }catch(e){$('#content').innerHTML=`<div class="msg">Erro: ${coEsc(e.message)}</div>`}
 }
-async function abrirContratoV137(id){
- const p=(await c137Orcamentos()).find(x=>String(x.id)===String(id));if(!p)return;
- let c=c137Get(id);if(!c)c=c137Set(id,{status:'Gerado',gerado_em:new Date().toISOString(),versao:1});
- const d=p.dados||{},pg=d.pagamento||{};
- $('#content').innerHTML=`<div class="sectionhead"><div><h2>Contrato — Proposta ${esc(p.numero||'')}</h2><div class="muted">${esc(p.cliente_nome||'')} • versão ${esc(c.versao||1)}</div></div><button class="btn secondary" onclick="renderContratosV137()">Voltar</button></div>
- <div class="card"><div class="row"><div class="field"><label>Cliente / Contratante</label><div>${esc(p.cliente_nome||'—')}</div></div><div class="field"><label>Telefone</label><div>${esc(p.cliente_telefone||'—')}</div></div></div>
- <div class="row"><div class="field"><label>Evento</label><div>${esc(p.evento_nome||'—')}</div></div><div class="field"><label>Data</label><div>${finDate(p.data_evento)}</div></div></div>
- <div class="row"><div class="field"><label>Local</label><div>${esc(d.local_evento||'—')}</div></div><div class="field"><label>Investimento</label><div><b>${money(p.valor_total)}</b></div></div></div>
- <div class="field"><label>Condição de pagamento</label><div>${pg.modo==='contratual'?'Parcelamento contratual':pg.modo==='avista'?'À vista':'Conforme proposta comercial'}</div></div></div>
- <div class="card"><h3 style="margin-top:0">Fluxo automático</h3><div class="muted">Quando o contrato for confirmado, esta proposta passa a alimentar o Financeiro e o evento entra no fluxo operacional. A data do evento aparece na Agenda automaticamente.</div></div>
- <div class="actions"><button class="btn secondary" onclick="imprimirContratoV137('${p.id}')">Imprimir / PDF</button><button class="btn secondary" onclick="enviarContratoV137('${p.id}')">Enviar WhatsApp</button>${!['Assinado','Confirmado'].includes(c.status)?`<button class="btn primary" onclick="confirmarContratoV137('${p.id}')">Confirmar contrato</button>`:`<span>${c137Badge(c.status)}</span>`}</div>`;
+async function abrirContratoOficialCZ(id){
+ const p=(await coOrcs()).find(x=>String(x.id)===String(id));if(!p)return;
+ const cli=await coCliente(p),d=p.dados||{},c=coGet(id)||{},end=[cli.endereco||cli.logradouro,cli.numero,cli.bairro,cli.cidade,cli.estado].filter(Boolean).join(', ');
+ const prod=coProdutos(p);
+ $('#content').innerHTML=`<div class="sectionhead"><div><h2>Preenchimento do Contrato Oficial CZ</h2><div class="muted">Proposta ${coEsc(p.numero||'')} • os dados encontrados já foram preenchidos automaticamente.</div></div><button class="btn secondary" onclick="renderContratosOficialCZ()">Voltar</button></div>
+ <div class="card"><h3 style="margin-top:0">CONTRATANTE</h3><div class="row"><div class="field"><label>Nome *</label><input id="coNome" value="${coEsc(c.nome??p.cliente_nome??cli.nome??'')}"></div><div class="field"><label>Telefone *</label><input id="coTel" value="${coEsc(c.telefone??p.cliente_telefone??cli.telefone??'')}"></div></div>
+ <div class="row"><div class="field"><label>CPF / CNPJ *</label><input id="coCpf" value="${coEsc(c.cpf??cli.cpf??cli.cnpj??'')}"></div><div class="field"><label>RG / IE</label><input id="coRg" value="${coEsc(c.rg??cli.rg??cli.ie??'')}"></div></div><div class="field"><label>Endereço completo *</label><input id="coEnd" value="${coEsc(c.endereco??end)}"></div></div>
+ <div class="card"><h3 style="margin-top:0">EVENTO</h3><div class="row"><div class="field"><label>Data *</label><input id="coData" type="date" value="${coEsc(c.data_evento??p.data_evento??'')}"></div><div class="field"><label>Horário</label><input id="coHora" type="time" value="${coEsc(c.horario??d.horario??d.horario_evento??'')}"></div></div>
+ <div class="row"><div class="field"><label>Local *</label><input id="coLocal" value="${coEsc(c.local??d.local_evento??'')}"></div><div class="field"><label>Cidade</label><input id="coCidade" value="${coEsc(c.cidade??d.cidade_evento??cli.cidade??'')}"></div></div></div>
+ <div class="card"><h3 style="margin-top:0">SERVIÇOS CONTRATADOS</h3><textarea id="coServicos" style="min-height:145px">${coEsc(c.servicos??(prod.length?prod.map(x=>`${x.qtd} - ${x.nome}${x.cor?` | COR: ${x.cor}`:''}`).join('\n'):'') )}</textarea><div class="muted">Pode conferir ou complementar antes de gerar o contrato.</div></div>
+ <div class="card"><h3 style="margin-top:0">PAGAMENTO</h3><div class="row"><div class="field"><label>Valor total</label><input id="coValor" value="${coEsc(c.valor??money(p.valor_total))}"></div><div class="field"><label>Condição de pagamento</label><input id="coPagamento" value="${coEsc(c.pagamento??coPagamentoTexto(p))}"></div></div><div class="field"><label>Data do contrato</label><input id="coDataContrato" type="date" value="${coEsc(c.data_contrato??new Date().toISOString().slice(0,10))}"></div></div>
+ <div class="actions"><button class="btn primary" onclick="salvarContratoOficialCZ('${id}',false)">Salvar preenchimento</button><button class="btn secondary" onclick="salvarContratoOficialCZ('${id}',true)">Visualizar / PDF</button>${c.status?`<button class="btn secondary" onclick="enviarContratoOficialCZ('${id}')">Enviar WhatsApp</button>`:''}</div>`;
 }
-async function imprimirContratoV137(id){
- const p=(await c137Orcamentos()).find(x=>String(x.id)===String(id));if(!p)return;const d=p.dados||{},c=c137Get(id)||{};
- const w=window.open('','_blank');if(!w)return czAlert('Libere pop-ups para gerar o PDF.','Contrato');
- w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Contrato ${esc(p.numero||'')}</title><style>body{font-family:Arial,sans-serif;color:#111;max-width:820px;margin:auto;padding:32px;line-height:1.55}h1{text-align:center;font-size:20px}h2{font-size:15px;margin-top:25px}.box{border:1px solid #bbb;padding:14px;margin:15px 0}.sign{display:grid;grid-template-columns:1fr 1fr;gap:50px;margin-top:70px;text-align:center}.line{border-top:1px solid #111;padding-top:6px}</style></head><body><h1>CONTRATO DE PRESTAÇÃO DE SERVIÇOS TÉCNICOS PARA EFEITOS ESPECIAIS</h1><div class="box"><b>CONTRATANTE:</b> ${esc(p.cliente_nome||'')}<br><b>Telefone:</b> ${esc(p.cliente_telefone||'—')}<br><b>Evento:</b> ${esc(p.evento_nome||'')}<br><b>Data:</b> ${finDate(p.data_evento)}<br><b>Local:</b> ${esc(d.local_evento||'—')}<br><b>Investimento:</b> ${money(p.valor_total)}</div><h2>OBJETO</h2><p>Prestação de serviços técnicos para efeitos especiais conforme serviços, produtos, quantidades, condições e observações constantes da Proposta Comercial nº ${esc(p.numero||'—')}, que integra este contrato.</p><h2>CONDIÇÕES COMERCIAIS</h2><p>O valor e a condição de pagamento seguem a proposta comercial vinculada. Alterações posteriores deverão ser registradas em nova versão ou aditivo, preservando-se o documento confirmado anteriormente.</p><h2>EXECUÇÃO</h2><p>A execução seguirá os dados técnicos e operacionais definidos para o evento, incluindo data, local, equipe, materiais e requisitos de segurança aplicáveis.</p><p style="margin-top:35px">Contrato gerado pelo Sistema CZ • Versão ${esc(c.versao||1)}</p><div class="sign"><div class="line">CONTRATANTE</div><div class="line">CZ EFEITOS ESPECIAIS — CONTRATADA</div></div><script>window.onload=()=>window.print()<\/script></body></html>`);w.document.close();
-}
-async function enviarContratoV137(id){
- const p=(await c137Orcamentos()).find(x=>String(x.id)===String(id));if(!p)return;let tel=String(p.cliente_telefone||'').replace(/\D/g,'');if(tel.length===10||tel.length===11)tel='55'+tel;if(!tel)return czAlert('Cliente sem telefone válido.','WhatsApp');
- c137Set(id,{status:c137Get(id)?.status==='Assinado'?'Assinado':'Enviado',enviado_em:new Date().toISOString()});
- window.open('https://wa.me/'+tel+'?text='+encodeURIComponent(`Olá ${p.cliente_nome||''}. Segue o contrato referente à Proposta ${p.numero||''} da CZ Efeitos Especiais.`),'_blank','noopener');renderContratosV137();
-}
-async function confirmarContratoV137(id){
- const p=(await c137Orcamentos()).find(x=>String(x.id)===String(id));if(!p)return;
- if(!await czConfirm(`Confirmar o contrato da proposta ${p.numero||''}?\n\nIsso libera o fluxo Financeiro, Evento, Agenda e Reservas.`,'Confirmar contrato','Confirmar'))return;
- const c=c137Set(id,{status:'Confirmado',confirmado_em:new Date().toISOString(),confirmado_por:currentAuthUser?.email||''});
- // Ensure an operational event exists. It starts as "aguardando_evento", which also activates current Finance logic.
- const {data:exist,error:ee}=await db.from('eventos_operacionais').select('id,status').eq('origem_orcamento_id',id).limit(1).maybeSingle();if(ee)return czAlert(ee.message,'Contrato');
- if(!exist){
-   const d=p.dados||{};
-   const payload={cliente_nome:p.cliente_nome,cliente_telefone:p.cliente_telefone,nome_evento:p.evento_nome,data_evento:p.data_evento,local_evento:d.local_evento||null,cidade_evento:d.cidade_evento||null,horario_evento:d.horario||null,origem_orcamento_id:p.id,status:'aguardando_evento',atualizado_em:new Date().toISOString()};
-   const {error}=await db.from('eventos_operacionais').insert(payload);if(error){c137Set(id,{status:'Gerado'});return czAlert('Contrato não foi confirmado porque o Evento não pôde ser criado: '+error.message,'Erro')}
+function coPagamentoTexto(p){
+ const pg=p?.dados?.pagamento||{};
+ if(pg.modo==='avista')return 'Pagamento à vista.';
+ if(pg.modo==='contratual'){
+  const ent=Number(pg.entrada_valor||0),rest=Number(p.valor_total||0)-ent;
+  return `Entrada de ${money(ent)} e saldo de ${money(rest)} conforme datas definidas na proposta.`;
  }
- await czAlert('Contrato confirmado. Financeiro e Evento foram liberados; a data entra na Agenda automaticamente.','Contrato confirmado');renderContratosV137();
+ return 'Conforme condição de pagamento definida na proposta comercial.';
 }
-
-/* Financeiro: contratos confirmados também contam como negócios fechados. */
-const _finRecebiveisV136=finRecebiveis;
-finRecebiveis=async function(){
- const base=await _finRecebiveisV136(),ids=new Set(base.map(x=>String(x.id))),map=c137Load();
- const extras=[];
- for(const [id,c] of Object.entries(map)){
-   if(!['Assinado','Confirmado'].includes(c.status)||ids.has(String(id)))continue;
-   const {data:o}=await db.from('orcamentos').select('id,numero,cliente_nome,cliente_telefone,evento_nome,data_evento,valor_total,criado_em,dados').eq('id',id).maybeSingle();if(!o)continue;
-   const total=Number(o.valor_total||0),pago=finPagoOrc(o.id),pg=o.dados?.pagamento||{},venc=pg.vencimento_saldo||o.data_evento?finAddDays(o.data_evento,-5):String(o.criado_em||'').slice(0,10);
-   extras.push({...o,total,pago,saldo:Math.max(0,total-pago),entrada:pg.modo==='contratual'?Number(pg.entrada_valor||0):pg.modo==='avista'?total:total*.4,vencimento:venc,status_fin:finStatus(total,pago,venc)});
- }
- return [...base,...extras];
+async function salvarContratoOficialCZ(id,visualizar){
+ const req=['coNome','coTel','coCpf','coEnd','coData','coLocal'],falt=req.filter(x=>!$('#'+x).value.trim());if(falt.length)return czAlert('Preencha os campos obrigatórios do contratante e do evento.','Cadastro incompleto');
+ const v={status:'Gerado',nome:$('#coNome').value.trim(),telefone:$('#coTel').value.trim(),cpf:$('#coCpf').value.trim(),rg:$('#coRg').value.trim(),endereco:$('#coEnd').value.trim(),data_evento:$('#coData').value,horario:$('#coHora').value,local:$('#coLocal').value.trim(),cidade:$('#coCidade').value.trim(),servicos:$('#coServicos').value.trim(),valor:$('#coValor').value.trim(),pagamento:$('#coPagamento').value.trim(),data_contrato:$('#coDataContrato').value,gerado_em:new Date().toISOString()};
+ coSet(id,v);if(visualizar)return imprimirContratoOficialCZ(id);await czAlert('Preenchimento do contrato salvo.','Contrato');abrirContratoOficialCZ(id);
 }
-
-/* Reserva automática consultiva: usa os materiais já definidos no Evento e não baixa estoque. */
-async function reservasV137(){
- const {data:ev}=await db.from('eventos_operacionais').select('id,nome_evento,cliente_nome,data_evento,status').not('status','eq','finalizado').order('data_evento');
- const ids=(ev||[]).map(x=>x.id);if(!ids.length)return [];
- const {data:m}=await db.from('evento_materiais').select('*').in('evento_id',ids);
- return (ev||[]).map(e=>({...e,materiais:(m||[]).filter(x=>String(x.evento_id)===String(e.id))}));
+function coContratoHTML(c,p){
+ const serv=(c.servicos||'').split(/\n+/).filter(Boolean).map(x=>`<li>${coEsc(x)}</li>`).join('');
+ return `<!doctype html><html><head><meta charset="utf-8"><title>Contrato CZ ${coEsc(p.numero||'')}</title><style>@page{size:A4;margin:18mm}body{font-family:Arial,sans-serif;color:#111;font-size:12.2px;line-height:1.48;margin:0}h1{text-align:center;font-size:18px;margin:0 0 20px}h2{font-size:13px;margin:18px 0 7px}p{margin:6px 0;text-align:justify}li{margin:3px 0}.sig{display:grid;grid-template-columns:1fr 1fr;gap:45px;margin-top:65px;text-align:center}.line{border-top:1px solid #111;padding-top:5px}.break{page-break-before:always}</style></head><body>
+ <h1>CONTRATO DE PRESTAÇÃO DE SERVIÇOS TÉCNICOS PARA EFEITOS ESPECIAIS</h1>
+ <p>Pelo presente instrumento particular de contrato de prestação de serviços técnicos especializados, de um lado:</p>
+ <p><b>CONTRATADA:</b> Luiz Fernando M. Caloi, CPF nº 434.772.738-00, residente na Rua Catarina Bongiovani, nº 109, Bairro Macedo Teles 1, São José do Rio Preto - SP, telefone (17) 98150-8580, doravante denominado simplesmente “CONTRATADA”;</p>
+ <p>E, de outro lado:</p><p><b>CONTRATANTE:</b> ${coEsc(c.nome)}, CPF/CNPJ nº ${coEsc(c.cpf)}${c.rg?`, RG/IE nº ${coEsc(c.rg)}`:''}, residente em ${coEsc(c.endereco)}, telefone de contato ${coEsc(c.telefone)}, doravante denominada simplesmente “CONTRATANTE”.</p>
+ <p>As partes acima qualificadas têm entre si justo e contratado o seguinte:</p>
+ <h2>CLÁUSULA 1 – DATA E LOCAL DO EVENTO</h2><p>1.1. O presente contrato refere-se à prestação de serviços para o evento a ser realizado na data de ${coEsc(coBrDate(c.data_evento))}, no ${coEsc(c.local)}, ${coEsc(c.cidade)}${c.horario?` - a partir das ${coEsc(c.horario)} horas`:''}.</p>
+ <h2>CLÁUSULA 2 – DO OBJETO</h2><p>2.1. O presente contrato tem por objeto a prestação de serviços técnicos especializados em efeitos especiais, a serem utilizados durante o evento organizado pela CONTRATANTE.</p><p>2.2. Os serviços incluem:</p><ul>${serv}<li>Acionamento automático;</li><li>Montagem e desmontagem dos equipamentos;</li><li>Execução técnica durante o evento.</li></ul><p>2.3. Os serviços poderão ser ajustados conforme as condições do local e necessidades técnicas do evento, desde que acordado previamente entre as partes.</p>
+ <h2>CLÁUSULA 3 – DO PAGAMENTO</h2><p>3.1. O valor total dos serviços contratados é de <b>${coEsc(c.valor)}</b>.</p><p>3.2. ${coEsc(c.pagamento)}</p><p>3.3. O pagamento poderá ser realizado através da chave PIX – celular 17997881166 de titularidade da C2 Gases LTDA, ou de qualquer outra forma acordada entre ambas as partes.</p><p>3.4. O não pagamento no prazo combinado acarretará cancelamento automático dos serviços, com multa de 45% do valor total do contrato.</p>
+ <h2>CLÁUSULA 4 – DA DESISTÊNCIA</h2><p>4.1. Caso a CONTRATANTE desista do evento sem aviso prévio de, no mínimo, 30 (trinta) dias corridos, será aplicada multa de 45% sobre o valor total do contrato.</p><p>4.2. O aviso de desistência deverá ser feito por escrito, enviado via e-mail ou aplicativo de mensagens, com confirmação de leitura.</p>
+ <h2>CLÁUSULA 5 – DAS RESPONSABILIDADES</h2><p>5.1. A CONTRATADA não se responsabiliza por: falta de energia elétrica no local; problemas técnicos ou estruturais do local; limpeza pós-evento; resíduos gerados pelos efeitos; equipamentos ou infraestrutura de terceiros; acesso inadequado ao local do evento.</p><p>5.2. Será realizada uma visita técnica prévia ao local do evento para planejamento adequado dos efeitos.</p><p>5.3. As partes deverão manter comunicação contínua para definir horários e dinâmica da operação técnica.</p>
+ <h2>CLÁUSULA 6 – CASOS FORTUITOS E FORÇA MAIOR</h2><p>6.1. Em caso de falecimento de parente de 1º grau de qualquer das partes, as penalidades contratuais serão desconsideradas.</p><p>6.2. Havendo mudança de local do evento, as partes negociarão novos termos quanto a valores, prazos e logística.</p><p>6.3. Emergências médicas comprovadas poderão justificar a reavaliação de penalidades.</p>
+ <h2>CLÁUSULA 7 – SERVIÇOS ADICIONAIS</h2><p>7.1. Serviços ou equipamentos adicionais solicitados no momento da montagem serão considerados aditivos contratuais.</p><p>7.2. Os aditivos deverão ser formalizados por escrito, podendo ser enviados por e-mail com confirmação de leitura.</p>
+ <h2>CLÁUSULA 8 – DISPOSIÇÕES GERAIS</h2><p>8.1. O presente contrato é celebrado em caráter irrevogável e irretratável, obrigando ambas as partes ao seu cumprimento integral.</p><p>8.2. Fica eleito o foro da Comarca de São José do Rio Preto - SP para dirimir quaisquer dúvidas ou litígios decorrentes deste contrato.</p>
+ <h2>CLÁUSULA 9 – SEGURANÇA E RESPONSABILIDADE PATRIMONIAL</h2><p>9.1. A CONTRATANTE é responsável por zelar pela segurança dos equipamentos da CONTRATADA durante montagem, execução e desmontagem.</p><p>9.2. Em caso de furto, roubo ou extravio, a CONTRATANTE deverá indenizar os prejuízos com base no valor de reposição dos equipamentos.</p><p>9.3. A CONTRATADA poderá fornecer uma lista dos equipamentos utilizados para controle e conferência.</p>
+ <h2>CLÁUSULA 10 – STAFF E HORÁRIOS</h2><p>10.1. A CONTRATADA poderá atuar com equipe técnica adicional, previamente informada à CONTRATANTE (até 2 profissionais).</p><p>10.2. A CONTRATADA não se responsabiliza por atrasos causados por terceiros, como organizadores, fornecedores ou artistas.</p>
+ <h2>CLÁUSULA 11 – PREVENÇÃO, SEGURANÇA E CONDIÇÕES CLIMÁTICAS</h2><p>11.1. O técnico da CONTRATADA poderá suspender a operação dos efeitos caso identifique risco à segurança de pessoas, equipamentos ou estrutura.</p><p>11.2. Essa decisão deve ser respeitada pela CONTRATANTE e não gera reembolso ou penalidades.</p><p>11.3. A CONTRATADA não se responsabiliza por efeitos não realizados devido a condições climáticas (vento, chuva, raios etc.).</p>
+ <h2>CLÁUSULA 12 – FALHAS DE EQUIPAMENTOS</h2><p>12.1. A CONTRATADA realiza manutenção preventiva dos equipamentos.</p><p>12.2. A CONTRATANTE reconhece que falhas técnicas podem ocorrer, sendo responsabilidade do fabricante, não da CONTRATADA.</p><p>12.3. A CONTRATADA buscará solução imediata, sem obrigação de reembolso ou abatimento.</p><p>12.4. Equipamentos poderão ser substituídos, se houver tempo hábil e disponibilidade.</p>
+ <h2>CLÁUSULA 13 – CONSUMÍVEIS E EXCLUSIVIDADE</h2><p>13.1. Todos os produtos consumíveis (CO₂, fumaça, jatos criogênicos, fogos, fogos indoor etc.) serão fornecidos exclusivamente pela CONTRATADA.</p><p>13.2. É proibido à CONTRATANTE ou terceiros fornecer consumíveis sem autorização expressa.</p><p>13.3. O descumprimento implicará suspensão imediata dos efeitos, sem reembolso e com responsabilidade por eventuais danos.</p>
+ <h2>CLÁUSULA 14 – COMUNICAÇÃO ENTRE AS PARTES</h2><p>14.1. Toda comunicação deverá ser feita por e-mail ou aplicativo de mensagens, com confirmação de leitura.</p><p>14.2. Contatos oficiais:<br>CONTRATADA: (17) 98150-8580 • (17) 99788-1166<br>CONTRATANTE: ${coEsc(c.telefone)}</p>
+ <h2>CLÁUSULA 15 – HORAS EXTRAS</h2><p>15.1. A CONTRATANTE poderá solicitar horas extras durante o evento, informando com antecedência mínima de 1 (uma) hora.</p><p>15.2. A CONTRATADA poderá ou não aceitar, conforme disponibilidade técnica e de equipe.</p><p>15.3. O valor das horas extras será informado no momento da solicitação e deverá ser pago à parte, no encerramento do evento.</p>
+ <h2>ASSINATURAS</h2><p>E por estarem assim justos e contratados, firmam o presente instrumento em duas vias de igual teor e forma.</p><p>São José do Rio Preto - SP, ${coEsc(coBrDate(c.data_contrato))}.</p><div class="sig"><div class="line">CONTRATANTE: ${coEsc(c.nome)}<br>CPF/CNPJ: ${coEsc(c.cpf)}</div><div class="line">CONTRATADA: Luiz Fernando M. Caloi<br>CPF: 434.772.738-00</div></div>
+ </body></html>`;
 }
-async function mostrarReservasV137(){
- $('#pageTitle').textContent='Reservas automáticas';const r=await reservasV137();
- $('#content').innerHTML=`<div class="sectionhead"><div><h2>Reservas automáticas</h2><div class="muted">Reserva não dá baixa no estoque. A baixa acontece somente na saída conferida.</div></div><button class="btn secondary" onclick="renderEventos()">Voltar</button></div><div class="tablewrap"><table><thead><tr><th>Data</th><th>Cliente</th><th>Evento</th><th>Materiais reservados</th><th>Status</th></tr></thead><tbody>${r.map(e=>`<tr><td>${finDate(e.data_evento)}</td><td>${esc(e.cliente_nome||'')}</td><td>${esc(e.nome_evento||'')}</td><td>${e.materiais.length?e.materiais.map(x=>`${esc(x.nome_item||'')} × ${esc(x.quantidade_necessaria||1)}`).join('<br>'):'<span class="muted">Aguardando definição dos materiais</span>'}</td><td>${esc(e.status||'')}</td></tr>`).join('')}</tbody></table></div>`;
+async function imprimirContratoOficialCZ(id){
+ const p=(await coOrcs()).find(x=>String(x.id)===String(id)),c=coGet(id);if(!p||!c)return;
+ const w=window.open('','_blank','width=950,height=800');if(!w)return czAlert('Libere pop-ups para visualizar o contrato.','Contrato');
+ w.document.write(coContratoHTML(c,p)+`<script>window.onload=()=>setTimeout(()=>window.print(),250)<\/script>`);w.document.close();
+}
+async function enviarContratoOficialCZ(id){
+ const p=(await coOrcs()).find(x=>String(x.id)===String(id)),c=coGet(id);if(!p||!c)return;
+ let tel=String(c.telefone||'').replace(/\D/g,'');if(tel.length===10||tel.length===11)tel='55'+tel;if(!tel)return czAlert('Telefone do contratante não preenchido.','WhatsApp');
+ coSet(id,{status:'Enviado',enviado_em:new Date().toISOString()});
+ window.open('https://wa.me/'+tel+'?text='+encodeURIComponent(`Olá ${c.nome}. O contrato referente à Proposta ${p.numero||''} da CZ Efeitos Especiais está pronto para conferência e assinatura.`),'_blank','noopener');
 }
 
 </script></body></html>
