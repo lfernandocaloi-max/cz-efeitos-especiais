@@ -3369,4 +3369,62 @@ async function verificarDisponibilidadeV140(eventoId,nomeItem,qtd){
 /* Ao confirmar contrato, o evento criado já passa a aparecer no Mapa de Reservas.
    Materiais adicionados ao evento entram automaticamente na reserva, sem botão extra. */
 
+
+/* ===== V141 — PREPARAÇÃO DO EVENTO UNIFICADA ===== */
+async function prep141Abrir(eventoId){
+ $('#pageTitle').textContent='Preparação do Evento';
+ try{
+  const {data:e,error}=await db.from('eventos_operacionais').select('*').eq('id',eventoId).single();if(error)throw error;
+  const {data:m}=await db.from('evento_materiais').select('*').eq('evento_id',eventoId);
+  const mats=m||[], grupos={
+   contratado:mats.filter(x=>['contratado','produto_contratado','produto'].includes(String(x.tipo||'').toLowerCase())),
+   extra:mats.filter(x=>String(x.tipo||'').toLowerCase().includes('extra')),
+   montagem:mats.filter(x=>['ativo','equipamento','montagem','material_montagem'].includes(String(x.tipo||'').toLowerCase()))
+  };
+  const linha=x=>`<tr><td>${coEsc(x.nome_item||x.descricao||x.produto_nome||x.ativo_nome||'Material')}</td><td>${coEsc(x.quantidade_necessaria||x.quantidade||1)}</td><td>${coEsc(x.codigo_barras||x.codigo||'')}</td><td>${coEsc(x.observacao||'')}</td></tr>`;
+  $('#content').innerHTML=`<div class="sectionhead"><div><h2>${coEsc(e.nome_evento||'Evento')}</h2><div class="muted">${coEsc(e.cliente_nome||'')} • ${finDate(e.data_evento)} • ${coEsc(e.cidade_evento||'')}</div></div><button class="btn secondary" onclick="renderEventos()">Voltar</button></div>
+  <div class="card"><h3 style="margin-top:0">1. Informação</h3><div class="row"><div class="field"><label>Cliente</label><input value="${coEsc(e.cliente_nome||'')}" disabled></div><div class="field"><label>Telefone</label><input value="${coEsc(e.cliente_telefone||'')}" disabled></div></div><div class="row"><div class="field"><label>Data</label><input value="${finDate(e.data_evento)}" disabled></div><div class="field"><label>Horário</label><input value="${coEsc(e.horario_evento||'')}" disabled></div></div><div class="row"><div class="field"><label>Local</label><input value="${coEsc(e.local_evento||'')}" disabled></div><div class="field"><label>Cidade</label><input value="${coEsc(e.cidade_evento||'')}" disabled></div></div></div>
+  ${prep141Grupo('2. Produtos Contratados',grupos.contratado,linha,'Os produtos da proposta/contrato aparecem aqui automaticamente.')}
+  ${prep141Grupo('3. Produto Extra',grupos.extra,linha,'Materiais levados como reserva. O consumo real será definido no retorno.')}
+  ${prep141Grupo('4. Materiais de Montagem',grupos.montagem,linha,'Equipamentos e ativos usados na montagem. Entram automaticamente na reserva do evento.')}
+  <div class="card"><h3 style="margin-top:0">5. Desenvolvimento</h3><button class="btn secondary" onclick="prep141Desenvolvimento('${eventoId}')">Abrir desenvolvimento / projeto</button></div>
+  <div class="card"><h3 style="margin-top:0">6. Observação</h3><textarea id="prep141Obs" style="min-height:100px">${coEsc(e.observacao||e.observacoes||'')}</textarea></div>
+  <div class="actions"><button class="btn primary" onclick="prep141Salvar('${eventoId}')">Salvar preparação</button><button class="btn secondary" onclick="abrirMapaReservasV140()">Ver reservas</button></div>`;
+ }catch(err){$('#content').innerHTML=`<div class="msg">Erro: ${coEsc(err.message)}</div>`}
+}
+function prep141Grupo(titulo,arr,linha,ajuda){
+ return `<div class="card"><div class="sectionhead"><div><h3 style="margin:0">${titulo}</h3><div class="muted">${ajuda}</div></div></div>${arr.length?`<div class="tablewrap"><table><thead><tr><th>Descrição</th><th>Qtd.</th><th>Código</th><th>Observação</th></tr></thead><tbody>${arr.map(linha).join('')}</tbody></table></div>`:'<div class="empty">Nenhum material neste grupo.</div>'}</div>`;
+}
+async function prep141Salvar(id){
+ try{
+  const obs=$('#prep141Obs')?.value||'';
+  const {error}=await db.from('eventos_operacionais').update({observacao:obs,atualizado_em:new Date().toISOString()}).eq('id',id);
+  if(error)throw error;
+  await czAlert('Preparação do evento salva. Os materiais definidos permanecem reservados automaticamente.','Evento');
+  prep141Abrir(id);
+ }catch(e){czAlert('Não foi possível salvar: '+e.message,'Evento')}
+}
+async function prep141Desenvolvimento(id){
+ // Reaproveita o desenvolvimento/projeto já existente, sem criar outra tela paralela.
+ if(typeof visualizarProjetoEvento==='function')return visualizarProjetoEvento(id);
+ return czAlert('O desenvolvimento deste evento ainda não foi criado.','Desenvolvimento');
+}
+/* Acrescenta atalho "Preparar" às linhas de eventos já renderizadas, sem trocar a tela existente. */
+const _renderEventosV141=typeof renderEventos==='function'?renderEventos:null;
+if(_renderEventosV141){
+ renderEventos=async function(){
+   const r=await _renderEventosV141.apply(this,arguments);
+   setTimeout(()=>{
+    document.querySelectorAll('tr').forEach(tr=>{
+      const el=tr.querySelector('[data-evento-id],button[onclick*="visualizarProjetoEvento"],button[onclick*="abrirEvento"]');
+      if(!el||tr.querySelector('.prep141btn'))return;
+      let id=el.getAttribute('data-evento-id')||((el.getAttribute('onclick')||'').match(/['"]([^'"]+)['"]/)||[])[1];
+      if(!id)return;
+      const td=tr.lastElementChild;if(td)td.insertAdjacentHTML('beforeend',` <button class="btn secondary prep141btn" onclick="prep141Abrir('${id}')">Preparar</button>`);
+    });
+   },120);
+   return r;
+ };
+}
+
 </script></body></html>
