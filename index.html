@@ -235,7 +235,7 @@ function contaMaster(){
  const perfil=String(czPerfilUsuario?.perfil||'').trim().toLowerCase();
  return email===CZ_MASTER_EMAIL || perfil==='master' || perfil==='master_principal' || perfil==='master_autorizado';
 }
-async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#login').style.display='none';$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V148';reconstruirMenuPermissoes();renderModule(0)}
+async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#login').style.display='none';$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V150';reconstruirMenuPermissoes();renderModule(0)}
 $('#loginBtn').onclick=async()=>{const email=$('#email').value.trim(),password=$('#password').value;$('#loginMsg').textContent='Entrando...';const {data,error}=await db.auth.signInWithPassword({email,password});if(error){$('#loginMsg').textContent='Não foi possível entrar: '+error.message;return}$('#loginMsg').textContent='';showApp(data.user)};
 $('#logoutBtn').onclick=async()=>{await db.auth.signOut();showLogin()};
   async function recuperarSenha(){
@@ -1720,7 +1720,7 @@ Obrigado!`;
     box.querySelectorAll('.btnVisualizarProposta').forEach(btn=>{btn.onclick=()=>{const p=propostasExibidas.find(x=>String(x.id)===String(btn.dataset.id));if(!p)return;if(!p.dados||typeof p.dados!=='object'){alert('Esta proposta não possui os dados completos salvos para visualização.');return}visualizarOrcamentoSalvo(p)}});
     box.insertAdjacentHTML('beforeend','<div id="orcEnvioMsg" class="msg" role="status"></div>');
     box.querySelectorAll('.btnEnviarProposta').forEach(btn=>{btn.onclick=()=>{const p=propostasExibidas.find(x=>String(x.id)===String(btn.dataset.id));if(p)enviarPropostaWhats(p,btn)}});
-    box.querySelectorAll('.btnEventoProposta').forEach(btn=>{btn.onclick=()=>{const p=propostasExibidas.find(x=>String(x.id)===String(btn.dataset.id));if(p)propostaVirarEvento(p)}});
+    box.querySelectorAll('.btnEventoProposta').forEach(btn=>{btn.style.display='none';btn.setAttribute('data-v150-ciclo-antigo','1')});
     box.querySelectorAll('.btnWhatsProposta').forEach(btn=>{btn.onclick=()=>{const p=propostasExibidas.find(x=>String(x.id)===String(btn.dataset.id));if(p)abrirWhatsPreenchimento(p)}});
     box.querySelectorAll('.btnExcluirProposta').forEach(btn=>{btn.onclick=()=>excluirProposta(btn.dataset.id)});
   }
@@ -3735,7 +3735,7 @@ async function duplicarOrcamentoV146(id){
 }
 
 
-/* ===== V148 — ORÇAMENTO NOVO APLICADO NA TELA REAL ===== */
+/* ===== V150 — ORÇAMENTO NOVO APLICADO NA TELA REAL ===== */
 function orc147AplicarAcoes(){
  document.querySelectorAll('#orcPropostasSalvas tr').forEach(tr=>{
    if(tr.querySelector('.orc147dup'))return;
@@ -3753,7 +3753,7 @@ orc147Obs.observe(document.documentElement,{childList:true,subtree:true});
 document.addEventListener('DOMContentLoaded',orc147AplicarAcoes);
 
 
-/* ===== V148 — FINANCEIRO DENTRO DO ORÇAMENTO ===== */
+/* ===== V150 — FINANCEIRO DENTRO DO ORÇAMENTO ===== */
 function orc148ISO(d){return d.toISOString().slice(0,10)}
 function orc148GerarDatas(){
  const tipo=$('#orcTipoDatasParcelas')?.value||'manual';
@@ -3786,5 +3786,163 @@ function orc148UI(){
 const orc148Obs=new MutationObserver(()=>{clearTimeout(window.__orc148);window.__orc148=setTimeout(orc148UI,60)});
 orc148Obs.observe(document.documentElement,{childList:true,subtree:true});
 document.addEventListener('DOMContentLoaded',orc148UI);
+
+
+/* ===== V150 — CICLO ÚNICO DO NOVO ORÇAMENTO =====
+   O orçamento novo passa a ser o único fluxo operacional.
+   O histórico antigo continua preservado somente para consulta.
+*/
+function orc149Normalizar(v){
+ return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
+}
+function orc149AplicarCicloUnico(){
+ // Remove/hide explicit legacy budget entry points and duplicated old cycle actions.
+ document.querySelectorAll('button,a,[role="button"],.btn').forEach(el=>{
+   const t=orc149Normalizar(el.textContent);
+   const oc=orc149Normalizar(el.getAttribute('onclick')||'');
+   const legacy =
+     t.includes('orcamento antigo') ||
+     t.includes('proposta antiga') ||
+     t.includes('ciclo antigo') ||
+     oc.includes('orcamentoantigo') ||
+     oc.includes('orcamentolegacy') ||
+     oc.includes('propostaantiga');
+   if(legacy){
+     el.style.display='none';
+     el.setAttribute('data-v149-legado','1');
+   }
+ });
+
+ // Official entry point: every visible "+ Novo orçamento" opens the current real form.
+ document.querySelectorAll('button,a,.btn').forEach(el=>{
+   const t=orc149Normalizar(el.textContent);
+   if(t==='+ novo orcamento' || t==='novo orcamento'){
+     el.onclick=(ev)=>{ev?.preventDefault?.();renderOrcamentos(true)};
+     el.removeAttribute('href');
+     el.setAttribute('data-v149-orcamento-oficial','1');
+   }
+ });
+
+ // Keep old records as history only; new proposals use the current V150 workflow.
+ const box=document.querySelector('#orcPropostasSalvas');
+ if(box && !box.querySelector('.orc149-info')){
+   const info=document.createElement('div');
+   info.className='msg orc149-info';
+   info.style.marginBottom='12px';
+   info.textContent='Fluxo oficial: Novo Orçamento → Contrato → Financeiro → Preparação do Evento. Orçamentos antigos permanecem apenas no histórico.';
+   box.prepend(info);
+ }
+}
+const orc149Observer=new MutationObserver(()=>{
+ clearTimeout(window.__orc149Timer);
+ window.__orc149Timer=setTimeout(orc149AplicarCicloUnico,60);
+});
+orc149Observer.observe(document.documentElement,{childList:true,subtree:true});
+document.addEventListener('DOMContentLoaded',orc149AplicarCicloUnico);
+
+
+/* ===== V150 — CICLO OPERACIONAL OFICIAL CZ =====
+ ORÇAMENTO → CONTRATO → FINANCEIRO → PREPARAÇÃO → SAÍDA/CONFERÊNCIA → EVENTO → RETORNO → FINALIZAÇÃO
+ Agenda e reservas trabalham em segundo plano.
+*/
+function cz150Norm(v){return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim()}
+function cz150ContratoLocal(orcId){
+ try{return coGet(String(orcId))||{}}catch(e){return {}}
+}
+function cz150EtapaOrc(p){
+ const c=cz150ContratoLocal(p.id);
+ if(c.status==='Confirmado'||c.status==='Assinado')return 'financeiro';
+ if(c.status==='Enviado')return 'contrato_enviado';
+ if(c.status==='Gerado')return 'contrato_gerado';
+ return 'contrato';
+}
+function cz150Badge(txt,ok=false,atual=false){
+ return `<span style="display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border-radius:999px;border:1px solid ${ok?'#2f9e63':atual?'#d69b2d':'#555'};font-size:11px;font-weight:800;opacity:${ok||atual?'1':'.58'}">${ok?'✓ ':''}${txt}</span>`;
+}
+function cz150LinhaCicloOrc(p){
+ const etapa=cz150EtapaOrc(p),c=cz150ContratoLocal(p.id);
+ const contratoOk=['Gerado','Enviado','Confirmado','Assinado'].includes(c.status);
+ const financeiroOk=['Confirmado','Assinado'].includes(c.status);
+ return `<div class="cz150-ciclo" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+ ${cz150Badge('Orçamento',true)}
+ ${cz150Badge('Contrato',contratoOk,etapa.startsWith('contrato'))}
+ ${cz150Badge('Financeiro',financeiroOk,etapa==='financeiro')}
+ ${cz150Badge('Preparação',false,false)}
+ ${cz150Badge('Saída',false,false)}
+ ${cz150Badge('Retorno',false,false)}
+ </div>`;
+}
+function cz150AbrirContrato(orcId){
+ renderContratosOficialCZ().then(()=>setTimeout(()=>abrirContratoOficialCZ(orcId),80));
+}
+function cz150AplicarOrcamentos(){
+ document.querySelectorAll('#orcPropostasSalvas tr').forEach(tr=>{
+   // OLD direct route "Virar evento" must disappear.
+   tr.querySelectorAll('.btnEventoProposta').forEach(b=>{b.style.display='none';b.setAttribute('data-v150-ciclo-antigo','1')});
+   const any=tr.querySelector('button[data-id]');
+   const id=any?.dataset?.id;if(!id)return;
+   const p=(window.propostasExibidas||[]).find(x=>String(x.id)===String(id));
+   if(!p)return;
+   const td=tr.lastElementChild;if(!td)return;
+   if(!td.querySelector('.cz150Contrato')){
+     const b=document.createElement('button');b.type='button';b.className='btn primary cz150Contrato';b.textContent='Contrato';b.onclick=()=>cz150AbrirContrato(id);
+     const del=td.querySelector('.btnExcluirProposta');if(del)td.insertBefore(b,del);else td.appendChild(b);
+   }
+   if(!tr.querySelector('.cz150-ciclo')){
+     const cell=tr.querySelector('td:nth-child(2)')||tr.firstElementChild;
+     if(cell)cell.insertAdjacentHTML('beforeend',cz150LinhaCicloOrc(p));
+   }
+ });
+}
+async function cz150EtapaEvento(id){
+ const st=sair142State(id),{data:e}=await db.from('eventos_operacionais').select('*').eq('id',id).maybeSingle();
+ const status=cz150Norm(e?.status);
+ if(status.includes('final'))return 'finalizado';
+ if(status.includes('aguardando_retorno')||status.includes('retorno')||st?.saida_em)return 'retorno';
+ if(status.includes('em_evento'))return 'evento';
+ if(st?.itens_enviados?.length)return 'evento';
+ return 'preparacao';
+}
+function cz150AplicarEventos(){
+ document.querySelectorAll('tr').forEach(tr=>{
+   const buttons=[...tr.querySelectorAll('button')];
+   const prep=buttons.find(b=>cz150Norm(b.textContent)==='preparar');
+   if(!prep)return;
+   const txt=prep.getAttribute('onclick')||'';
+   const m=txt.match(/['"]([^'"]+)['"]/);const id=m?.[1];if(!id)return;
+   // New path is the only visible operational path.
+   buttons.forEach(b=>{
+     const t=cz150Norm(b.textContent),oc=cz150Norm(b.getAttribute('onclick')||'');
+     if(t.includes('iniciar separacao')||t.includes('liberar saida')||t.includes('bipagem')||oc.includes('iniciarseparacao')||oc.includes('liberarsaida')) b.style.display='none';
+   });
+ });
+}
+/* After contract confirmation, the official next stage is Financeiro.
+   Existing V139 continues creating the event and finance base; this wrapper only redirects the user to the next stage. */
+if(typeof confirmarContratoFluxoV139==='function' && !window.__cz150ConfirmWrap){
+ window.__cz150ConfirmWrap=true;
+ const _cz150Confirmar=confirmarContratoFluxoV139;
+ confirmarContratoFluxoV139=async function(id){
+   await _cz150Confirmar(id);
+   const c=cz150ContratoLocal(id);
+   if(c.status==='Confirmado'){
+     await czAlert('Contrato confirmado. O orçamento avançou para FINANCEIRO e o evento foi liberado para preparação.','Ciclo CZ');
+     try{renderFinanceiro()}catch(e){try{renderModule(10)}catch(_){}}
+   }
+ };
+}
+function cz150Aplicar(){
+ cz150AplicarOrcamentos();cz150AplicarEventos();
+ // hide known legacy standalone operational entries when duplicated by the new cycle
+ document.querySelectorAll('button,a,.btn').forEach(el=>{
+   const t=cz150Norm(el.textContent);
+   if(['iniciar separação','iniciar separacao','liberar saída','liberar saida','bipagem de saída','bipagem de saida'].includes(t)){
+     el.style.display='none';el.setAttribute('data-v150-legado','1');
+   }
+ });
+}
+const cz150Obs=new MutationObserver(()=>{clearTimeout(window.__cz150t);window.__cz150t=setTimeout(cz150Aplicar,80)});
+cz150Obs.observe(document.documentElement,{childList:true,subtree:true});
+document.addEventListener('DOMContentLoaded',cz150Aplicar);
 
 </script></body></html>
