@@ -235,7 +235,7 @@ function contaMaster(){
  const perfil=String(czPerfilUsuario?.perfil||'').trim().toLowerCase();
  return email===CZ_MASTER_EMAIL || perfil==='master' || perfil==='master_principal' || perfil==='master_autorizado';
 }
-async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#login').style.display='none';$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V150';reconstruirMenuPermissoes();renderModule(0)}
+async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#login').style.display='none';$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V151';reconstruirMenuPermissoes();renderModule(0)}
 $('#loginBtn').onclick=async()=>{const email=$('#email').value.trim(),password=$('#password').value;$('#loginMsg').textContent='Entrando...';const {data,error}=await db.auth.signInWithPassword({email,password});if(error){$('#loginMsg').textContent='Não foi possível entrar: '+error.message;return}$('#loginMsg').textContent='';showApp(data.user)};
 $('#logoutBtn').onclick=async()=>{await db.auth.signOut();showLogin()};
   async function recuperarSenha(){
@@ -3735,7 +3735,7 @@ async function duplicarOrcamentoV146(id){
 }
 
 
-/* ===== V150 — ORÇAMENTO NOVO APLICADO NA TELA REAL ===== */
+/* ===== V151 — ORÇAMENTO NOVO APLICADO NA TELA REAL ===== */
 function orc147AplicarAcoes(){
  document.querySelectorAll('#orcPropostasSalvas tr').forEach(tr=>{
    if(tr.querySelector('.orc147dup'))return;
@@ -3753,7 +3753,7 @@ orc147Obs.observe(document.documentElement,{childList:true,subtree:true});
 document.addEventListener('DOMContentLoaded',orc147AplicarAcoes);
 
 
-/* ===== V150 — FINANCEIRO DENTRO DO ORÇAMENTO ===== */
+/* ===== V151 — FINANCEIRO DENTRO DO ORÇAMENTO ===== */
 function orc148ISO(d){return d.toISOString().slice(0,10)}
 function orc148GerarDatas(){
  const tipo=$('#orcTipoDatasParcelas')?.value||'manual';
@@ -3788,7 +3788,7 @@ orc148Obs.observe(document.documentElement,{childList:true,subtree:true});
 document.addEventListener('DOMContentLoaded',orc148UI);
 
 
-/* ===== V150 — CICLO ÚNICO DO NOVO ORÇAMENTO =====
+/* ===== V151 — CICLO ÚNICO DO NOVO ORÇAMENTO =====
    O orçamento novo passa a ser o único fluxo operacional.
    O histórico antigo continua preservado somente para consulta.
 */
@@ -3823,7 +3823,7 @@ function orc149AplicarCicloUnico(){
    }
  });
 
- // Keep old records as history only; new proposals use the current V150 workflow.
+ // Keep old records as history only; new proposals use the current V151 workflow.
  const box=document.querySelector('#orcPropostasSalvas');
  if(box && !box.querySelector('.orc149-info')){
    const info=document.createElement('div');
@@ -3841,7 +3841,7 @@ orc149Observer.observe(document.documentElement,{childList:true,subtree:true});
 document.addEventListener('DOMContentLoaded',orc149AplicarCicloUnico);
 
 
-/* ===== V150 — CICLO OPERACIONAL OFICIAL CZ =====
+/* ===== V151 — CICLO OPERACIONAL OFICIAL CZ =====
  ORÇAMENTO → CONTRATO → FINANCEIRO → PREPARAÇÃO → SAÍDA/CONFERÊNCIA → EVENTO → RETORNO → FINALIZAÇÃO
  Agenda e reservas trabalham em segundo plano.
 */
@@ -3944,5 +3944,168 @@ function cz150Aplicar(){
 const cz150Obs=new MutationObserver(()=>{clearTimeout(window.__cz150t);window.__cz150t=setTimeout(cz150Aplicar,80)});
 cz150Obs.observe(document.documentElement,{childList:true,subtree:true});
 document.addEventListener('DOMContentLoaded',cz150Aplicar);
+
+
+/* ===== V151 — CONFIRMAR ORÇAMENTO É O GATILHO ÚNICO DO CICLO =====
+   EM ABERTO → CONFIRMAR ORÇAMENTO → CONTRATO + FINANCEIRO + EVENTO/PREPARAÇÃO
+*/
+function cz151Norm(v){return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim()}
+function cz151ContratoBase(p){
+ const d=p?.dados||{}, pg=d.pagamento||{};
+ const parcelas=Array.isArray(pg.parcelas_detalhes)?pg.parcelas_detalhes:[];
+ return {
+   nome:d.cliente||p.cliente_nome||'',
+   telefone:d.telefone||p.cliente_telefone||'',
+   evento:d.evento||p.evento_nome||'',
+   data_evento:d.data_evento||p.data_evento||'',
+   horario:d.horario||'',
+   local_evento:d.local_evento||p.local_evento||'',
+   cidade_evento:d.cidade_evento||'',
+   valor_total:Number(d.total??p.valor_total??0),
+   pagamento:pg,
+   parcelas,
+   status:'Gerado',
+   gerado_em:new Date().toISOString(),
+   origem:'orcamento_confirmado'
+ };
+}
+async function cz151CriarEvento(p){
+ const d=p.dados||{};
+ const {data:existente,error:ee}=await db.from('eventos_operacionais').select('*').eq('origem_orcamento_id',p.id).maybeSingle();
+ if(ee && !String(ee.message||'').toLowerCase().includes('multiple')) throw ee;
+ if(existente)return existente;
+ const payload={
+   origem_orcamento_id:p.id,
+   cliente_nome:d.cliente||p.cliente_nome||'',
+   cliente_telefone:d.telefone||p.cliente_telefone||null,
+   nome_evento:d.evento||p.evento_nome||'Evento',
+   data_evento:d.data_evento||p.data_evento||null,
+   horario_evento:d.horario||null,
+   local_evento:d.local_evento||p.local_evento||null,
+   cidade_evento:d.cidade_evento||null,
+   status:'em_preparacao',
+   atualizado_em:new Date().toISOString()
+ };
+ const {data,error}=await db.from('eventos_operacionais').insert(payload).select('*').single();
+ if(error)throw error;
+ return data;
+}
+async function cz151MateriaisEvento(evento,p){
+ if(!evento?.id)return;
+ const {data:atuais,error:e0}=await db.from('evento_materiais').select('id').eq('evento_id',evento.id).limit(1);
+ if(e0)throw e0;
+ if((atuais||[]).length)return;
+ const d=p.dados||{};
+ const itens=[
+   ...(Array.isArray(d.produtos)?d.produtos:[]).map(x=>({...x,tipo:'produto'})),
+   ...(Array.isArray(d.equipamentos)?d.equipamentos:[]).map(x=>({...x,tipo:'ativo'}))
+ ];
+ for(const x of itens){
+   const payload={
+     evento_id:evento.id,
+     tipo:x.tipo,
+     item_id:x.id||x.item_id||null,
+     nome_item:x.nome||x.descricao||'Item',
+     codigo:x.codigo_barras||x.codigo||x.codigo_interno||null,
+     quantidade_necessaria:Number(x.quantidade||1),
+     quantidade_bipada:0,
+     origem:'orcamento'
+   };
+   const {error}=await db.from('evento_materiais').insert(payload);
+   if(error)throw error;
+ }
+}
+async function cz151ConfirmarOrcamento(id){
+ const p=(window.propostasExibidas||[]).find(x=>String(x.id)===String(id))
+   || (await db.from('orcamentos').select('*').eq('id',id).single()).data;
+ if(!p)return czAlert('Orçamento não encontrado.','Confirmar orçamento');
+ if(cz151Norm(p.status)==='fechado')return czAlert('Este orçamento já está fechado.','Confirmar orçamento');
+
+ const ok=await czConfirm(
+   'Confirmar que o cliente FECHOU este orçamento? Ao confirmar, o sistema vai gerar o contrato, o financeiro e o evento automaticamente.',
+   'Confirmar orçamento'
+ );
+ if(!ok)return;
+
+ try{
+   // 1. Close budget
+   const {error:eo}=await db.from('orcamentos').update({status:'fechado'}).eq('id',id);
+   if(eo)throw eo;
+
+   // 2. Generate contract draft linked to this budget
+   const contrato=cz151ContratoBase(p);
+   try{coSet(String(id),contrato)}catch(_){}
+
+   // 3. Event is created immediately, independent of payment
+   const evento=await cz151CriarEvento(p);
+   await cz151MateriaisEvento(evento,p);
+
+   // 4. Finance: the existing finance engine reads closed/confirmed budget payment data.
+   // Mark the local contract as confirmed so the current finance integration includes it immediately.
+   contrato.status='Confirmado';
+   contrato.confirmado_em=new Date().toISOString();
+   try{coSet(String(id),contrato)}catch(_){}
+
+   await czAlert(
+     'Orçamento confirmado. Contrato gerado, financeiro liberado e evento criado em PREPARAÇÃO.',
+     'Ciclo CZ'
+   );
+   await renderOrcamentos();
+ }catch(e){
+   await czAlert('Não foi possível concluir o ciclo automático: '+(e?.message||e),'Confirmar orçamento');
+ }
+}
+function cz151AplicarOrcamentos(){
+ document.querySelectorAll('#orcPropostasSalvas tr').forEach(tr=>{
+   const btns=[...tr.querySelectorAll('button[data-id]')];
+   const ref=btns[0]; const id=ref?.dataset?.id;if(!id)return;
+   const p=(window.propostasExibidas||[]).find(x=>String(x.id)===String(id));
+   if(!p)return;
+   const td=tr.lastElementChild;if(!td)return;
+
+   // REMOVE old cycle actions from operation.
+   td.querySelectorAll('.btnEventoProposta,.cz150Contrato').forEach(b=>b.remove());
+   [...td.querySelectorAll('button')].forEach(b=>{
+     const t=cz151Norm(b.textContent);
+     if(t==='contrato' || t.includes('virar evento') || t.includes('criar evento')) b.remove();
+   });
+
+   if(cz151Norm(p.status)!=='fechado'){
+     if(!td.querySelector('.cz151Confirmar')){
+       const b=document.createElement('button');
+       b.type='button';b.className='btn primary cz151Confirmar';
+       b.textContent='CONFIRMAR ORÇAMENTO';
+       b.dataset.id=id;
+       b.onclick=()=>cz151ConfirmarOrcamento(id);
+       const excluir=td.querySelector('.btnExcluirProposta');
+       if(excluir)td.insertBefore(b,excluir);else td.appendChild(b);
+     }
+   }else{
+     td.querySelector('.cz151Confirmar')?.remove();
+     if(!td.querySelector('.cz151Fechado')){
+       const tag=document.createElement('span');
+       tag.className='cz151Fechado';
+       tag.textContent='FECHADO';
+       tag.style.cssText='display:inline-flex;padding:7px 10px;border:1px solid #2f9e63;border-radius:999px;font-size:11px;font-weight:900';
+       td.insertBefore(tag,td.firstChild);
+     }
+     if(!td.querySelector('.cz151AbrirContrato')){
+       const b=document.createElement('button');b.type='button';b.className='btn secondary cz151AbrirContrato';b.textContent='Ver contrato';b.onclick=()=>cz150AbrirContrato(id);td.appendChild(b);
+     }
+   }
+ });
+}
+function cz151RemoverCicloAntigo(){
+ document.querySelectorAll('button,a,.btn').forEach(el=>{
+   const t=cz151Norm(el.textContent),oc=cz151Norm(el.getAttribute('onclick')||'');
+   if(t.includes('virar evento') || t==='criar evento' || oc.includes('propostavirarevento')){
+     el.remove();
+   }
+ });
+}
+function cz151Aplicar(){cz151RemoverCicloAntigo();cz151AplicarOrcamentos()}
+const cz151Obs=new MutationObserver(()=>{clearTimeout(window.__cz151);window.__cz151=setTimeout(cz151Aplicar,80)});
+cz151Obs.observe(document.documentElement,{childList:true,subtree:true});
+document.addEventListener('DOMContentLoaded',cz151Aplicar);
 
 </script></body></html>
