@@ -3658,4 +3658,65 @@ async function prep145RemoverExtra(id,eventoId){
  prep141Abrir(eventoId);
 }
 
+
+/* ===== V146 — ORÇAMENTO NOVO OFICIAL / ANTIGO FORA DO FLUXO =====
+   Substitui o acesso antigo sem apagar dados históricos.
+*/
+function orc146AbrirNovo(id=null){
+  // Reaproveita o formulário mais completo já existente no sistema.
+  if(id && typeof editarOrcamento==='function') return editarOrcamento(id);
+  if(typeof novoOrcamento==='function') return novoOrcamento();
+  if(typeof abrirNovoOrcamento==='function') return abrirNovoOrcamento(id);
+  if(typeof renderNovoOrcamento==='function') return renderNovoOrcamento(id);
+  return czAlert('Formulário de orçamento não localizado.','Orçamento');
+}
+function orc146LimparAntigo(){
+  const norm=t=>String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+  document.querySelectorAll('button,a,.btn,[role="button"]').forEach(el=>{
+    const t=norm(el.textContent), oc=String(el.getAttribute('onclick')||'');
+    // remove apenas acessos antigos duplicados; histórico/lista permanece.
+    if((t.includes('orcamento antigo')||t.includes('orçamento antigo')||t==='novo orçamento antigo') && !oc.includes('orc146')){
+      el.style.display='none'; el.setAttribute('data-orcamento-antigo','1');
+    }
+  });
+}
+const orc146Obs=new MutationObserver(()=>{clearTimeout(window.__orc146);window.__orc146=setTimeout(orc146LimparAntigo,50)});
+orc146Obs.observe(document.documentElement,{childList:true,subtree:true});
+document.addEventListener('DOMContentLoaded',orc146LimparAntigo);
+
+/* Campos oficiais do novo orçamento:
+   1 Orçamento/evento
+   Introdução da proposta
+   Deslocamento
+   Equipe
+   2 Produtos
+   Pagamento
+   Observações
+   Total de investimento
+*/
+function orc146CamposExtrasHTML(d={}){
+ const intro=d.introducao_proposta||'A CZ Efeitos Especiais apresenta esta proposta comercial para execução dos serviços e efeitos selecionados para o evento.';
+ return `<div class="card"><h3 style="margin-top:0">Introdução da Proposta</h3><textarea id="orc146Intro" rows="5">${coEsc(intro)}</textarea></div>`;
+}
+function orc146DadosExtras(){
+ return {introducao_proposta:($('#orc146Intro')?.value||'').trim()};
+}
+
+/* Duplicar orçamento: copia conteúdo, nunca copia aceite/contrato/financeiro/reservas/status. */
+async function duplicarOrcamentoV146(id){
+ if(!await czConfirm('Duplicar este orçamento? Será criado um novo número sem copiar aceite, contrato, financeiro ou reservas.','Duplicar orçamento','Duplicar'))return;
+ const {data:o,error}=await db.from('orcamentos').select('*').eq('id',id).single();if(error)return czAlert(error.message,'Orçamento');
+ const n={...o}; delete n.id; delete n.created_at; delete n.updated_at;
+ ['status','aceito_em','contrato_id','financeiro_id','evento_id','reserva_id'].forEach(k=>delete n[k]);
+ n.status='rascunho';
+ if(n.dados && typeof n.dados==='object'){
+   n.dados=JSON.parse(JSON.stringify(n.dados));
+   ['aceite','contrato','financeiro','reservas','status'].forEach(k=>delete n.dados[k]);
+ }
+ const ins=await db.from('orcamentos').insert(n).select('id').single();
+ if(ins.error)return czAlert(ins.error.message,'Orçamento');
+ await czAlert('Novo orçamento criado.','Orçamento');
+ orc146AbrirNovo(ins.data.id);
+}
+
 </script></body></html>
