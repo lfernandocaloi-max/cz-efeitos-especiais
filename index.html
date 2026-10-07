@@ -3208,7 +3208,7 @@ async function abrirContratoOficialCZ(id){
  <div class="row"><div class="field"><label>Local *</label><input id="coLocal" value="${coEsc(c.local??d.local_evento??'')}"></div><div class="field"><label>Cidade</label><input id="coCidade" value="${coEsc(c.cidade??d.cidade_evento??cli.cidade??'')}"></div></div></div>
  <div class="card"><h3 style="margin-top:0">SERVIÇOS CONTRATADOS</h3><textarea id="coServicos" style="min-height:145px">${coEsc(c.servicos??(prod.length?prod.map(x=>`${x.qtd} - ${x.nome}${x.cor?` | COR: ${x.cor}`:''}`).join('\n'):'') )}</textarea><div class="muted">Pode conferir ou complementar antes de gerar o contrato.</div></div>
  <div class="card"><h3 style="margin-top:0">PAGAMENTO</h3><div class="row"><div class="field"><label>Valor total</label><input id="coValor" value="${coEsc(c.valor??money(p.valor_total))}"></div><div class="field"><label>Condição de pagamento</label><input id="coPagamento" value="${coEsc(c.pagamento??coPagamentoTexto(p))}"></div></div><div class="field"><label>Data do contrato</label><input id="coDataContrato" type="date" value="${coEsc(c.data_contrato??new Date().toISOString().slice(0,10))}"></div></div>
- <div class="actions"><button class="btn primary" onclick="salvarContratoOficialCZ('${id}',false)">Salvar preenchimento</button><button class="btn secondary" onclick="salvarContratoOficialCZ('${id}',true)">Visualizar / PDF</button>${c.status?`<button class="btn secondary" onclick="enviarContratoOficialCZ('${id}')">Enviar WhatsApp</button>`:''}</div>`;
+ <div class="actions"><button class="btn primary" onclick="salvarContratoOficialCZ('${id}',false)">Salvar preenchimento</button><button class="btn secondary" onclick="salvarContratoOficialCZ('${id}',true)">Visualizar / PDF</button>${c.status?`<button class="btn secondary" onclick="enviarContratoOficialCZ('${id}')">Enviar WhatsApp</button>`:''}${c.status&&!['Confirmado','Assinado'].includes(c.status)?`<button class="btn primary" onclick="confirmarContratoFluxoV139('${id}')">Confirmar contrato</button>`:''}${['Confirmado','Assinado'].includes(c.status)?`<span style="padding:7px 10px;border-radius:999px;border:1px solid #45b879;background:#45b87922">✓ Contrato confirmado</span>`:''}</div>`;
 }
 function coPagamentoTexto(p){
  const pg=p?.dados?.pagamento||{};
@@ -3260,6 +3260,61 @@ async function enviarContratoOficialCZ(id){
  let tel=String(c.telefone||'').replace(/\D/g,'');if(tel.length===10||tel.length===11)tel='55'+tel;if(!tel)return czAlert('Telefone do contratante não preenchido.','WhatsApp');
  coSet(id,{status:'Enviado',enviado_em:new Date().toISOString()});
  window.open('https://wa.me/'+tel+'?text='+encodeURIComponent(`Olá ${c.nome}. O contrato referente à Proposta ${p.numero||''} da CZ Efeitos Especiais está pronto para conferência e assinatura.`),'_blank','noopener');
+}
+
+
+/* ===== V139 — CONFIRMAÇÃO DO CONTRATO E FLUXO AUTOMÁTICO ===== */
+async function confirmarContratoFluxoV139(id){
+ const p=(await coOrcs()).find(x=>String(x.id)===String(id)),c=coGet(id);
+ if(!p||!c)return czAlert('Salve o preenchimento do contrato antes de confirmar.','Contrato');
+ if(!await czConfirm('Confirmar este contrato?\n\nO sistema criará/liberará o Evento e o Financeiro usando os dados já cadastrados. Não será necessário digitar novamente.','Confirmar contrato','Confirmar'))return;
+ try{
+   // Idempotência: não duplica evento.
+   let {data:ev,error:e1}=await db.from('eventos_operacionais').select('*').eq('origem_orcamento_id',p.id).limit(1).maybeSingle();
+   if(e1)throw e1;
+   if(!ev){
+     const d=p.dados||{};
+     const payload={
+       cliente_nome:c.nome||p.cliente_nome||null,
+       cliente_telefone:c.telefone||p.cliente_telefone||null,
+       nome_evento:p.evento_nome||'Evento',
+       data_evento:c.data_evento||p.data_evento||null,
+       horario_evento:c.horario||d.horario||d.horario_evento||null,
+       local_evento:c.local||d.local_evento||null,
+       cidade_evento:c.cidade||d.cidade_evento||null,
+       origem_orcamento_id:p.id,
+       status:'aguardando_evento',
+       atualizado_em:new Date().toISOString()
+     };
+     const ins=await db.from('eventos_operacionais').insert(payload).select('*').single();
+     if(ins.error)throw ins.error; ev=ins.data;
+   } else if(ev.status==='orcamento'||ev.status==='rascunho'){
+     await db.from('eventos_operacionais').update({status:'aguardando_evento',atualizado_em:new Date().toISOString()}).eq('id',ev.id);
+   }
+   coSet(id,{status:'Confirmado',confirmado_em:new Date().toISOString(),confirmado_por:(typeof currentAuthUser!=='undefined'&&currentAuthUser?.email)||''});
+   await czAlert('Contrato confirmado.\n\n✓ Evento liberado\n✓ Financeiro passa a usar os dados da proposta\n✓ Data disponível na Agenda\n✓ Sem redigitar o cadastro','Fluxo liberado');
+   abrirContratoOficialCZ(id);
+ }catch(e){
+   await czAlert('Não foi possível liberar o fluxo automático: '+(e?.message||e),'Contrato');
+ }
+}
+
+/* Financeiro V139: contratos confirmados entram como recebíveis mesmo antes de outro status manual. */
+if(typeof finRecebiveis==='function'){
+ const _finRecebiveisV139=finRecebiveis;
+ finRecebiveis=async function(){
+   const base=await _finRecebiveisV139(), vistos=new Set((base||[]).map(x=>String(x.id))), mapa=coLoad(), extras=[];
+   for(const [id,c] of Object.entries(mapa)){
+     if(!['Confirmado','Assinado'].includes(c.status)||vistos.has(String(id)))continue;
+     const {data:o,error}=await db.from('orcamentos').select('*').eq('id',id).maybeSingle();
+     if(error||!o)continue;
+     const total=Number(o.valor_total||0), pago=typeof finPagoOrc==='function'?finPagoOrc(o.id):0, pg=o.dados?.pagamento||{};
+     let venc=pg.vencimento_saldo||'';
+     if(!venc&&o.data_evento&&typeof finAddDays==='function')venc=finAddDays(o.data_evento,-5);
+     extras.push({...o,total,pago,saldo:Math.max(0,total-pago),entrada:pg.modo==='contratual'?Number(pg.entrada_valor||0):pg.modo==='avista'?total:total*.4,vencimento:venc,status_fin:typeof finStatus==='function'?finStatus(total,pago,venc):'A receber'});
+   }
+   return [...(base||[]),...extras];
+ };
 }
 
 </script></body></html>
