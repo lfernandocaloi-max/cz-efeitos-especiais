@@ -235,7 +235,7 @@ function contaMaster(){
  const perfil=String(czPerfilUsuario?.perfil||'').trim().toLowerCase();
  return email===CZ_MASTER_EMAIL || perfil==='master' || perfil==='master_principal' || perfil==='master_autorizado';
 }
-async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#login').style.display='none';$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V153';reconstruirMenuPermissoes();renderModule(0)}
+async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#login').style.display='none';$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V154';reconstruirMenuPermissoes();renderModule(0)}
 $('#loginBtn').onclick=async()=>{const email=$('#email').value.trim(),password=$('#password').value;$('#loginMsg').textContent='Entrando...';const {data,error}=await db.auth.signInWithPassword({email,password});if(error){$('#loginMsg').textContent='Não foi possível entrar: '+error.message;return}$('#loginMsg').textContent='';showApp(data.user)};
 $('#logoutBtn').onclick=async()=>{await db.auth.signOut();showLogin()};
   async function recuperarSenha(){
@@ -1715,16 +1715,16 @@ Obrigado!`;
     const eventosVinculados=[...(porOrigem.data||[]),...(porId.data||[])];
     const origensComEvento=new Set(eventosVinculados.filter(x=>x.status!=='pendente').map(x=>String(x.origem_orcamento_id)).filter(Boolean));
     const eventosExistentes=new Set(eventosVinculados.filter(x=>x.status!=='pendente').map(x=>String(x.id)));
-    const propostasExibidas=(data||[]).filter(x=>{const fechado=String(x.status||'').toLowerCase()==='fechado'||origensComEvento.has(String(x.id))||eventosExistentes.has(String(x.dados?.evento_operacional_id||''));return orcamentosFechadosModo?fechado:!fechado});
-    box.innerHTML=propostasExibidas.length?`<div class="tablewrap"><table class="orcamentos-lista"><thead><tr><th>Cliente</th><th>Data</th><th>Evento</th><th>Valor</th><th>Status</th><th>Nº Proposta</th><th style="min-width:190px">Fechamento</th><th>Ações</th></tr></thead><tbody>${propostasExibidas.map(x=>`<tr><td>${esc(x.cliente_nome||'')}</td><td>${x.data_evento?new Date(x.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${esc(x.evento_nome||'')}</td><td>${money(x.valor_total)}</td><td>${esc(x.status||'')}</td><td><b>${esc(x.numero||'')}</b></td><td>${String(x.status||'').toLowerCase()==='fechado'?'<span style="display:inline-flex;padding:8px 12px;border:1px solid #2f9e63;border-radius:999px;font-size:11px;font-weight:900">FECHADO</span>':`<button type="button" class="btn primary btnConfirmarOrcamentoV153" data-id="${esc(x.id)}" style="font-weight:900;white-space:nowrap;padding:9px 12px">CONFIRMAR ORÇAMENTO</button>`}</td><td><div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap"><button type="button" class="btn secondary btnVisualizarProposta" data-id="${esc(x.id)}" title="Visualizar proposta" aria-label="Visualizar proposta" style="padding:5px 7px;min-height:auto">${iconeOlho()}</button><button type="button" class="btn secondary btnEnviarProposta" data-id="${esc(x.id)}" title="Enviar proposta pelo WhatsApp" aria-label="Enviar proposta pelo WhatsApp" style="padding:5px 7px;min-height:auto">${iconeEnviarProposta()}</button><button type="button" class="btn secondary btnWhatsProposta" data-id="${esc(x.id)}" title="Enviar preenchimento pelo WhatsApp" aria-label="Enviar preenchimento pelo WhatsApp" style="padding:5px 7px;min-height:auto">${iconeWhats()}</button><button type="button" class="btn danger btnExcluirProposta" data-id="${esc(x.id)}" title="Excluir proposta" aria-label="Excluir proposta" style="font-size:14px;padding:4px 8px;min-height:auto">×</button></div></td></tr>`).join('')}</tbody></table></div>`:'<div class="muted">Nenhuma proposta gerada ainda.</div>';
-    box.querySelectorAll('.btnConfirmarOrcamentoV153').forEach(btn=>{btn.onclick=()=>cz151ConfirmarOrcamento(btn.dataset.id)});
+    const propostasExibidas=(data||[]).filter(x=>{const fechado=origensComEvento.has(String(x.id))||eventosExistentes.has(String(x.dados?.evento_operacional_id||''));return orcamentosFechadosModo?fechado:!fechado});
+    box.innerHTML=propostasExibidas.length?`<div class="tablewrap"><table class="orcamentos-lista"><thead><tr><th>Cliente</th><th>Data</th><th>Evento</th><th>Valor</th><th>Status</th><th>Nº Proposta</th><th style="min-width:190px">Fechamento</th><th>Ações</th></tr></thead><tbody>${propostasExibidas.map(x=>`<tr><td>${esc(x.cliente_nome||'')}</td><td>${x.data_evento?new Date(x.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${esc(x.evento_nome||'')}</td><td>${money(x.valor_total)}</td><td>${esc(x.status||'')}</td><td><b>${esc(x.numero||'')}</b></td><td>${(origensComEvento.has(String(x.id))||eventosExistentes.has(String(x.dados?.evento_operacional_id||'')))?'<span style="display:inline-flex;padding:8px 12px;border:1px solid #2f9e63;border-radius:999px;font-size:11px;font-weight:900">FECHADO</span>':`<button type="button" class="btn primary btnConfirmarOrcamentoV154" data-id="${esc(x.id)}" style="font-weight:900;white-space:nowrap;padding:9px 12px">CONFIRMAR ORÇAMENTO</button>`}</td><td><div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap"><button type="button" class="btn secondary btnVisualizarProposta" data-id="${esc(x.id)}" title="Visualizar proposta" aria-label="Visualizar proposta" style="padding:5px 7px;min-height:auto">${iconeOlho()}</button><button type="button" class="btn secondary btnEnviarProposta" data-id="${esc(x.id)}" title="Enviar proposta pelo WhatsApp" aria-label="Enviar proposta pelo WhatsApp" style="padding:5px 7px;min-height:auto">${iconeEnviarProposta()}</button><button type="button" class="btn secondary btnWhatsProposta" data-id="${esc(x.id)}" title="Enviar preenchimento pelo WhatsApp" aria-label="Enviar preenchimento pelo WhatsApp" style="padding:5px 7px;min-height:auto">${iconeWhats()}</button><button type="button" class="btn danger btnExcluirProposta" data-id="${esc(x.id)}" title="Excluir proposta" aria-label="Excluir proposta" style="font-size:14px;padding:4px 8px;min-height:auto">×</button></div></td></tr>`).join('')}</tbody></table></div>`:'<div class="muted">Nenhuma proposta gerada ainda.</div>';
+    box.querySelectorAll('.btnConfirmarOrcamentoV154').forEach(btn=>{btn.onclick=()=>cz151ConfirmarOrcamento(btn.dataset.id)});
     box.querySelectorAll('.btnVisualizarProposta').forEach(btn=>{btn.onclick=()=>{const p=propostasExibidas.find(x=>String(x.id)===String(btn.dataset.id));if(!p)return;if(!p.dados||typeof p.dados!=='object'){czAlert('Esta proposta não possui os dados completos salvos para visualização.','Orçamento');return}visualizarOrcamentoSalvo(p)}});
     box.insertAdjacentHTML('beforeend','<div id="orcEnvioMsg" class="msg" role="status"></div>');
     box.querySelectorAll('.btnEnviarProposta').forEach(btn=>{btn.onclick=()=>{const p=propostasExibidas.find(x=>String(x.id)===String(btn.dataset.id));if(p)enviarPropostaWhats(p,btn)}});
     box.querySelectorAll('.btnEventoProposta').forEach(btn=>{btn.style.display='none';btn.setAttribute('data-v150-ciclo-antigo','1')});
     box.querySelectorAll('.btnWhatsProposta').forEach(btn=>{btn.onclick=()=>{const p=propostasExibidas.find(x=>String(x.id)===String(btn.dataset.id));if(p)abrirWhatsPreenchimento(p)}});
     box.querySelectorAll('.btnExcluirProposta').forEach(btn=>{btn.onclick=()=>excluirProposta(btn.dataset.id)});
-    // V153: fechamento agora é uma coluna fixa da tabela, sem injeção dinâmica.
+    // V154: fechamento agora é uma coluna fixa da tabela, sem injeção dinâmica.
 
   }
   prepararItensOrcamento();
@@ -3738,7 +3738,7 @@ async function duplicarOrcamentoV146(id){
 }
 
 
-/* ===== V153 — ORÇAMENTO NOVO APLICADO NA TELA REAL ===== */
+/* ===== V154 — ORÇAMENTO NOVO APLICADO NA TELA REAL ===== */
 function orc147AplicarAcoes(){
  document.querySelectorAll('#orcPropostasSalvas tr').forEach(tr=>{
    if(tr.querySelector('.orc147dup'))return;
@@ -3756,7 +3756,7 @@ orc147Obs.observe(document.documentElement,{childList:true,subtree:true});
 document.addEventListener('DOMContentLoaded',orc147AplicarAcoes);
 
 
-/* ===== V153 — FINANCEIRO DENTRO DO ORÇAMENTO ===== */
+/* ===== V154 — FINANCEIRO DENTRO DO ORÇAMENTO ===== */
 function orc148ISO(d){return d.toISOString().slice(0,10)}
 function orc148GerarDatas(){
  const tipo=$('#orcTipoDatasParcelas')?.value||'manual';
@@ -3791,7 +3791,7 @@ orc148Obs.observe(document.documentElement,{childList:true,subtree:true});
 document.addEventListener('DOMContentLoaded',orc148UI);
 
 
-/* ===== V153 — CICLO ÚNICO DO NOVO ORÇAMENTO =====
+/* ===== V154 — CICLO ÚNICO DO NOVO ORÇAMENTO =====
    O orçamento novo passa a ser o único fluxo operacional.
    O histórico antigo continua preservado somente para consulta.
 */
@@ -3826,7 +3826,7 @@ function orc149AplicarCicloUnico(){
    }
  });
 
- // Keep old records as history only; new proposals use the current V153 workflow.
+ // Keep old records as history only; new proposals use the current V154 workflow.
  const box=document.querySelector('#orcPropostasSalvas');
  if(box && !box.querySelector('.orc149-info')){
    const info=document.createElement('div');
@@ -3844,7 +3844,7 @@ orc149Observer.observe(document.documentElement,{childList:true,subtree:true});
 document.addEventListener('DOMContentLoaded',orc149AplicarCicloUnico);
 
 
-/* ===== V153 — CICLO OPERACIONAL OFICIAL CZ =====
+/* ===== V154 — CICLO OPERACIONAL OFICIAL CZ =====
  ORÇAMENTO → CONTRATO → FINANCEIRO → PREPARAÇÃO → SAÍDA/CONFERÊNCIA → EVENTO → RETORNO → FINALIZAÇÃO
  Agenda e reservas trabalham em segundo plano.
 */
@@ -3949,7 +3949,7 @@ cz150Obs.observe(document.documentElement,{childList:true,subtree:true});
 document.addEventListener('DOMContentLoaded',cz150Aplicar);
 
 
-/* ===== V153 — CONFIRMAR ORÇAMENTO É O GATILHO ÚNICO DO CICLO =====
+/* ===== V154 — CONFIRMAR ORÇAMENTO É O GATILHO ÚNICO DO CICLO =====
    EM ABERTO → CONFIRMAR ORÇAMENTO → CONTRATO + FINANCEIRO + EVENTO/PREPARAÇÃO
 */
 function cz151Norm(v){return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim()}
@@ -4022,7 +4022,8 @@ async function cz151ConfirmarOrcamento(id){
  const p=(window.propostasExibidas||[]).find(x=>String(x.id)===String(id))
    || (await db.from('orcamentos').select('*').eq('id',id).single()).data;
  if(!p)return czAlert('Orçamento não encontrado.','Confirmar orçamento');
- if(cz151Norm(p.status)==='fechado')return czAlert('Este orçamento já está fechado.','Confirmar orçamento');
+ const {data:jaEvento}=await db.from('eventos_operacionais').select('id').eq('origem_orcamento_id',id).limit(1);
+ if((jaEvento||[]).length)return czAlert('Este orçamento já está fechado e já possui evento gerado.','Confirmar orçamento');
 
  const ok=await czConfirm(
    'Confirmar que o cliente FECHOU este orçamento? Ao confirmar, o sistema vai gerar o contrato, o financeiro e o evento automaticamente.',
@@ -4032,7 +4033,11 @@ async function cz151ConfirmarOrcamento(id){
 
  try{
    // 1. Close budget
-   const {error:eo}=await db.from('orcamentos').update({status:'fechado'}).eq('id',id);
+   // V154: não grava mais o status inválido "fechado".
+   // Mantém um status aceito pelo schema atual; o vínculo com o evento define o orçamento como fechado na interface.
+   const statusAtual=String(p.status||'').toLowerCase();
+   const statusPermitido=['rascunho','enviado','aceito','recusado','cancelado'].includes(statusAtual)?statusAtual:'enviado';
+   const {error:eo}=await db.from('orcamentos').update({status:statusPermitido}).eq('id',id);
    if(eo)throw eo;
 
    // 2. Generate contract draft linked to this budget
