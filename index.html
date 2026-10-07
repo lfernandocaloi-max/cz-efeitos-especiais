@@ -235,7 +235,7 @@ function contaMaster(){
  const perfil=String(czPerfilUsuario?.perfil||'').trim().toLowerCase();
  return email===CZ_MASTER_EMAIL || perfil==='master' || perfil==='master_principal' || perfil==='master_autorizado';
 }
-async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#login').style.display='none';$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V151';reconstruirMenuPermissoes();renderModule(0)}
+async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#login').style.display='none';$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V152';reconstruirMenuPermissoes();renderModule(0)}
 $('#loginBtn').onclick=async()=>{const email=$('#email').value.trim(),password=$('#password').value;$('#loginMsg').textContent='Entrando...';const {data,error}=await db.auth.signInWithPassword({email,password});if(error){$('#loginMsg').textContent='Não foi possível entrar: '+error.message;return}$('#loginMsg').textContent='';showApp(data.user)};
 $('#logoutBtn').onclick=async()=>{await db.auth.signOut();showLogin()};
   async function recuperarSenha(){
@@ -1723,6 +1723,36 @@ Obrigado!`;
     box.querySelectorAll('.btnEventoProposta').forEach(btn=>{btn.style.display='none';btn.setAttribute('data-v150-ciclo-antigo','1')});
     box.querySelectorAll('.btnWhatsProposta').forEach(btn=>{btn.onclick=()=>{const p=propostasExibidas.find(x=>String(x.id)===String(btn.dataset.id));if(p)abrirWhatsPreenchimento(p)}});
     box.querySelectorAll('.btnExcluirProposta').forEach(btn=>{btn.onclick=()=>excluirProposta(btn.dataset.id)});
+    // V152: botão oficial e visível para fechar orçamento.
+    box.querySelectorAll('tr').forEach(tr=>{
+      const ref=tr.querySelector('button[data-id]');
+      const id=ref?.dataset?.id;
+      if(!id)return;
+      const p=propostasExibidas.find(x=>String(x.id)===String(id));
+      if(!p)return;
+      const td=tr.lastElementChild;
+      if(!td)return;
+      td.querySelectorAll('.btnEventoProposta,.cz150Contrato').forEach(b=>b.remove());
+      const fechado=String(p.status||'').toLowerCase()==='fechado';
+      if(!fechado && !td.querySelector('.cz152Confirmar')){
+        const b=document.createElement('button');
+        b.type='button';
+        b.className='btn primary cz152Confirmar';
+        b.dataset.id=id;
+        b.textContent='CONFIRMAR ORÇAMENTO';
+        b.style.cssText='font-weight:900;white-space:nowrap;border:2px solid currentColor';
+        b.onclick=()=>cz151ConfirmarOrcamento(id);
+        const excluir=td.querySelector('.btnExcluirProposta');
+        if(excluir)td.insertBefore(b,excluir); else td.appendChild(b);
+      }
+      if(fechado && !td.querySelector('.cz152Fechado')){
+        const tag=document.createElement('span');
+        tag.className='cz152Fechado';
+        tag.textContent='FECHADO';
+        tag.style.cssText='display:inline-flex;padding:7px 10px;border:1px solid #2f9e63;border-radius:999px;font-size:11px;font-weight:900;margin-right:6px';
+        td.insertBefore(tag,td.firstChild);
+      }
+    });
   }
   prepararItensOrcamento();
   $('#orcSave').onclick=()=>{$('#orcMsg').textContent='Rascunho não é gerado como proposta. Use GERAR PROPOSTA quando estiver pronto.'};
@@ -3735,7 +3765,7 @@ async function duplicarOrcamentoV146(id){
 }
 
 
-/* ===== V151 — ORÇAMENTO NOVO APLICADO NA TELA REAL ===== */
+/* ===== V152 — ORÇAMENTO NOVO APLICADO NA TELA REAL ===== */
 function orc147AplicarAcoes(){
  document.querySelectorAll('#orcPropostasSalvas tr').forEach(tr=>{
    if(tr.querySelector('.orc147dup'))return;
@@ -3753,7 +3783,7 @@ orc147Obs.observe(document.documentElement,{childList:true,subtree:true});
 document.addEventListener('DOMContentLoaded',orc147AplicarAcoes);
 
 
-/* ===== V151 — FINANCEIRO DENTRO DO ORÇAMENTO ===== */
+/* ===== V152 — FINANCEIRO DENTRO DO ORÇAMENTO ===== */
 function orc148ISO(d){return d.toISOString().slice(0,10)}
 function orc148GerarDatas(){
  const tipo=$('#orcTipoDatasParcelas')?.value||'manual';
@@ -3788,7 +3818,7 @@ orc148Obs.observe(document.documentElement,{childList:true,subtree:true});
 document.addEventListener('DOMContentLoaded',orc148UI);
 
 
-/* ===== V151 — CICLO ÚNICO DO NOVO ORÇAMENTO =====
+/* ===== V152 — CICLO ÚNICO DO NOVO ORÇAMENTO =====
    O orçamento novo passa a ser o único fluxo operacional.
    O histórico antigo continua preservado somente para consulta.
 */
@@ -3823,7 +3853,7 @@ function orc149AplicarCicloUnico(){
    }
  });
 
- // Keep old records as history only; new proposals use the current V151 workflow.
+ // Keep old records as history only; new proposals use the current V152 workflow.
  const box=document.querySelector('#orcPropostasSalvas');
  if(box && !box.querySelector('.orc149-info')){
    const info=document.createElement('div');
@@ -3841,7 +3871,7 @@ orc149Observer.observe(document.documentElement,{childList:true,subtree:true});
 document.addEventListener('DOMContentLoaded',orc149AplicarCicloUnico);
 
 
-/* ===== V151 — CICLO OPERACIONAL OFICIAL CZ =====
+/* ===== V152 — CICLO OPERACIONAL OFICIAL CZ =====
  ORÇAMENTO → CONTRATO → FINANCEIRO → PREPARAÇÃO → SAÍDA/CONFERÊNCIA → EVENTO → RETORNO → FINALIZAÇÃO
  Agenda e reservas trabalham em segundo plano.
 */
@@ -3881,7 +3911,7 @@ function cz150AplicarOrcamentos(){
    tr.querySelectorAll('.btnEventoProposta').forEach(b=>{b.style.display='none';b.setAttribute('data-v150-ciclo-antigo','1')});
    const any=tr.querySelector('button[data-id]');
    const id=any?.dataset?.id;if(!id)return;
-   const p=(window.propostasExibidas||[]).find(x=>String(x.id)===String(id));
+   const p=(typeof propostasExibidas!=='undefined'?propostasExibidas:[]).find(x=>String(x.id)===String(id));
    if(!p)return;
    const td=tr.lastElementChild;if(!td)return;
    if(!td.querySelector('.cz150Contrato')){
@@ -3946,7 +3976,7 @@ cz150Obs.observe(document.documentElement,{childList:true,subtree:true});
 document.addEventListener('DOMContentLoaded',cz150Aplicar);
 
 
-/* ===== V151 — CONFIRMAR ORÇAMENTO É O GATILHO ÚNICO DO CICLO =====
+/* ===== V152 — CONFIRMAR ORÇAMENTO É O GATILHO ÚNICO DO CICLO =====
    EM ABERTO → CONFIRMAR ORÇAMENTO → CONTRATO + FINANCEIRO + EVENTO/PREPARAÇÃO
 */
 function cz151Norm(v){return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim()}
@@ -4059,7 +4089,7 @@ function cz151AplicarOrcamentos(){
  document.querySelectorAll('#orcPropostasSalvas tr').forEach(tr=>{
    const btns=[...tr.querySelectorAll('button[data-id]')];
    const ref=btns[0]; const id=ref?.dataset?.id;if(!id)return;
-   const p=(window.propostasExibidas||[]).find(x=>String(x.id)===String(id));
+   const p=(typeof propostasExibidas!=='undefined'?propostasExibidas:[]).find(x=>String(x.id)===String(id));
    if(!p)return;
    const td=tr.lastElementChild;if(!td)return;
 
