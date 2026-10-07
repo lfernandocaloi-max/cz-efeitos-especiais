@@ -3427,4 +3427,116 @@ if(_renderEventosV141){
  };
 }
 
+
+/* ===== V142 — SAIR PRO EVENTO / CONFERÊNCIA UNIFICADA ===== */
+const SAIR142_KEY='cz_v142_saida_eventos';
+function sair142Load(){try{return JSON.parse(localStorage.getItem(SAIR142_KEY)||'{}')}catch(_){return {}}}
+function sair142Save(v){localStorage.setItem(SAIR142_KEY,JSON.stringify(v||{}))}
+function sair142State(id){const a=sair142Load();return a[String(id)]||{responsavel:'',bipados:[],historico:[]}}
+function sair142Set(id,v){const a=sair142Load();a[String(id)]={...sair142State(id),...v};sair142Save(a);return a[String(id)]}
+async function sair142Abrir(eventoId){
+ $('#pageTitle').textContent='Sair pro Evento';
+ try{
+  const {data:e,error}=await db.from('eventos_operacionais').select('*').eq('id',eventoId).single();if(error)throw error;
+  const {data:m,error:em}=await db.from('evento_materiais').select('*').eq('evento_id',eventoId);if(em)throw em;
+  const mats=m||[],st=sair142State(eventoId),b=new Set(st.bipados||[]);
+  const grupos=[
+   ['Produtos contratados',mats.filter(x=>['contratado','produto_contratado','produto'].includes(String(x.tipo||'').toLowerCase()))],
+   ['Produtos extras',mats.filter(x=>String(x.tipo||'').toLowerCase().includes('extra'))],
+   ['Materiais montagem',mats.filter(x=>['ativo','equipamento','montagem','material_montagem'].includes(String(x.tipo||'').toLowerCase()))]
+  ];
+  const esperado=mats.reduce((a,x)=>a+Number(x.quantidade_necessaria||x.quantidade||1),0),conf=Math.min(esperado,b.size),pct=esperado?Math.round(conf/esperado*100):0;
+  $('#content').innerHTML=`<div class="sectionhead"><div><h2>${coEsc(e.nome_evento||'Evento')}</h2><div class="muted">${coEsc(e.cliente_nome||'')} • ${finDate(e.data_evento)} • ${coEsc(e.cidade_evento||'')}</div></div><button class="btn secondary" onclick="renderModule(18)">Voltar</button></div>
+  <div class="card"><div class="row"><div class="field"><label>Responsável pela conferência *</label><input id="sair142Resp" value="${coEsc(st.responsavel||'')}" placeholder="Selecione/digite o colaborador"></div><div class="field"><label>Código de barras</label><input id="sair142Cod" autofocus placeholder="Bipe o material" onkeydown="if(event.key==='Enter'){event.preventDefault();sair142Bipar('${eventoId}')}"></div></div></div>
+  <div class="card"><h3 style="margin-top:0">Conferência</h3>${grupos.map(([n,a])=>sair142Grupo(n,a,b)).join('')}
+   <div style="margin-top:14px"><b>Total: ${conf}/${esperado} — ${pct}%</b><div style="height:10px;background:#26313b;border-radius:10px;margin-top:6px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${pct===100?'#45b879':'#d7a73b'}"></div></div></div>
+  </div>
+  <div class="actions"><button class="btn secondary" onclick="sair142Imprimir('${eventoId}')">Imprimir bipagem</button><button class="btn primary" onclick="sair142DarSaida('${eventoId}')">${pct===100?'Dar saída':'Dar saída com pendência'}</button></div>`;
+  setTimeout(()=>$('#sair142Cod')?.focus(),80);
+ }catch(err){$('#content').innerHTML=`<div class="msg">Erro: ${coEsc(err.message)}</div>`}
+}
+function sair142Grupo(nome,arr,b){
+ const exp=arr.reduce((a,x)=>a+Number(x.quantidade_necessaria||x.quantidade||1),0);
+ const ok=arr.reduce((a,x)=>a+(b.has(String(x.codigo_barras||x.codigo||x.id))?Number(x.quantidade_necessaria||x.quantidade||1):0),0);
+ return `<div style="margin:12px 0;padding:10px;border:1px solid #303b45;border-radius:10px"><b>${nome}</b><span style="float:right">${ok}/${exp} ${ok===exp?'✓':'⚠'}</span>${arr.map(x=>{const k=String(x.codigo_barras||x.codigo||x.id),feito=b.has(k);return `<div style="display:flex;justify-content:space-between;padding:5px 0;border-top:1px solid #ffffff12"><span>${coEsc(x.nome_item||x.descricao||x.produto_nome||x.ativo_nome||'Material')} × ${coEsc(x.quantidade_necessaria||x.quantidade||1)}</span><span>${feito?'✓ Conferido':coEsc(x.codigo_barras||x.codigo||'Pendente')}</span></div>`}).join('')}</div>`;
+}
+async function sair142Bipar(id){
+ const cod=String($('#sair142Cod')?.value||'').trim(),resp=String($('#sair142Resp')?.value||'').trim();if(!resp)return czAlert('Informe o responsável pela conferência.','Conferência');if(!cod)return;
+ const {data:m}=await db.from('evento_materiais').select('*').eq('evento_id',id);
+ const item=(m||[]).find(x=>String(x.codigo_barras||x.codigo||x.id).trim()===cod);
+ if(!item){$('#sair142Cod').value='';return czAlert('Código não pertence aos materiais deste evento.','Conferência')}
+ const st=sair142State(id),b=new Set(st.bipados||[]);b.add(String(item.codigo_barras||item.codigo||item.id));
+ sair142Set(id,{responsavel:resp,bipados:[...b],historico:[...(st.historico||[]),{acao:'Conferência',codigo:cod,data:new Date().toISOString(),responsavel:resp}]});sair142Abrir(id);
+}
+async function sair142DarSaida(id){
+ const resp=String($('#sair142Resp')?.value||'').trim();if(!resp)return czAlert('Informe o responsável pela conferência.','Saída');
+ const {data:m}=await db.from('evento_materiais').select('*').eq('evento_id',id),st=sair142State(id),b=new Set(st.bipados||[]);
+ const falt=(m||[]).filter(x=>!b.has(String(x.codigo_barras||x.codigo||x.id)));
+ let motivo='';
+ if(falt.length){
+   motivo=await czPrompt(`A conferência está incompleta.\n\nFaltam ${falt.length} item(ns). Informe obrigatoriamente o motivo para liberar a saída:`, '', 'Saída com pendência');
+   if(!String(motivo||'').trim())return czAlert('O motivo é obrigatório para sair com pendência.','Saída');
+ }
+ const status=falt.length?'em_evento_divergencia':'aguardando_retorno';
+ const {error}=await db.from('eventos_operacionais').update({status,atualizado_em:new Date().toISOString()}).eq('id',id);if(error)return czAlert(error.message,'Saída');
+ sair142Set(id,{responsavel:resp,motivo_pendencia:motivo||'',saida_em:new Date().toISOString(),itens_enviados:[...b],historico:[...(st.historico||[]),{acao:falt.length?'Saída com divergência':'Saída',data:new Date().toISOString(),responsavel:resp,motivo:motivo||''}]});
+ await czAlert(falt.length?'Saída liberada com divergência registrada. Somente os materiais realmente bipados serão esperados no retorno.':'Saída liberada. Evento enviado para Aguardando Retorno.','Saída');
+ if(typeof renderModule==='function')renderModule(18);
+}
+async function sair142Imprimir(id){
+ const {data:e}=await db.from('eventos_operacionais').select('*').eq('id',id).single(),st=sair142State(id);
+ const w=window.open('','_blank','width=900,height=800');if(!w)return;
+ w.document.write(`<html><head><title>Bipagem</title><style>body{font-family:Arial;padding:30px}h1{font-size:20px}li{margin:7px}</style></head><body><h1>RELATÓRIO DE CONFERÊNCIA / SAÍDA</h1><p><b>Evento:</b> ${coEsc(e?.nome_evento||'')}</p><p><b>Cliente:</b> ${coEsc(e?.cliente_nome||'')}</p><p><b>Responsável:</b> ${coEsc(st.responsavel||'')}</p><p><b>Data/hora:</b> ${new Date().toLocaleString('pt-BR')}</p><h3>Materiais bipados</h3><ul>${(st.bipados||[]).map(x=>`<li>${coEsc(x)}</li>`).join('')}</ul>${st.motivo_pendencia?`<p><b>Divergência:</b> ${coEsc(st.motivo_pendencia)}</p>`:''}<script>window.onload=()=>window.print()<\/script></body></html>`);w.document.close();
+}
+
+
+/* ===== V143 — LIMPEZA OPERACIONAL / UM ÚNICO CAMINHO =====
+   Mantém os dados e o banco. Remove visualmente acessos antigos substituídos pelo fluxo novo.
+*/
+function cz143Norm(t){return String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim().toLowerCase()}
+function cz143LimparDuplicados(){
+ const esconderTextos=[
+   'iniciar separacao','iniciar conferência','iniciar conferencia',
+   'separacao de materiais','separação de materiais',
+   'bipagem de saida','bipagem de saída',
+   'liberar saida','liberar saída'
+ ];
+ document.querySelectorAll('button,a,.btn,[role="button"]').forEach(el=>{
+   if(el.classList.contains('prep141btn'))return;
+   const t=cz143Norm(el.textContent);
+   // O novo fluxo V141/V142 permanece. Os atalhos antigos equivalentes somem.
+   if(esconderTextos.some(x=>t===cz143Norm(x))){
+     el.style.display='none';
+     el.setAttribute('data-cz143-antigo','1');
+   }
+ });
+ // Remove blocos antigos que tenham sido marcados explicitamente por versões anteriores.
+ document.querySelectorAll('[data-fluxo-antigo="1"],.fluxo-operacional-antigo,.separacao-antiga,.conferencia-antiga').forEach(el=>el.style.display='none');
+}
+const cz143Observer=new MutationObserver(()=>{clearTimeout(window.__cz143t);window.__cz143t=setTimeout(cz143LimparDuplicados,40)});
+cz143Observer.observe(document.documentElement,{childList:true,subtree:true});
+document.addEventListener('DOMContentLoaded',cz143LimparDuplicados);
+
+/* Caminho oficial V143:
+   Orçamento → Contrato → Financeiro → Preparação → Sair pro Evento → Retorno → Oficina/PDV/Perda → Finalizado.
+   Reaproveitamos as páginas principais existentes, mas sem mostrar ações antigas duplicadas.
+*/
+async function cz143AbrirSaida(eventoId){ return sair142Abrir(eventoId); }
+async function cz143AbrirPreparacao(eventoId){ return prep141Abrir(eventoId); }
+
+/* Garante que os botões novos tenham nomes claros e que o usuário não veja dois caminhos. */
+function cz143AjustarBotoes(){
+ document.querySelectorAll('.prep141btn').forEach(b=>b.textContent='Preparar');
+ document.querySelectorAll('button,a').forEach(el=>{
+   const oc=String(el.getAttribute('onclick')||'');
+   const t=cz143Norm(el.textContent);
+   if(oc.includes('sair142Abrir')) el.textContent='Sair pro Evento';
+   // se houver um botão antigo que abra a antiga conferência, ele fica oculto
+   if((oc.includes('iniciarSeparacao')||oc.includes('iniciarConferencia')||oc.includes('liberarSaida'))&&!oc.includes('sair142')) el.style.display='none';
+ });
+}
+const cz143Observer2=new MutationObserver(()=>{clearTimeout(window.__cz143b);window.__cz143b=setTimeout(cz143AjustarBotoes,50)});
+cz143Observer2.observe(document.documentElement,{childList:true,subtree:true});
+document.addEventListener('DOMContentLoaded',cz143AjustarBotoes);
+
 </script></body></html>
