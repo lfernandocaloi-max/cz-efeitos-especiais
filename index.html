@@ -235,7 +235,7 @@ function contaMaster(){
  const perfil=String(czPerfilUsuario?.perfil||'').trim().toLowerCase();
  return email===CZ_MASTER_EMAIL || perfil==='master' || perfil==='master_principal' || perfil==='master_autorizado';
 }
-async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#login').style.display='none';$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V119';reconstruirMenuPermissoes();renderModule(0)}
+async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#login').style.display='none';$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V147';reconstruirMenuPermissoes();renderModule(0)}
 $('#loginBtn').onclick=async()=>{const email=$('#email').value.trim(),password=$('#password').value;$('#loginMsg').textContent='Entrando...';const {data,error}=await db.auth.signInWithPassword({email,password});if(error){$('#loginMsg').textContent='Não foi possível entrar: '+error.message;return}$('#loginMsg').textContent='';showApp(data.user)};
 $('#logoutBtn').onclick=async()=>{await db.auth.signOut();showLogin()};
   async function recuperarSenha(){
@@ -1052,7 +1052,13 @@ async function renderOrcamentos(novo=false){
 </div>
 
     <div class="card" style="margin-bottom:18px">
-      <h3 style="margin:0 0 10px">🚗 Deslocamento</h3>
+      <h3 style="margin:0 0 10px">Introdução da Proposta</h3>
+      <div class="muted" style="margin-bottom:10px">Texto que será apresentado ao cliente na proposta. Pode editar para cada orçamento.</div>
+      <textarea id="orcIntroducaoProposta" rows="5">A CZ Efeitos Especiais apresenta esta proposta comercial para execução dos serviços e efeitos selecionados para o evento.</textarea>
+    </div>
+
+    <div class="card" style="margin-bottom:18px">
+      <h3 style="margin:0 0 10px">Deslocamento</h3>
       <div class="orc-travel-grid">
         <div class="field"><label for="orcVeiculo">Veículo</label><select id="orcVeiculo"><option value="">Carregando veículos...</option></select></div>
         <div class="field"><label>Km rodado</label><input id="orcKm" type="number" min="0" value="0"></div>
@@ -1079,11 +1085,11 @@ async function renderOrcamentos(novo=false){
     </div>
 
     <div class="card" style="margin-bottom:18px">
-      <h3 style="margin:0 0 12px">Adicionar item ao orçamento</h3>
+      <h3 style="margin:0 0 12px">📦 2. Produtos</h3><div class="muted" style="margin-bottom:10px">Adicione produtos e equipamentos do orçamento.</div>
       <div id="orcItemPicker" class="muted">Carregando produtos e equipamentos...</div>
     </div>
     <div class="card" style="margin-bottom:18px">
-      <h3 style="margin:0">📦 Orçamento</h3>
+      <h3 style="margin:0">Itens do orçamento</h3>
       <div id="orcProdutosLista" style="margin-top:16px" class="muted">Nenhum item adicionado.</div>
     </div>
 
@@ -1146,6 +1152,11 @@ async function renderOrcamentos(novo=false){
         <div id="orcParcelasContratoLista"></div>
         <div id="orcPagamentoMsg" class="msg" role="status"></div>
       </div>
+    </div>
+
+    <div class="card" style="margin-bottom:18px">
+      <h3 style="margin-top:0">Observações da Proposta</h3>
+      <textarea id="orcObservacoes" rows="5" placeholder="Observações que devem constar na proposta"></textarea>
     </div>
 
     <div style="display:flex;gap:10px;flex-wrap:wrap">
@@ -1422,6 +1433,8 @@ atualizarEquipe();
       horario_montagem:null,
       responsavel_evento:$('#orcResponsavelEvento').value.trim(), telefone_responsavel:$('#orcTelefoneResponsavel').value.trim(),
       tecnico_responsavel:'',
+      introducao_proposta:$('#orcIntroducaoProposta')?.value.trim()||'',
+      observacoes:$('#orcObservacoes')?.value.trim()||'',
       produtos:itensProduto.map(x=>({...x})), equipamentos:itensAtivo.map(x=>({...x})), equipe,
       deslocamento:{veiculo_id:$('#orcVeiculo').value||null,veiculo:veiculosOrc.find(v=>String(v.id)===$('#orcVeiculo').value)?.nome||'',km:Number($('#orcKm').value||0),valor_km:Number($('#orcValorKm').value||0),pedagio:Number($('#orcPedagio').value||0)},
       pagamento:{modo,forma:modo==='avista'?$('#orcFormaPagamento').value:null,parcelas:modo==='avista'&&$('#orcFormaPagamento').value==='Cartão de crédito'?Number($('#orcParcelasCartao').value):1,entrada_percentual:entradaPercentual,entrada_valor:entradaValor,data_entrada:modo==='contratual'?$('#orcDataEntrada').value:null,forma_entrada:modo==='contratual'?$('#orcFormaEntrada').value:null,restante:Number((total-entradaValor).toFixed(2)),parcelas_detalhes:parcelasDetalhes,vencimento_saldo:parcelasDetalhes.at(-1)?.data||null},
@@ -1713,7 +1726,7 @@ Obrigado!`;
   $('#orcSave').onclick=()=>{$('#orcMsg').textContent='Rascunho não é gerado como proposta. Use GERAR PROPOSTA quando estiver pronto.'};
   $('#orcPrint').onclick=async()=>{
     const btn=$('#orcPrint');btn.disabled=true;$('#orcMsg').textContent='Salvando proposta e preparando PDF...';
-    try{const r=await salvarProposta('enviado');gerarPdfProposta(r.d,r.numero);alert('Proposta '+r.numero+' salva em Orçamentos e PDF gerado.');await renderOrcamentos()}
+    try{const r=await salvarProposta('enviado');gerarPdfProposta(r.d,r.numero);await czAlert('Proposta '+r.numero+' salva em Orçamentos e PDF gerado.','Orçamento');await renderOrcamentos()}
     catch(e){$('#orcMsg').textContent='Erro ao gerar proposta: '+e.message}
     finally{btn.disabled=false}
   };
@@ -3718,5 +3731,23 @@ async function duplicarOrcamentoV146(id){
  await czAlert('Novo orçamento criado.','Orçamento');
  orc146AbrirNovo(ins.data.id);
 }
+
+
+/* ===== V147 — ORÇAMENTO NOVO APLICADO NA TELA REAL ===== */
+function orc147AplicarAcoes(){
+ document.querySelectorAll('#orcPropostasSalvas tr').forEach(tr=>{
+   if(tr.querySelector('.orc147dup'))return;
+   const btn=tr.querySelector('button[data-id],button.btnEnviarProposta,button.btnExcluirProposta');
+   const id=btn?.dataset?.id;
+   if(!id)return;
+   const td=tr.lastElementChild;if(!td)return;
+   const b=document.createElement('button');b.type='button';b.className='btn secondary orc147dup';b.textContent='Duplicar';b.onclick=()=>duplicarOrcamentoV146(id);
+   const excluir=td.querySelector('.btnExcluirProposta');
+   if(excluir)td.insertBefore(b,excluir);else td.appendChild(b);
+ });
+}
+const orc147Obs=new MutationObserver(()=>{clearTimeout(window.__orc147);window.__orc147=setTimeout(orc147AplicarAcoes,80)});
+orc147Obs.observe(document.documentElement,{childList:true,subtree:true});
+document.addEventListener('DOMContentLoaded',orc147AplicarAcoes);
 
 </script></body></html>
