@@ -3491,7 +3491,16 @@ async function relatorioCampoV135(id){
 const CZ_CONTRATOS_OFICIAL_KEY='cz_contratos_oficial_v137';
 function coLoad(){try{return JSON.parse(localStorage.getItem(CZ_CONTRATOS_OFICIAL_KEY)||'{}')}catch(_){return {}}}
 function coSave(v){localStorage.setItem(CZ_CONTRATOS_OFICIAL_KEY,JSON.stringify(v||{}))}
-function coGet(id){return coLoad()[String(id)]||null}
+function cz173ContratoPendente(c){
+ if(!c)return false;
+ return c.origem==='orcamento_confirmado'
+   && ['Confirmado','Gerado'].includes(c.status)
+   && !c.data_contrato && !c.cpf && !c.servicos;
+}
+function coGet(id){
+ const c=coLoad()[String(id)]||null;
+ return cz173ContratoPendente(c)?{...c,status:'Não gerado'}:c;
+}
 function coSet(id,p){const a=coLoad(),k=String(id);a[k]={...(a[k]||{}),...p,orcamento_id:id};coSave(a);return a[k]}
 function coBrDate(v){if(!v)return '____/____/________';try{return new Date(v+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'})}catch(_){return v}}
 function coEsc(v){return esc(v==null?'':String(v))}
@@ -3534,7 +3543,7 @@ async function renderContratosOficialCZ(){
  try{
   const os=await coOrcs(),map=coLoad();
   $('#content').innerHTML=`<div class="sectionhead"><div><h2>Contratos</h2><div class="muted">Modelo oficial CZ • contrato vinculado à proposta e ao cliente.</div></div><button class="btn secondary" onclick="abrirMapaReservasV140()">Reservas</button></div>
-  <div class="tablewrap">${os.length?`<table><thead><tr><th>Proposta</th><th>Cliente</th><th>Evento</th><th>Data</th><th>Contrato</th><th>Ação</th></tr></thead><tbody>${os.map(p=>{const c=map[String(p.id)]||{};return `<tr><td><b>${coEsc(p.numero||'—')}</b></td><td>${coEsc(p.cliente_nome||'')}</td><td>${coEsc(p.evento_nome||'')}</td><td>${finDate(p.data_evento)}</td><td>${coStatusBadge(c.status)}</td><td><button class="btn primary" onclick="abrirContratoOficialCZ('${p.id}')">${c.status?'Abrir contrato':'Preencher contrato'}</button></td></tr>`}).join('')}</tbody></table>`:'<div class="empty">Nenhuma proposta encontrada.</div>'}</div>`;
+  <div class="tablewrap">${os.length?`<table><thead><tr><th>Proposta</th><th>Cliente</th><th>Evento</th><th>Data</th><th>Contrato</th><th>Ação</th></tr></thead><tbody>${os.map(p=>{const c=coGet(p.id)||{};return `<tr><td><b>${coEsc(p.numero||'—')}</b></td><td>${coEsc(p.cliente_nome||'')}</td><td>${coEsc(p.evento_nome||'')}</td><td>${finDate(p.data_evento)}</td><td>${coStatusBadge(c.status)}</td><td><button class="btn primary" onclick="abrirContratoOficialCZ('${p.id}')">${!c.status||c.status==='Não gerado'?'Preencher contrato':'Abrir contrato'}</button></td></tr>`}).join('')}</tbody></table>`:'<div class="empty">Nenhuma proposta encontrada.</div>'}</div>`;
  }catch(e){$('#content').innerHTML=`<div class="msg">Erro: ${coEsc(e.message)}</div>`}
 }
 async function abrirContratoOficialCZ(id){
@@ -3552,7 +3561,7 @@ async function abrirContratoOficialCZ(id){
  <div class="row"><div class="field"><label>Local *</label><input id="coLocal" value="${coEsc(c.local??d.local_evento??'')}"></div><div class="field"><label>Cidade</label><input id="coCidade" value="${coEsc(c.cidade??d.cidade_evento??cli.cidade??'')}"></div></div></div>
  <div class="card"><h3 style="margin-top:0">SERVIÇOS CONTRATADOS</h3><textarea id="coServicos" style="min-height:145px">${coEsc(c.servicos??(prod.length?prod.map(x=>`${x.qtd} - ${x.nome}${x.cor?` | COR: ${x.cor}`:''}`).join('\n'):'') )}</textarea><div class="muted">Pode conferir ou complementar antes de gerar o contrato.</div></div>
  <div class="card"><h3 style="margin-top:0">PAGAMENTO</h3><div class="row"><div class="field"><label>Valor total</label><input id="coValor" value="${coEsc(c.valor??money(p.valor_total))}"></div><div class="field"><label>Condição de pagamento</label><input id="coPagamento" value="${coEsc(c.pagamento??coPagamentoTexto(p))}"></div></div><div class="field"><label>Data do contrato</label><input id="coDataContrato" type="date" value="${coEsc(c.data_contrato??new Date().toISOString().slice(0,10))}"></div></div>
- <div class="actions"><button class="btn primary" onclick="salvarContratoOficialCZ('${id}',false)">Salvar preenchimento</button><button class="btn secondary" onclick="salvarContratoOficialCZ('${id}',true)">Visualizar / PDF</button>${c.status?`<button class="btn secondary" onclick="enviarContratoOficialCZ('${id}')">Enviar WhatsApp</button>`:''}${c.status&&!['Confirmado','Assinado'].includes(c.status)?`<button class="btn primary" onclick="confirmarContratoFluxoV139('${id}')">Confirmar contrato</button>`:''}${['Confirmado','Assinado'].includes(c.status)?`<span style="padding:7px 10px;border-radius:999px;border:1px solid #45b879;background:#45b87922">✓ Contrato confirmado</span>`:''}</div>`;
+ <div class="actions"><button class="btn primary" onclick="salvarContratoOficialCZ('${id}',false)">Salvar preenchimento</button><button class="btn secondary" onclick="salvarContratoOficialCZ('${id}',true)">Visualizar / PDF</button>${c.status&&c.status!=='Não gerado'?`<button class="btn secondary" onclick="enviarContratoOficialCZ('${id}')">Enviar WhatsApp</button>`:''}${c.status&&!['Não gerado','Confirmado','Assinado'].includes(c.status)?`<button class="btn primary" onclick="confirmarContratoFluxoV139('${id}')">Confirmar contrato</button>`:''}${['Confirmado','Assinado'].includes(c.status)?`<span style="padding:7px 10px;border-radius:999px;border:1px solid #45b879;background:#45b87922">✓ Contrato confirmado</span>`:''}</div>`;
 }
 function coPagamentoTexto(p){
  const pg=p?.dados?.pagamento||{};
@@ -4292,8 +4301,7 @@ function cz151ContratoBase(p){
    valor_total:Number(d.total??p.valor_total??0),
    pagamento:pg,
    parcelas,
-   status:'Gerado',
-   gerado_em:new Date().toISOString(),
+   status:'Não gerado',
    origem:'orcamento_confirmado'
  };
 }
@@ -4419,13 +4427,9 @@ async function cz151ConfirmarOrcamento(id){
    const evento=await cz151CriarEvento(p);
    await cz151MateriaisEvento(evento,p);
 
-   // 5. Mark the local contract as confirmed.
-   contrato.status='Confirmado';
-   contrato.confirmado_em=new Date().toISOString();
-   try{coSet(String(id),contrato)}catch(_){}
-
+   // 5. O contrato permanece pendente até o preenchimento e geração manual.
    await czAlert(
-     'Orçamento confirmado. Recebimentos enviados para Caixa → Recebimentos aguardando confirmação. Contrato gerado e evento criado em PREPARAÇÃO.',
+     'Orçamento confirmado. Recebimentos enviados para Caixa → Recebimentos aguardando confirmação. Contrato aguardando preenchimento e evento criado em PREPARAÇÃO.',
      'Ciclo CZ'
    );
    await renderOrcamentos();
