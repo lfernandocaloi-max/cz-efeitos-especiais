@@ -1557,11 +1557,38 @@ atualizarEquipe();
     pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.setTextColor(80,80,80);
     const obs=String(d.observacoes||d.observacao||'').trim();
     if(obs){const partes=pdf.splitTextToSize(obs,175).slice(0,4);pdf.text(partes,18,y);y+=Math.max(18,partes.length*6);}else{for(let i=0;i<3;i++){pdf.setDrawColor(210,210,210);pdf.line(18,y,193,y);y+=9;}}
-    // Único valor destacado: total do investimento. Tarja curta, discreta e somente atrás do valor.
-    const totalY=270;
-    pdf.setTextColor(...preto);pdf.setFont('times','italic');pdf.setFontSize(18);pdf.text('Total de Investimento:',128,totalY,{align:'right'});
-    pdf.setFillColor(55,55,55);pdf.roundedRect(132,totalY-10,63,15,2,2,'F');
-    pdf.setTextColor(235,203,145);pdf.setFont('helvetica','bold');pdf.setFontSize(15);pdf.text(money(d.total),190,totalY,{align:'right'});
+    // Total sem tarja escura e condições de pagamento logo abaixo.
+    const totalY=Math.max(y+8,247);
+    pdf.setTextColor(...preto);pdf.setFont('times','italic');pdf.setFontSize(17);
+    pdf.text('Total de Investimento:',128,totalY,{align:'right'});
+    pdf.setFont('helvetica','bold');pdf.setFontSize(15);
+    pdf.text(money(d.total),190,totalY,{align:'right'});
+    const pg=d.pagamento||{};
+    const linhasPagamento=[];
+    if(pg.modo==='contratual'){
+      linhasPagamento.push('Condição: Parcelamento contratual');
+      linhasPagamento.push('Entrada: '+money(pg.entrada_valor)+' ('+Number(pg.entrada_percentual||0)+'%) - '+(pg.forma_entrada||'—')+' - '+(pg.data_entrada?finDate(pg.data_entrada):'—'));
+      (pg.parcelas_detalhes||[]).forEach((par,i)=>linhasPagamento.push((i+1)+'ª parcela: '+money(par.valor)+' - '+(par.forma||'—')+' - '+(par.data?finDate(par.data):'—')));
+    }else{
+      linhasPagamento.push('Condição: À vista');
+      linhasPagamento.push('Forma de pagamento: '+(pg.forma||'—')+(Number(pg.parcelas||1)>1?' ('+pg.parcelas+'x no cartão)':''));
+    }
+    const escreverPagamento=(lista,inicio)=>{
+      pdf.setTextColor(...preto);pdf.setFont('helvetica','bold');pdf.setFontSize(10);
+      pdf.text('Forma e condição de pagamento',16,inicio);
+      pdf.setFont('helvetica','normal');pdf.setFontSize(9);
+      let pos=inicio+6;
+      lista.forEach(l=>{pdf.text(pdf.splitTextToSize(l,175)[0],18,pos);pos+=5;});
+    };
+    const disponiveis=Math.max(0,Math.floor((280-(totalY+12)-6)/5));
+    escreverPagamento(linhasPagamento.slice(0,disponiveis),totalY+12);
+    if(linhasPagamento.length>disponiveis){
+      pdf.addPage();marcaDagua();
+      pdf.setFont('times','italic');pdf.setFontSize(17);pdf.setTextColor(...preto);
+      pdf.text('Condições de Pagamento — continuação',15,28);
+      pdf.setFont('helvetica','normal');pdf.setFontSize(10);
+      linhasPagamento.slice(disponiveis).forEach((l,i)=>pdf.text(pdf.splitTextToSize(l,170)[0],18,43+i*7));
+    }
     pdf.setDrawColor(...ouro);pdf.setLineWidth(.45);pdf.line(12,286,198,286);
     const nomeArquivo='proposta-'+String(numero).replace(/[^a-zA-Z0-9_-]/g,'-')+'-'+String(d.cliente||'cliente').replace(/[^a-zA-Z0-9_-]/g,'-')+'.pdf';
     if(paraEnvio)return {blob:pdf.output('blob'),nomeArquivo};
