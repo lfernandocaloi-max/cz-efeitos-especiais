@@ -2172,7 +2172,7 @@ Obrigado!`;
     const origensComEvento=new Set(eventosVinculados.filter(x=>x.status!=='pendente').map(x=>String(x.origem_orcamento_id)).filter(Boolean));
     const eventosExistentes=new Set(eventosVinculados.filter(x=>x.status!=='pendente').map(x=>String(x.id)));
     const propostasExibidas=(data||[]).filter(x=>{const fechado=origensComEvento.has(String(x.id))||eventosExistentes.has(String(x.dados?.evento_operacional_id||''));return orcamentosFechadosModo?fechado:!fechado});
-    box.innerHTML=propostasExibidas.length?`<div class="tablewrap"><table class="orcamentos-lista"><thead><tr><th>Cliente</th><th>Data</th><th>Evento</th><th>Valor</th><th>Status</th><th>Nº Proposta</th><th style="min-width:190px">Fechamento</th><th>Ações</th></tr></thead><tbody>${propostasExibidas.map(x=>`<tr><td>${esc(x.cliente_nome||'')}</td><td>${x.data_evento?new Date(x.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${esc(x.evento_nome||'')}</td><td>${money(x.valor_total)}</td><td>${esc(x.status||'')}</td><td><b>${esc(x.numero||'')}</b></td><td>${(origensComEvento.has(String(x.id))||eventosExistentes.has(String(x.dados?.evento_operacional_id||'')))?'<span style="display:inline-flex;padding:8px 12px;border:1px solid #2f9e63;border-radius:999px;font-size:11px;font-weight:900">FECHADO</span>':`<button type="button" class="btn primary btnConfirmarOrcamentoV156" data-id="${esc(x.id)}" style="font-weight:900;white-space:nowrap;padding:9px 12px">CONFIRMAR ORÇAMENTO</button>`}</td><td><div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap"><button type="button" class="btn secondary btnVisualizarProposta" data-id="${esc(x.id)}" title="Visualizar proposta" aria-label="Visualizar proposta" style="padding:5px 7px;min-height:auto">${iconeOlho()}</button><button type="button" class="btn secondary btnVerPdfProposta" data-id="${esc(x.id)}" title="Visualizar PDF da proposta" aria-label="Visualizar PDF da proposta" style="padding:6px 9px;min-height:auto;font-weight:800;white-space:nowrap">Ver PDF</button><button type="button" class="btn secondary btnEnviarProposta" data-id="${esc(x.id)}" title="Enviar proposta pelo WhatsApp" aria-label="Enviar proposta pelo WhatsApp" style="padding:5px 7px;min-height:auto">${iconeEnviarProposta()}</button><button type="button" class="btn secondary btnWhatsProposta" data-id="${esc(x.id)}" title="Enviar preenchimento pelo WhatsApp" aria-label="Enviar preenchimento pelo WhatsApp" style="padding:5px 7px;min-height:auto">${iconeWhats()}</button><button type="button" class="btn danger btnExcluirProposta" data-id="${esc(x.id)}" title="Excluir proposta" aria-label="Excluir proposta" style="font-size:14px;padding:4px 8px;min-height:auto">×</button></div></td></tr>`).join('')}</tbody></table></div>`:'<div class="muted">Nenhuma proposta gerada ainda.</div>';
+    box.innerHTML=propostasExibidas.length?`<div class="tablewrap"><table class="orcamentos-lista"><thead><tr><th>Cliente</th><th>Data</th><th>Evento</th><th>Valor</th><th>Status</th><th>Nº Proposta</th><th style="min-width:190px">Fechamento</th><th>Ações</th></tr></thead><tbody>${propostasExibidas.map(x=>`<tr><td>${esc(x.cliente_nome||'')}</td><td>${x.data_evento?new Date(x.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${esc(x.evento_nome||'')}</td><td>${money(x.valor_total)}</td><td>${esc(x.status||'')}</td><td><b>${esc(x.numero||'')}</b></td><td>${String(x.status||'').toLowerCase()==='cancelado'?'<span style="display:inline-flex;padding:8px 12px;border:1px solid #b85050;border-radius:999px;font-size:11px;font-weight:900;color:#ff8989">CANCELADO</span>':(origensComEvento.has(String(x.id))||eventosExistentes.has(String(x.dados?.evento_operacional_id||'')))?'<span style="display:inline-flex;padding:8px 12px;border:1px solid #2f9e63;border-radius:999px;font-size:11px;font-weight:900">FECHADO</span>':`<button type="button" class="btn primary btnConfirmarOrcamentoV156" data-id="${esc(x.id)}" style="font-weight:900;white-space:nowrap;padding:9px 12px">CONFIRMAR ORÇAMENTO</button>`}</td><td><div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap"><button type="button" class="btn secondary btnVisualizarProposta" data-id="${esc(x.id)}" title="Visualizar proposta" aria-label="Visualizar proposta" style="padding:5px 7px;min-height:auto">${iconeOlho()}</button><button type="button" class="btn secondary btnVerPdfProposta" data-id="${esc(x.id)}" title="Visualizar PDF da proposta" aria-label="Visualizar PDF da proposta" style="padding:6px 9px;min-height:auto;font-weight:800;white-space:nowrap">Ver PDF</button><button type="button" class="btn secondary btnEnviarProposta" data-id="${esc(x.id)}" title="Enviar proposta pelo WhatsApp" aria-label="Enviar proposta pelo WhatsApp" style="padding:5px 7px;min-height:auto">${iconeEnviarProposta()}</button><button type="button" class="btn secondary btnWhatsProposta" data-id="${esc(x.id)}" title="Enviar preenchimento pelo WhatsApp" aria-label="Enviar preenchimento pelo WhatsApp" style="padding:5px 7px;min-height:auto">${iconeWhats()}</button><button type="button" class="btn danger btnExcluirProposta" data-id="${esc(x.id)}" title="Excluir proposta" aria-label="Excluir proposta" style="font-size:14px;padding:4px 8px;min-height:auto">×</button></div></td></tr>`).join('')}</tbody></table></div>`:'<div class="muted">Nenhuma proposta gerada ainda.</div>';
     box.querySelectorAll('.btnConfirmarOrcamentoV156').forEach(btn=>{btn.onclick=()=>cz151ConfirmarOrcamento(btn.dataset.id)});
     box.querySelectorAll('.btnVerPdfProposta').forEach(btn=>{btn.onclick=()=>{
       const p=propostasExibidas.find(x=>String(x.id)===String(btn.dataset.id));
@@ -3718,6 +3718,27 @@ function coStatusBadge(st){
  const c=st==='Assinado'||st==='Confirmado'?'#45b879':st==='Enviado'?'#d7a73b':st==='Gerado'?'#4f8fd1':'#7b8794';
  return `<span style="border:1px solid ${c};background:${c}22;padding:4px 9px;border-radius:999px;font-size:12px">${coEsc(st||'Não gerado')}</span>`;
 }
+// V179 — Cancelamento conjunto de contrato e proposta, preservando o histórico.
+async function cz179CancelarContrato(id){
+ const p=(await coOrcs()).find(x=>String(x.id)===String(id));
+ if(!p)return czAlert('Proposta não encontrada.','Cancelar contrato');
+ const contrato=coGet(id)||{};
+ if(contrato.status==='Cancelado'||String(p.status||'').toLowerCase()==='cancelado'){
+  return czAlert('Este contrato ou orçamento já está cancelado.','Cancelar contrato');
+ }
+ const ok=await czConfirm(
+  'Cancelar o contrato da proposta '+(p.numero||'')+' de '+(p.cliente_nome||'este cliente')+'? O orçamento também ficará CANCELADO. Esta ação não exclui registros, pagamentos já recebidos ou eventos existentes. Confira separadamente os lançamentos financeiros e o evento, caso seja necessário cancelá-los.',
+  'Cancelar contrato e orçamento','Sim, cancelar'
+ );
+ if(!ok)return;
+ try{
+  const {error}=await db.from('orcamentos').update({status:'cancelado'}).eq('id',id);
+  if(error)throw error;
+  coSet(id,{status:'Cancelado',cancelado_em:new Date().toISOString()});
+  await czAlert('Contrato e orçamento marcados como CANCELADOS.','Cancelamento realizado');
+  await renderContratosOficialCZ();
+ }catch(e){await czAlert('Não foi possível cancelar o orçamento: '+(e.message||e),'Erro no cancelamento')}
+}
 // V176 — situação de pagamento dos contratos, igual à tela Eventos.
 async function renderContratosOficialCZ(){
  $('#pageTitle').textContent='Contratos';
@@ -3733,11 +3754,15 @@ async function renderContratosOficialCZ(){
   }catch(err){falhaFinanceiro=err.message||String(err)}
   $('#content').innerHTML=`<div class="sectionhead"><div><h2>Contratos</h2><div class="muted">Modelo oficial CZ • contrato vinculado à proposta e ao cliente.</div></div><button class="btn secondary" onclick="abrirMapaReservasV140()">Reservas</button></div>
   ${falhaFinanceiro?`<div class="msg" style="color:#ff8b78">Não foi possível consultar os pagamentos: ${coEsc(falhaFinanceiro)}. Confira a conexão com o Caixa.</div>`:''}
-  <div class="tablewrap">${os.length?`<table><thead><tr><th>Proposta</th><th>Cliente</th><th>Evento</th><th>Data</th><th>Contrato</th><th>Pagamento</th><th>Ação</th></tr></thead><tbody>${os.map(p=>{const c=coGet(p.id)||{};const pagamento=falhaFinanceiro?'<span class="muted">Indisponível</span>':cz175StatusPagamentoEvento({origem_orcamento_id:p.id},mapaOrcamentos,parcelasContrato,movimentosContrato);return `<tr><td><b>${coEsc(p.numero||'—')}</b></td><td>${coEsc(p.cliente_nome||'')}</td><td>${coEsc(p.evento_nome||'')}</td><td>${finDate(p.data_evento)}</td><td>${coStatusBadge(c.status)}</td><td>${pagamento}</td><td><button class="btn primary" onclick="abrirContratoOficialCZ('${p.id}')">${!c.status||c.status==='Não gerado'?'Preencher contrato':'Abrir contrato'}</button></td></tr>`}).join('')}</tbody></table>`:'<div class="empty">Nenhuma proposta encontrada.</div>'}</div>`;
+  <div class="tablewrap">${os.length?`<table><thead><tr><th>Proposta</th><th>Cliente</th><th>Evento</th><th>Data</th><th>Contrato</th><th>Pagamento</th><th>Ação</th></tr></thead><tbody>${os.map(p=>{const c=coGet(p.id)||{};const cancelado=c.status==='Cancelado'||String(p.status||'').toLowerCase()==='cancelado';const pagamento=cancelado?'<span class="muted">Cancelado</span>':falhaFinanceiro?'<span class="muted">Indisponível</span>':cz175StatusPagamentoEvento({origem_orcamento_id:p.id},mapaOrcamentos,parcelasContrato,movimentosContrato);return `<tr><td><b>${coEsc(p.numero||'—')}</b></td><td>${coEsc(p.cliente_nome||'')}</td><td>${coEsc(p.evento_nome||'')}</td><td>${finDate(p.data_evento)}</td><td>${coStatusBadge(cancelado?'Cancelado':c.status)}</td><td>${pagamento}</td><td><div style="display:flex;gap:6px;flex-wrap:wrap">${cancelado?'<span style="color:#ff8989;font-weight:800">CANCELADO</span>':`<button class="btn primary" onclick="abrirContratoOficialCZ('${p.id}')">${!c.status||c.status==='Não gerado'?'Preencher contrato':'Abrir contrato'}</button><button type="button" class="btn danger" onclick="cz179CancelarContrato('${p.id}')">Cancelar</button>`}</div></td></tr>`}).join('')}</tbody></table>`:'<div class="empty">Nenhuma proposta encontrada.</div>'}</div>`;
  }catch(e){$('#content').innerHTML=`<div class="msg">Erro: ${coEsc(e.message)}</div>`}
 }
 async function abrirContratoOficialCZ(id){
  const p=(await coOrcs()).find(x=>String(x.id)===String(id));if(!p)return;
+ if(String(p.status||'').toLowerCase()==='cancelado'||coGet(id)?.status==='Cancelado'){
+  await czAlert('Este contrato e orçamento estão cancelados. O preenchimento está bloqueado.','Contrato cancelado');
+  return renderContratosOficialCZ();
+ }
  const cli=await coCliente(p),d=p.dados||{},c=coGet(id)||{},end=coEnderecoCliente(cli);
  const nomeBase=coVal(cli,'nome','razao_social','nome_fantasia')||p.cliente_nome||'';
  const telBase=coVal(cli,'telefone','celular','whatsapp','telefone_contato')||p.cliente_telefone||'';
@@ -4587,6 +4612,7 @@ async function cz151ConfirmarOrcamento(id){
  const p=(window.propostasExibidas||[]).find(x=>String(x.id)===String(id))
    || (await db.from('orcamentos').select('*').eq('id',id).single()).data;
  if(!p)return czAlert('Orçamento não encontrado.','Confirmar orçamento');
+ if(String(p.status||'').toLowerCase()==='cancelado')return czAlert('Orçamento cancelado não pode ser confirmado.','Confirmar orçamento');
  const {data:jaEvento}=await db.from('eventos_operacionais').select('id').eq('origem_orcamento_id',id).limit(1);
  if((jaEvento||[]).length)return czAlert('Este orçamento já está fechado e já possui evento gerado.','Confirmar orçamento');
 
