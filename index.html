@@ -104,9 +104,15 @@
 <div class="field"><label>Fornecedor</label><input id="productSupplier" type="text"></div><div class="field"><label>Tempo</label><input id="productTime" type="text"></div><div class="field"><label>Efeito</label><input id="productEffect" type="text"></div><div class="field"><label>Cor</label><input id="productColor" type="text"></div><div class="field"><label>Ruído</label><select id="productNoise"><option value="">Selecione</option><option value="baixo">Baixo ruído</option><option value="alto">Alto ruído</option></select></div><div class="field"><label>Ambiente</label><select id="productEnvironment"><option value="">Selecione</option><option value="Indoor">Indoor</option><option value="Outdoor">Outdoor</option></select></div>
 <div class="field"><label>Foto do produto (máx. 5 MB)</label><input id="productPhoto" type="file" accept="image/*"><img id="productPreview" class="preview hidden"></div><div class="field"><label>Link do vídeo do produto</label><input id="productVideoUrl" type="url" placeholder="https://..." inputmode="url"></div><div class="actions"><button id="deleteProductBtn" type="button" class="btn danger hidden" style="margin-right:auto">Excluir produto</button><button class="btn secondary" onclick="closeProduct()">Cancelar</button><button id="saveProductBtn" class="btn primary">Salvar produto</button></div><div id="productMsg" class="msg"></div></div></div>
 <div id="assetModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="assetModalTitle">Novo ativo</h2><button class="btn secondary" onclick="closeAsset()">Fechar</button></div><input id="assetId" type="hidden">
-<div class="row"><div class="field"><label>Nome do equipamento *</label><input id="assetName" placeholder="Ex.: Fire Machine P1"></div><div class="field"><label>Quantidade *</label><input id="assetQuantity" type="number" min="1" step="1" value="1" inputmode="numeric"><div class="muted" style="margin-top:5px">Ao aumentar a quantidade, preencha o código das novas unidades.</div></div></div>
-<div class="row"><div class="field"><label>Código do cadastro</label><input id="assetCode" placeholder="Digite o código livremente"><div class="muted" style="margin-top:5px">Ex.: FOGO-01, CO2-05 ou 0001</div></div><div class="field"><label>Código de barras</label><input id="assetBarcode" placeholder="Digite o código de barras"></div></div>
-<div class="row"><div class="field"><label>Fornecedor</label><input id="assetSupplier"></div><div class="field"><label>Data da compra</label><input id="assetPurchaseDate" type="date"></div></div>
+<div class="row"><div class="field"><label>Nome do equipamento *</label><input id="assetName" placeholder="Ex.: Fire Machine P1"></div><div class="field"><label>Quantidade *</label><input id="assetQuantity" type="number" min="1" step="1" value="1" inputmode="numeric"><div class="muted" style="margin-top:5px">Quantidade de equipamentos no estoque. Não altera os códigos de rastreio.</div></div></div>
+<div class="row"><div class="field"><label>Código do cadastro</label><input id="assetCode" placeholder="Digite o código livremente"><div class="muted" style="margin-top:5px">Ex.: FOGO-01, CO2-05 ou 0001</div></div><div class="field"><label>Código de barras do cadastro (opcional)</label><input id="assetBarcode" placeholder="Código do modelo / cadastro"></div></div>
+<div class="card" style="margin:12px 0;padding:14px">
+ <div class="sectionhead" style="margin-bottom:8px"><div><b>Códigos de rastreio individuais</b><div class="muted">Cada equipamento físico recebe seu próprio código. Os códigos não são gerados nem apagados ao alterar a quantidade.</div></div><button type="button" class="btn secondary" id="assetAddTracking">+ Código de rastreio</button></div>
+ <div id="assetUnitsList"></div>
+ <div class="muted" style="margin-top:6px">Ex.: CZ-FOGO-A01, CZ-FOGO-A02. Digite ou leia cada código. Não repita códigos entre equipamentos.</div>
+ <button type="button" class="btn secondary" style="margin-top:10px" onclick="imprimirEtiquetasAtivoAtual()">Imprimir etiquetas de rastreio</button>
+ </div>
+ <div class="row"><div class="field"><label>Fornecedor</label><input id="assetSupplier"></div><div class="field"><label>Data da compra</label><input id="assetPurchaseDate" type="date"></div></div>
 <div class="row"><div class="field"><label>Valor da compra</label><input id="assetPurchaseValue" type="text" inputmode="decimal" placeholder="R$ 0,00"></div><div class="field"></div></div>
 <div class="row"><div class="field"><label>Locação tabela 1</label><input id="assetRent1" type="number" step="0.01"></div><div class="field"><label>Locação tabela 2</label><input id="assetRent2" type="number" step="0.01"></div></div>
 <div class="row"><div class="field"><label>Peso (kg)</label><input id="assetWeight" type="number" step="0.01"></div><div class="field"><label>Possui case?</label><select id="assetCase"><option value="false">Não</option><option value="true">Sim</option></select></div></div>
@@ -300,7 +306,7 @@ const CAIXA_CONTAS_KEY='cz_caixa_contas_recebimento_v1';
 function caixaContas(){try{return JSON.parse(localStorage.getItem(CAIXA_CONTAS_KEY)||'[]')}catch(_){return []}}
 function salvarCaixaContas(v){localStorage.setItem(CAIXA_CONTAS_KEY,JSON.stringify(v))}
 function caixaConfirmado(x){return String(x?.observacao||'').includes('[CAIXA_CONFIRMADO]')}
-function caixaPrecisaConfirmar(x){return x?.tipo==='entrada'&&!caixaConfirmado(x)}
+function caixaPrecisaConfirmar(x){return x?.tipo==='entrada'&&!caixaConfirmado(x)&&!cz180Cancelado(x)}
 function caixaContaMovimento(x){const m=String(x?.observacao||'').match(/\[CONTA:([^\]]+)\]/);return m?m[1].trim():'—'}
 function abrirCadastroContaCaixa(){
   const nome=prompt('Nome da conta ou máquina de cartão. Ex.: Bradesco, PagSeguro, Caixa Dinheiro');
@@ -889,7 +895,7 @@ function cz172ParcelasFinanceiras(movimentos){
   const k=String(x.orcamento_id);
   baixasManuais.set(k,(baixasManuais.get(k)||0)+Math.max(0,Math.round(Number(x.valor||0)*100)));
  }
- const abertas=geradas.filter(x=>!caixaConfirmado(x)).sort((a,b)=>czVencimentoRecebimento(a).localeCompare(czVencimentoRecebimento(b)));
+ const abertas=geradas.filter(x=>!caixaConfirmado(x)&&!cz180Cancelado(x)).sort((a,b)=>czVencimentoRecebimento(a).localeCompare(czVencimentoRecebimento(b)));
  const parcelas=[];
  for(const x of abertas){
   const k=String(x.orcamento_id||'');
@@ -2171,8 +2177,8 @@ Obrigado!`;
     const eventosVinculados=[...(porOrigem.data||[]),...(porId.data||[])];
     const origensComEvento=new Set(eventosVinculados.filter(x=>x.status!=='pendente').map(x=>String(x.origem_orcamento_id)).filter(Boolean));
     const eventosExistentes=new Set(eventosVinculados.filter(x=>x.status!=='pendente').map(x=>String(x.id)));
-    const propostasExibidas=(data||[]).filter(x=>{const fechado=origensComEvento.has(String(x.id))||eventosExistentes.has(String(x.dados?.evento_operacional_id||''));return orcamentosFechadosModo?fechado:!fechado});
-    box.innerHTML=propostasExibidas.length?`<div class="tablewrap"><table class="orcamentos-lista"><thead><tr><th>Cliente</th><th>Data</th><th>Evento</th><th>Valor</th><th>Status</th><th>Nº Proposta</th><th style="min-width:190px">Fechamento</th><th>Ações</th></tr></thead><tbody>${propostasExibidas.map(x=>`<tr><td>${esc(x.cliente_nome||'')}</td><td>${x.data_evento?new Date(x.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${esc(x.evento_nome||'')}</td><td>${money(x.valor_total)}</td><td>${esc(x.status||'')}</td><td><b>${esc(x.numero||'')}</b></td><td>${String(x.status||'').toLowerCase()==='cancelado'?'<span style="display:inline-flex;padding:8px 12px;border:1px solid #b85050;border-radius:999px;font-size:11px;font-weight:900;color:#ff8989">CANCELADO</span>':(origensComEvento.has(String(x.id))||eventosExistentes.has(String(x.dados?.evento_operacional_id||'')))?'<span style="display:inline-flex;padding:8px 12px;border:1px solid #2f9e63;border-radius:999px;font-size:11px;font-weight:900">FECHADO</span>':`<button type="button" class="btn primary btnConfirmarOrcamentoV156" data-id="${esc(x.id)}" style="font-weight:900;white-space:nowrap;padding:9px 12px">CONFIRMAR ORÇAMENTO</button>`}</td><td><div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap"><button type="button" class="btn secondary btnVisualizarProposta" data-id="${esc(x.id)}" title="Visualizar proposta" aria-label="Visualizar proposta" style="padding:5px 7px;min-height:auto">${iconeOlho()}</button><button type="button" class="btn secondary btnVerPdfProposta" data-id="${esc(x.id)}" title="Visualizar PDF da proposta" aria-label="Visualizar PDF da proposta" style="padding:6px 9px;min-height:auto;font-weight:800;white-space:nowrap">Ver PDF</button><button type="button" class="btn secondary btnEnviarProposta" data-id="${esc(x.id)}" title="Enviar proposta pelo WhatsApp" aria-label="Enviar proposta pelo WhatsApp" style="padding:5px 7px;min-height:auto">${iconeEnviarProposta()}</button><button type="button" class="btn secondary btnWhatsProposta" data-id="${esc(x.id)}" title="Enviar preenchimento pelo WhatsApp" aria-label="Enviar preenchimento pelo WhatsApp" style="padding:5px 7px;min-height:auto">${iconeWhats()}</button><button type="button" class="btn danger btnExcluirProposta" data-id="${esc(x.id)}" title="Excluir proposta" aria-label="Excluir proposta" style="font-size:14px;padding:4px 8px;min-height:auto">×</button></div></td></tr>`).join('')}</tbody></table></div>`:'<div class="muted">Nenhuma proposta gerada ainda.</div>';
+    const propostasExibidas=(data||[]).filter(x=>{const fechado=origensComEvento.has(String(x.id))||eventosExistentes.has(String(x.dados?.evento_operacional_id||''));return orcamentosFechadosModo?(fechado||String(x.status||'').toLowerCase()==='cancelado'):(!fechado&&String(x.status||'').toLowerCase()!=='cancelado')});
+    box.innerHTML=propostasExibidas.length?`<div class="tablewrap"><table class="orcamentos-lista"><thead><tr><th>Cliente</th><th>Data</th><th>Evento</th><th>Valor</th><th>Status</th><th>Nº Proposta</th><th style="min-width:190px">Fechamento</th><th>Ações</th></tr></thead><tbody>${propostasExibidas.map(x=>`<tr><td>${esc(x.cliente_nome||'')}</td><td>${x.data_evento?new Date(x.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${esc(x.evento_nome||'')}</td><td>${money(x.valor_total)}</td><td>${esc(x.status||'')}</td><td><b>${esc(x.numero||'')}</b></td><td>${String(x.status||'').toLowerCase()==='cancelado'?'<span style="display:inline-flex;padding:8px 12px;border:1px solid #b85050;border-radius:999px;font-size:11px;font-weight:900;color:#ff8989">CANCELADO</span>':(origensComEvento.has(String(x.id))||eventosExistentes.has(String(x.dados?.evento_operacional_id||'')))?'<span style="display:inline-flex;padding:8px 12px;border:1px solid #2f9e63;border-radius:999px;font-size:11px;font-weight:900">FECHADO</span>':`<button type="button" class="btn primary btnConfirmarOrcamentoV156" data-id="${esc(x.id)}" style="font-weight:900;white-space:nowrap;padding:9px 12px">CONFIRMAR ORÇAMENTO</button>`}</td><td><div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap"><button type="button" class="btn secondary btnVisualizarProposta" data-id="${esc(x.id)}" title="Visualizar proposta" aria-label="Visualizar proposta" style="padding:5px 7px;min-height:auto">${iconeOlho()}</button><button type="button" class="btn secondary btnVerPdfProposta" data-id="${esc(x.id)}" title="Visualizar PDF da proposta" aria-label="Visualizar PDF da proposta" style="padding:6px 9px;min-height:auto;font-weight:800;white-space:nowrap">Ver PDF</button><button type="button" class="btn secondary btnEnviarProposta" data-id="${esc(x.id)}" title="Enviar proposta pelo WhatsApp" aria-label="Enviar proposta pelo WhatsApp" style="padding:5px 7px;min-height:auto">${iconeEnviarProposta()}</button><button type="button" class="btn secondary btnWhatsProposta" data-id="${esc(x.id)}" title="Enviar preenchimento pelo WhatsApp" aria-label="Enviar preenchimento pelo WhatsApp" style="padding:5px 7px;min-height:auto">${iconeWhats()}</button>${String(x.status||'').toLowerCase()!=='cancelado'&&(origensComEvento.has(String(x.id))||eventosExistentes.has(String(x.dados?.evento_operacional_id||'')))?`<button type="button" class="btn danger" onclick="cz180CancelarOrcamento('${esc(x.id)}')" style="padding:5px 9px;min-height:auto">Cancelar</button>`:''}<button type="button" class="btn danger btnExcluirProposta" data-id="${esc(x.id)}" title="Excluir proposta" aria-label="Excluir proposta" style="font-size:14px;padding:4px 8px;min-height:auto">×</button></div></td></tr>`).join('')}</tbody></table></div>`:'<div class="muted">Nenhuma proposta gerada ainda.</div>';
     box.querySelectorAll('.btnConfirmarOrcamentoV156').forEach(btn=>{btn.onclick=()=>cz151ConfirmarOrcamento(btn.dataset.id)});
     box.querySelectorAll('.btnVerPdfProposta').forEach(btn=>{btn.onclick=()=>{
       const p=propostasExibidas.find(x=>String(x.id)===String(btn.dataset.id));
@@ -2482,20 +2488,53 @@ $('#deleteProductBtn').onclick=async()=>{
 $('#productPhoto').onchange=e=>{const f=e.target.files[0];if(f){$('#productPreview').src=URL.createObjectURL(f);$('#productPreview').classList.remove('hidden')}};
 $('#saveProductBtn').onclick=async()=>{const id=$('#productId').value;$('#productMsg').textContent='Salvando...';try{let foto_url=id?products.find(p=>p.id===id)?.foto_url:null;const f=$('#productPhoto').files[0];if(f)foto_url=await uploadPhoto(f,'produtos');const payload={nome:$('#productName').value.trim(),codigo_barras:$('#productBarcode').value.trim()||null,marca:$('#productBrand').value.trim()||null,consumivel:$('#productConsumable').checked,unidade:$('#productUnit').value.trim()||'unidade',estoque_atual:+$('#productStock').value||0,estoque_minimo:+$('#productMin').value||0,valor_custo:moedaInputNumero($('#productCost').value),ambiente:$('#productEnvironment').value||null,valor_varejo:+$('#productRetail').value||0,valor_atacado:+$('#productWholesale').value||0,tempo:$('#productTime').value.trim()||null,fornecedor:$('#productSupplier').value.trim()||null,efeito:$('#productEffect').value.trim()||null,cor:$('#productColor').value.trim()||null,ruido:$('#productNoise').value||null,foto_url,video_url:$('#productVideoUrl').value.trim()||null,atualizado_em:new Date().toISOString()};if(!payload.nome)throw new Error('Informe o nome do produto.');if(payload.video_url&&!safeHttpUrl(payload.video_url))throw new Error('Informe um link de vídeo válido começando com https:// ou http://.');const {error}=await(id?db.from('produtos').update(payload).eq('id',id):db.from('produtos').insert(payload));if(error)throw error;closeProduct();renderProducts()}catch(e){$('#productMsg').textContent='Erro: '+e.message}};
 function codigoCadastroAtivo(a){return String(a?.codigo_interno||a?.codigo_barras||'').trim()}
-function cz155Load(){try{return JSON.parse(localStorage.getItem('cz155_codigos_unidades')||'{}')}catch(e){return {}}}
-function cz155Save(v){localStorage.setItem('cz155_codigos_unidades',JSON.stringify(v))}
-function unidadesAtivo(a,qtdOverride=null){
- const base=codigoCadastroAtivo(a),q=Math.max(0,Number(qtdOverride??a?.quantidade??0)||0);
- const salvos=cz155Load()[String(a?.id)]||[];
- return Array.from({length:q},(_,i)=>salvos[i]||`${base}-${String(i+1).padStart(3,'0')}`);
+// V181: códigos independentes da quantidade, compartilhados no cadastro Supabase.
+// Guardados em observacoes como metadado, sem exigir nova coluna no banco.
+const CZ181_TAG='[CZ_RASTREIO_V181]';
+function cz181ExtrairNotas(v){
+ const texto=String(v||'');
+ const pos=texto.lastIndexOf('\n'+CZ181_TAG);
+ if(pos<0)return {texto,codigos:[]};
+ try{
+  const arr=JSON.parse(texto.slice(pos+1+CZ181_TAG.length));
+  if(Array.isArray(arr))return {texto:texto.slice(0,pos),codigos:arr.map(x=>String(x).trim()).filter(Boolean)};
+ }catch(_){}
+ return {texto,codigos:[]};
 }
+function cz181MontarNotas(texto,codigos){
+ const t=String(texto||'').trim(),lista=codigos.map(x=>String(x).trim()).filter(Boolean);
+ return t+(lista.length?'\n'+CZ181_TAG+JSON.stringify(lista):'')||null;
+}
+function cz155Load(){try{return JSON.parse(localStorage.getItem('cz155_codigos_unidades')||'{}')}catch(e){return {}}}
+function unidadesAtivo(a){
+ const codigos=cz181ExtrairNotas(a?.observacoes).codigos;
+ // Compatibilidade de leitura com rastreios editados em versões anteriores.
+ if(codigos.length)return codigos;
+ return (cz155Load()[String(a?.id)]||[]).map(x=>String(x).trim()).filter(Boolean);
+}
+function cz181AdicionarRastreio(valor=''){
+ const box=$('#assetUnitsList');if(!box)return;
+ const linha=document.createElement('div');
+ linha.className='row cz181RastreioLinha';
+ linha.style.cssText='align-items:end;gap:8px;margin:7px 0';
+ linha.innerHTML=`<div class="field" style="flex:1"><label>Código de rastreio</label><input class="cz181Rastreio" placeholder="Digite ou leia o código individual" value="${esc(valor)}"></div><button type="button" class="btn danger" title="Remover este código" style="margin-bottom:3px">×</button>`;
+ linha.querySelector('button').onclick=()=>linha.remove();
+ box.appendChild(linha);
+}
+function cz181LerRastreios(){return [...document.querySelectorAll('#assetUnitsList .cz181Rastreio')].map(x=>x.value.trim()).filter(Boolean)}
+function renderAssetUnitsPreview(){
+ // A quantidade não modifica a lista de códigos de rastreio.
+ const box=$('#assetUnitsList');if(!box)return;
+ if(!box.children.length)cz181AdicionarRastreio();
+}
+$('#assetAddTracking').onclick=()=>cz181AdicionarRastreio();
 async function renderAssets(){
   await atualizarContaMaster();
   const {data,error}=await db.from('ativos').select('*').order('nome');
   if(error){$('#content').innerHTML=`<div class="msg">Erro ao carregar ativos: ${error.message}</div>`;return}
   assets=data||[];
   $('#content').innerHTML=`<div class="sectionhead"><div><h2>Ativos / Equipamentos</h2><div class="muted">${assets.length} cadastro(s)</div></div><button class="btn primary" onclick="openAsset()">+ Novo ativo</button></div>
-  <div class="tablewrap">${assets.length?`<table><thead><tr><th>Foto</th><th>Equipamento</th><th>Código</th><th>Quantidade</th><th>Compra</th><th>Valor compra</th><th>Status</th><th>Ações</th></tr></thead><tbody>${assets.map(a=>`<tr><td>${a.foto_url?`<img class="thumb" src="${esc(a.foto_url)}">`:'—'}</td><td>${esc(a.nome)}</td><td><b>${esc(codigoCadastroAtivo(a))}</b><div class="muted">${esc(unidadesAtivo(a)[0]||'')} ${Number(a.quantidade||0)>1?'até '+esc(unidadesAtivo(a).at(-1)||''):''}</div></td><td>${esc(a.quantidade??1)}</td><td>${a.data_compra?new Date(a.data_compra+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${money(a.valor_compra)}</td><td>${esc(a.status||'')}</td><td><div class="actions"><button class="btn secondary" onclick="editAsset('${a.id}')">Editar / Etiquetas</button>${contaMaster()?`<button type="button" title="Excluir equipamento" aria-label="Excluir equipamento" onclick="excluirAtivo('${a.id}')" style="width:28px;height:28px;border:1px solid #63303a;background:#2a151a;color:#ff7b88;border-radius:7px;font-size:14px;font-weight:900;cursor:pointer;padding:0">×</button>`:''}</div></td></tr>`).join('')}</tbody></table>`:`<div class="empty">Nenhum ativo cadastrado.</div>`}</div>`;
+  <div class="tablewrap">${assets.length?`<table><thead><tr><th>Foto</th><th>Equipamento</th><th>Cód. cadastro / rastreio</th><th>Quantidade</th><th>Compra</th><th>Valor compra</th><th>Status</th><th>Ações</th></tr></thead><tbody>${assets.map(a=>`<tr><td>${a.foto_url?`<img class="thumb" src="${esc(a.foto_url)}">`:'—'}</td><td>${esc(a.nome)}</td><td><b>${esc(codigoCadastroAtivo(a))}</b><div class="muted">${unidadesAtivo(a).length?unidadesAtivo(a).map(c=>esc(c)).join(' · '):'Nenhum código de rastreio cadastrado'}</div></td><td>${esc(a.quantidade??1)}</td><td>${a.data_compra?new Date(a.data_compra+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${money(a.valor_compra)}</td><td>${esc(a.status||'')}</td><td><div class="actions"><button class="btn secondary" onclick="editAsset('${a.id}')">Editar / Etiquetas</button>${contaMaster()?`<button type="button" title="Excluir equipamento" aria-label="Excluir equipamento" onclick="excluirAtivo('${a.id}')" style="width:28px;height:28px;border:1px solid #63303a;background:#2a151a;color:#ff7b88;border-radius:7px;font-size:14px;font-weight:900;cursor:pointer;padding:0">×</button>`:''}</div></td></tr>`).join('')}</tbody></table>`:`<div class="empty">Nenhum ativo cadastrado.</div>`}</div>`;
 }
 async function excluirAtivo(id){
  if(!contaMaster()){await czAlert('Somente a conta Master pode excluir equipamentos.','Acesso restrito');return}
@@ -2519,14 +2558,14 @@ function renderAssetUnitsPreview(){
 }
 function openAsset(a=null){
  $('#assetModal').classList.remove('hidden');$('#assetModalTitle').textContent=a?'Editar ativo':'Novo ativo';$('#assetId').value=a?.id||'';$('#assetName').value=a?.nome||'';
- $('#assetCode').value=a?codigoCadastroAtivo(a):'';$('#assetBarcode').value=a?.codigo_barras||'';$('#assetSupplier').value=a?.fornecedor||'';$('#assetQuantity').value=a?.quantidade??1;$('#assetPurchaseDate').value=a?.data_compra||'';$('#assetPurchaseValue').value=moedaInputValor(a?.valor_compra??0);$('#assetRent1').value=a?.valor_locacao_tabela1??0;$('#assetRent2').value=a?.valor_locacao_tabela2??0;$('#assetWeight').value=a?.peso??'';$('#assetCase').value=String(a?.possui_case??false);$('#assetMontagem').checked=a?.material_montagem===true;$('#assetNotes').value=a?.observacoes||'';$('#assetPhoto').value='';
- const im=$('#assetPreview');if(a?.foto_url){im.src=a.foto_url;im.classList.remove('hidden')}else im.classList.add('hidden');$('#assetMsg').textContent='';renderAssetUnitsPreview();
+ $('#assetCode').value=a?codigoCadastroAtivo(a):'';$('#assetBarcode').value=a?.codigo_barras||'';$('#assetSupplier').value=a?.fornecedor||'';$('#assetQuantity').value=a?.quantidade??1;$('#assetPurchaseDate').value=a?.data_compra||'';$('#assetPurchaseValue').value=moedaInputValor(a?.valor_compra??0);$('#assetRent1').value=a?.valor_locacao_tabela1??0;$('#assetRent2').value=a?.valor_locacao_tabela2??0;$('#assetWeight').value=a?.peso??'';$('#assetCase').value=String(a?.possui_case??false);$('#assetMontagem').checked=a?.material_montagem===true;$('#assetNotes').value=cz181ExtrairNotas(a?.observacoes).texto;$('#assetPhoto').value='';
+ const im=$('#assetPreview');if(a?.foto_url){im.src=a.foto_url;im.classList.remove('hidden')}else im.classList.add('hidden');$('#assetMsg').textContent='';$('#assetUnitsList').innerHTML='';const codigos=a?unidadesAtivo(a):[];if(codigos.length)codigos.forEach(c=>cz181AdicionarRastreio(c));else cz181AdicionarRastreio();
 }
 function closeAsset(){$('#assetModal').classList.add('hidden')}
 function editAsset(id){openAsset(assets.find(a=>String(a.id)===String(id)))}
 $('#assetPhoto').onchange=e=>{const f=e.target.files[0];if(f){$('#assetPreview').src=URL.createObjectURL(f);$('#assetPreview').classList.remove('hidden')}};
-$('#assetQuantity').addEventListener('input',renderAssetUnitsPreview);
-$('#assetCode').addEventListener('change',()=>{renderAssetUnitsPreview()});
+// A quantidade não altera os rastreios.
+// Código do cadastro e códigos de rastreio são independentes.
 
 function imprimirEtiquetasAtivo(a,codigos=null){
  if(!a)return;
@@ -2538,9 +2577,9 @@ function imprimirEtiquetasAtivo(a,codigos=null){
 function imprimirEtiquetasAtivoAtual(){
  const id=$('#assetId').value,a=assets.find(x=>String(x.id)===String(id));
  if(!a){czAlert('Salve o ativo primeiro. Depois as etiquetas ficarão disponíveis dentro do cadastro.','Etiquetas');return}
- const qtd=Math.max(1,Number($('#assetQuantity').value)||1),tmp={...a,quantidade:qtd,codigo_interno:$('#assetCode').value};
- const codigos=[...document.querySelectorAll('#assetUnitsList [data-unidade-codigo]')].map(x=>x.value.trim());
- if(codigos.some(x=>!x))return czAlert('Preencha os códigos das unidades.','Etiquetas');
+ const tmp={...a,codigo_interno:$('#assetCode').value};
+ const codigos=cz181LerRastreios();
+ if(!codigos.length)return czAlert('Adicione pelo menos um código de rastreio para imprimir.','Etiquetas');
  imprimirEtiquetasAtivo(tmp,codigos);
 }
 $('#saveAssetBtn').onclick=async()=>{
@@ -2548,10 +2587,14 @@ $('#saveAssetBtn').onclick=async()=>{
  if($('#assetQuantity').value===''||!Number.isInteger(qtd)||qtd<1){$('#assetMsg').textContent='Informe uma quantidade inteira maior que zero.';return}
  try{
   let foto_url=id?assets.find(p=>String(p.id)===String(id))?.foto_url:null;const f=$('#assetPhoto').files[0];if(f)foto_url=await uploadPhoto(f,'ativos');
-  const atual=id?assets.find(a=>String(a.id)===String(id)):null,antigaQtd=Number(atual?.quantidade||0);
+  const atual=id?assets.find(a=>String(a.id)===String(id)):null;
+  const rastreios=cz181LerRastreios(),normalizados=rastreios.map(x=>x.toUpperCase());
+  if(new Set(normalizados).size!==normalizados.length)throw new Error('Existem códigos de rastreio repetidos neste cadastro.');
+  const emUso=new Set(assets.filter(a=>String(a.id)!==String(id)).flatMap(a=>unidadesAtivo(a).map(c=>c.toUpperCase())));
+  if(rastreios.some(c=>emUso.has(c.toUpperCase())))throw new Error('Um código de rastreio já está cadastrado em outro equipamento.');
   const codigo=$('#assetCode').value.trim(),barras=$('#assetBarcode').value.trim()||codigo;
   if(!codigo)throw new Error('Informe o código principal do ativo.');
-  const payload={nome:$('#assetName').value.trim(),quantidade:qtd,codigo_interno:codigo,codigo_barras:barras,fornecedor:$('#assetSupplier').value.trim()||null,data_compra:$('#assetPurchaseDate').value||null,valor_compra:moedaInputNumero($('#assetPurchaseValue').value),valor_locacao_tabela1:+$('#assetRent1').value||0,valor_locacao_tabela2:+$('#assetRent2').value||0,peso:$('#assetWeight').value?+$('#assetWeight').value:null,possui_case:$('#assetCase').value==='true',material_montagem:$('#assetMontagem').checked,observacoes:$('#assetNotes').value.trim()||null,foto_url,atualizado_em:new Date().toISOString()};
+  const payload={nome:$('#assetName').value.trim(),quantidade:qtd,codigo_interno:codigo,codigo_barras:barras,fornecedor:$('#assetSupplier').value.trim()||null,data_compra:$('#assetPurchaseDate').value||null,valor_compra:moedaInputNumero($('#assetPurchaseValue').value),valor_locacao_tabela1:+$('#assetRent1').value||0,valor_locacao_tabela2:+$('#assetRent2').value||0,peso:$('#assetWeight').value?+$('#assetWeight').value:null,possui_case:$('#assetCase').value==='true',material_montagem:$('#assetMontagem').checked,observacoes:cz181MontarNotas($('#assetNotes').value,rastreios),foto_url,atualizado_em:new Date().toISOString()};
   if(!payload.nome)throw new Error('Informe o nome do equipamento.');
   const {data,error}=id?await db.from('ativos').update(payload).eq('id',id).select():await db.from('ativos').insert({...payload,status:'disponivel'}).select();
   if(error)throw error;
@@ -3719,26 +3762,103 @@ function coStatusBadge(st){
  return `<span style="border:1px solid ${c};background:${c}22;padding:4px 9px;border-radius:999px;font-size:12px">${coEsc(st||'Não gerado')}</span>`;
 }
 // V179 — Cancelamento conjunto de contrato e proposta, preservando o histórico.
-async function cz179CancelarContrato(id){
- const p=(await coOrcs()).find(x=>String(x.id)===String(id));
- if(!p)return czAlert('Proposta não encontrada.','Cancelar contrato');
- const contrato=coGet(id)||{};
- if(contrato.status==='Cancelado'||String(p.status||'').toLowerCase()==='cancelado'){
-  return czAlert('Este contrato ou orçamento já está cancelado.','Cancelar contrato');
+// V180 — cancelamento vinculado e estorno de cancelamento no Caixa.
+function cz180Cancelado(m){return String(m?.observacao||'').includes('[CANCELADO_ORCAMENTO]')}
+async function cz180CancelarOrcamento(id){
+ let p;
+ try{p=(await coOrcs()).find(x=>String(x.id)===String(id))}catch(e){return czAlert(e.message,'Cancelamento')}
+ if(!p)return czAlert('Orçamento não encontrado.','Cancelamento');
+ if(String(p.status||'').toLowerCase()==='cancelado')return czAlert('Este orçamento já está cancelado.','Cancelamento');
+ await carregarCaixa();
+ if(caixaErro)return czAlert('Não foi possível consultar o Caixa: '+caixaErro+'. Cancelamento bloqueado para evitar divergência.','Cancelamento');
+ const movs=(caixaCache||[]).filter(x=>String(x.orcamento_id||'')===String(id));
+ const pagos=movs.filter(x=>x.tipo==='entrada'&&caixaConfirmado(x)&&!cz180Cancelado(x));
+ const jaEstornado=movs.filter(x=>x.tipo==='saida'&&String(x.origem_id||'').startsWith('estorno-cancelamento:'));
+ const centPago=pagos.reduce((n,x)=>n+Math.round(Number(x.valor||0)*100),0);
+ const centEstornado=jaEstornado.reduce((n,x)=>n+Math.round(Number(x.valor||0)*100),0);
+ const centDisponivel=Math.max(0,centPago-centEstornado);
+ const {data:eventos,error:errEventos}=await db.from('eventos_operacionais').select('id,nome_evento,status,saida_baixada_em').eq('origem_orcamento_id',id);
+ if(errEventos)return czAlert('Erro ao conferir evento: '+errEventos.message,'Cancelamento');
+ const vinculados=eventos||[];
+ if(vinculados.some(e=>e.saida_baixada_em||e.status==='finalizado')){
+  return czAlert('Este orçamento possui evento com movimentação de estoque ou já finalizado. Por segurança, confira o retorno dos materiais antes de excluir o evento. Nenhum cancelamento ou estorno foi efetuado.','Cancelamento bloqueado');
  }
- const ok=await czConfirm(
-  'Cancelar o contrato da proposta '+(p.numero||'')+' de '+(p.cliente_nome||'este cliente')+'? O orçamento também ficará CANCELADO. Esta ação não exclui registros, pagamentos já recebidos ou eventos existentes. Confira separadamente os lançamentos financeiros e o evento, caso seja necessário cancelá-los.',
-  'Cancelar contrato e orçamento','Sim, cancelar'
- );
- if(!ok)return;
- try{
-  const {error}=await db.from('orcamentos').update({status:'cancelado'}).eq('id',id);
-  if(error)throw error;
-  coSet(id,{status:'Cancelado',cancelado_em:new Date().toISOString()});
-  await czAlert('Contrato e orçamento marcados como CANCELADOS.','Cancelamento realizado');
-  await renderContratosOficialCZ();
- }catch(e){await czAlert('Não foi possível cancelar o orçamento: '+(e.message||e),'Erro no cancelamento')}
+ const contas=caixaContas();
+ document.getElementById('cz180CancelOverlay')?.remove();
+ const ov=document.createElement('div');ov.id='cz180CancelOverlay';
+ ov.style.cssText='position:fixed;inset:0;z-index:200030;background:rgba(0,0,0,.83);display:flex;align-items:center;justify-content:center;padding:16px';
+ const box=document.createElement('div');
+ box.style.cssText='width:min(610px,100%);max-height:94vh;overflow:auto;background:#151b26;border:1px solid #3b4656;border-radius:16px;padding:24px;color:#fff;box-shadow:0 24px 70px #000a';
+ box.innerHTML=`
+ <div style="font-size:12px;color:#ff641f;font-weight:900">CZ EFEITOS ESPECIAIS • CANCELAMENTO</div>
+ <h2 style="margin:8px 0">Cancelar orçamento e contrato</h2>
+ <div style="background:#0b121a;border:1px solid #334155;border-radius:10px;padding:13px;line-height:1.8">
+ <div><b>Proposta:</b> ${esc(p.numero||'—')}</div><div><b>Cliente:</b> ${esc(p.cliente_nome||'—')}</div>
+ <div><b>Evento vinculado:</b> ${vinculados.length?esc(vinculados.map(e=>e.nome_evento||e.id).join(', ')):'Nenhum'}</div>
+ <div><b>Total recebido:</b> ${money(centPago/100)}</div>
+ <div><b>Já estornado:</b> ${money(centEstornado/100)}</div>
+ <div style="font-size:19px;font-weight:900;color:#ffce78"><b>Disponível para estorno:</b> ${money(centDisponivel/100)}</div></div>
+ <p style="color:#ffce78;font-size:13px;margin:14px 0">O cancelamento marcará contrato e orçamento como CANCELADOS, cancelará as parcelas pendentes e excluirá o evento que não movimentou estoque. O pagamento original permanecerá no histórico.</p>
+ <h3 style="margin:12px 0 8px">Estorno de cancelamento</h3>
+ <div class="row"><div class="field"><label>Valor do estorno (R$)</label><input id="cz180Valor" inputmode="decimal" value="${cz177ValorMoeda(centDisponivel/100)}"></div>
+ <div class="field"><label>Data da devolução</label><input id="cz180Data" type="date" value="${finISODate()}"></div></div>
+ <div class="row"><div class="field"><label>Conta de saída</label><select id="cz180Conta"><option value="">Selecione a conta</option>${contas.map((c,i)=>`<option value="${i}">${esc(c.nome)}</option>`).join('')}</select></div>
+ <div class="field"><label>Observação</label><input id="cz180Obs" placeholder="Motivo / comprovante do estorno"></div></div>
+ <div style="color:#9ba7b6;font-size:12px">Informe R$ 0,00 se ainda não devolveu o dinheiro. Só informe um valor positivo quando o estorno for efetivamente realizado.</div>
+ <div id="cz180Erro" style="min-height:20px;color:#ff8989;margin-top:12px;font-size:13px" role="alert"></div>
+ <div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:12px">
+ <button type="button" class="btn secondary" id="cz180Voltar">Voltar</button>
+ <button type="button" class="btn danger" id="cz180Confirmar">CONFIRMAR CANCELAMENTO</button></div>`;
+ ov.appendChild(box);document.body.appendChild(ov);
+ const q=id=>box.querySelector('#'+id);
+ q('cz180Voltar').onclick=()=>ov.remove();
+ q('cz180Confirmar').onclick=async()=>{
+  const cent=cz177LerValor(q('cz180Valor').value);
+  const conta=contas[Number(q('cz180Conta').value)];
+  if(!Number.isFinite(cent)||cent<0||cent>centDisponivel){q('cz180Erro').textContent='O valor do estorno deve estar entre R$ 0,00 e '+money(centDisponivel/100);return}
+  if(cent>0&&(!q('cz180Data').value||q('cz180Conta').value===''||!conta)){q('cz180Erro').textContent='Para estornar, informe data e conta de saída.';return}
+  const ok=await czConfirm('Confirmar cancelamento da proposta '+(p.numero||'')+' e do contrato?'+(cent>0?' Será registrado um ESTORNO DE CANCELAMENTO de '+money(cent/100)+'.':' Nenhum estorno financeiro será lançado agora.')+' O evento sem movimentação de estoque será excluído.','Confirmar cancelamento','Confirmar');
+  if(!ok)return;
+  q('cz180Confirmar').disabled=true;q('cz180Erro').textContent='Processando cancelamento...';
+  try{
+   // Exclui apenas eventos sem baixa de estoque, com os vínculos operacionais.
+   for(const e of vinculados){
+    const {data:atual,error:errEv}=await db.from('eventos_operacionais').select('id,saida_baixada_em,status').eq('id',e.id).maybeSingle();
+    if(errEv)throw errEv;
+    if(!atual)continue;
+    if(atual.saida_baixada_em||atual.status==='finalizado')throw new Error('O evento '+e.id+' mudou de situação e não pode ser excluído.');
+    const {error:errMat}=await db.from('evento_materiais').delete().eq('evento_id',e.id);
+    if(errMat)throw new Error('Materiais do evento: '+errMat.message);
+    const {error:errDel}=await db.from('eventos_operacionais').delete().eq('id',e.id);
+    if(errDel)throw new Error('Evento: '+errDel.message);
+   }
+   // Cancela parcelas não confirmadas sem apagar seu histórico.
+   for(const x of movs.filter(x=>x.tipo==='entrada'&&!caixaConfirmado(x)&&!cz180Cancelado(x))){
+    const {error:errPend}=await db.from('caixa_movimentacoes').update({observacao:String(x.observacao||'')+' [CANCELADO_ORCAMENTO]'}).eq('id',x.id);
+    if(errPend)throw new Error('Parcela pendente: '+errPend.message);
+   }
+   const {error:errOrc}=await db.from('orcamentos').update({status:'cancelado'}).eq('id',id);
+   if(errOrc)throw errOrc;
+   coSet(id,{status:'Cancelado',cancelado_em:new Date().toISOString()});
+   if(cent>0){
+    const obs='Estorno de cancelamento da proposta '+(p.numero||'')+' [CONTA:'+conta.nome+'] [CAIXA_CONFIRMADO]'+(q('cz180Obs').value?' — '+q('cz180Obs').value.trim():'');
+    const {error:errEstorno}=await db.from('caixa_movimentacoes').insert({
+      origem_id:'estorno-cancelamento:'+String(id)+':'+crypto.randomUUID(),
+      orcamento_id:id,cliente_nome:p.cliente_nome||null,proposta_numero:p.numero||null,
+      tipo:'saida',valor:cent/100,data:q('cz180Data').value,
+      descricao:'Estorno de cancelamento — proposta '+(p.numero||''),
+      categoria:'Estorno de cancelamento',forma:'Devolução ao cliente',observacao:obs
+    });
+    if(errEstorno)throw new Error('O contrato e orçamento foram cancelados, mas o ESTORNO NÃO FOI REGISTRADO. Confira o Caixa antes de qualquer nova tentativa: '+errEstorno.message);
+   }
+   ov.remove();caixaCache=[];await carregarCaixa();
+   await czAlert('Orçamento e contrato cancelados; evento sem movimentação excluído. '+(cent>0?'Estorno de cancelamento registrado: '+money(cent/100)+'.':'Nenhum estorno financeiro registrado.'),'Cancelamento realizado');
+   if(document.querySelector('#orcPropostasSalvas'))await carregarPropostasSalvas();
+   else await renderContratosOficialCZ();
+  }catch(e){q('cz180Erro').textContent='Atenção: '+(e.message||e)+' Confira o sistema antes de repetir esta operação.';q('cz180Confirmar').disabled=true}
+ };
 }
+async function cz179CancelarContrato(id){return cz180CancelarOrcamento(id)}
 // V176 — situação de pagamento dos contratos, igual à tela Eventos.
 async function renderContratosOficialCZ(){
  $('#pageTitle').textContent='Contratos';
