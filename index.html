@@ -1512,7 +1512,7 @@ atualizarEquipe();
     const ouro=[178,125,47],preto=[28,28,28],cinza=[115,115,115];
     const linhaTitulo=(n,titulo,y)=>{
       pdf.setTextColor(...preto);pdf.setFont('times','italic');pdf.setFontSize(16);
-      pdf.text(n+'.  '+titulo,15,y);
+      pdf.text(titulo,15,y);
       pdf.setDrawColor(...ouro);pdf.setLineWidth(.35);pdf.line(15,y+3,195,y+3);
       return y+12;
     };
@@ -1539,7 +1539,23 @@ atualizarEquipe();
     pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(...preto);
     pdf.text('DATA: '+new Date().toLocaleDateString('pt-BR'),195,30,{align:'right'});
     pdf.text('VALIDADE: '+(d.validade_orcamento?finDate(d.validade_orcamento):'—'),195,35,{align:'right'});
-    let y=49;
+    // Introdução sem título, imediatamente abaixo de Proposta Comercial.
+    pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.setTextColor(80,80,80);
+    const textoIntroducao=String(d.introducao_proposta||'').trim();
+    const linhasIntroducao=textoIntroducao?pdf.splitTextToSize(textoIntroducao,175):[];
+    let y=43;
+    if(linhasIntroducao.length){
+      // Se for longa, mantém o texto integral em uma página própria, sem cortar linhas.
+      if(linhasIntroducao.length>9){
+        pdf.addPage();marcaDagua();y=24;
+      }
+      for(const linha of linhasIntroducao){
+        if(y>273){pdf.addPage();marcaDagua();y=24;}
+        pdf.text(linha,18,y);y+=5;
+      }
+      y+=8;
+    }else{y=49;}
+    if(y>100){pdf.addPage();marcaDagua();y=26;}
     y=linhaTitulo('1','Dados do Evento',y);
     const dataFmt=d.data_evento?new Date(d.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—';
     y=campo('Data do evento',dataFmt,y); y=campo('Local',d.local_evento||'—',y); y=campo('Cidade',d.cidade_evento||'—',y); y=campo('Horário',d.horario||'—',y); y=campo('Evento',d.evento||'—',y);
@@ -1558,6 +1574,7 @@ atualizarEquipe();
     const obs=String(d.observacoes||d.observacao||'').trim();
     if(obs){const partes=pdf.splitTextToSize(obs,175).slice(0,4);pdf.text(partes,18,y);y+=Math.max(18,partes.length*6);}else{for(let i=0;i<3;i++){pdf.setDrawColor(210,210,210);pdf.line(18,y,193,y);y+=9;}}
     // Total sem tarja escura e condições de pagamento logo abaixo.
+    if(y>237){pdf.addPage();marcaDagua();y=26;}
     const totalY=Math.max(y+8,247);
     pdf.setTextColor(...preto);pdf.setFont('times','italic');pdf.setFontSize(17);
     pdf.text('Total de Investimento:',128,totalY,{align:'right'});
