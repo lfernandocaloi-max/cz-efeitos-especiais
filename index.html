@@ -1535,22 +1535,41 @@ var CZ_CAPA_CHA_W='data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAsICA
     const modelo=['casamento','cha_revelacao','padrao'].includes(d?.modelo_proposta)?d.modelo_proposta:'padrao';
     const produtos=Array.isArray(d.produtos)?d.produtos:[];
     const equipamentos=Array.isArray(d.equipamentos)?d.equipamentos:[];
-    // Converte JPEG base64 em bytes binários, evitando a interpretação
-    // automática de data URLs que falhava na biblioteca de PDF.
-    const imagemBinaria=(data)=>{
-      if(typeof data!=='string'||!/^data:image\/jpeg;base64,/i.test(data))
-        throw new Error('Imagem da proposta inválida.');
-      const bin=atob(data.slice(data.indexOf(',')+1));
-      const bytes=new Uint8Array(bin.length);
-      for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
-      return bytes;
+    // V167: aceita JPEG/PNG e normaliza imagens de modelos antigos.
+    // Se alguma capa estiver indisponível, não impede a abertura da proposta.
+    const imagemBinaria=(fonte)=>{
+      if(fonte instanceof Uint8Array)return {bytes:fonte,formato:'JPEG'};
+      if(typeof fonte!=='string')return null;
+      const valor=fonte.trim();
+      const separador=valor.indexOf(',');
+      if(separador<0)return null;
+      const cabecalho=valor.slice(0,separador).toLowerCase().replace(/\s/g,'');
+      if(!cabecalho.startsWith('data:image/')||!cabecalho.includes(';base64'))return null;
+      const formato=cabecalho.includes('png')?'PNG':'JPEG';
+      try{
+        const bin=atob(valor.slice(separador+1).replace(/\s/g,''));
+        if(bin.length<4)return null;
+        const bytes=new Uint8Array(bin.length);
+        for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+        if(formato==='JPEG' && !(bytes[0]===255&&bytes[1]===216))return null;
+        if(formato==='PNG' && !(bytes[0]===137&&bytes[1]===80))return null;
+        return {bytes,formato};
+      }catch(e){console.warn('CZ PDF: falha ao decodificar imagem',e);return null;}
     };
-    const imagemA4=(data)=>{
-      pdf.addImage(imagemBinaria(data),'JPEG',0,0,W,H);
+    const imagemA4=(fonte,tipo='capa')=>{
+      const principal=imagemBinaria(fonte);
+      // Só usa imagem alternativa se a imagem escolhida estiver inválida.
+      const alternativa=principal||imagemBinaria(CZ_CAPA_PADRAO)||imagemBinaria(CZ_ORCAMENTO_CAPA);
+      if(!alternativa){
+        console.warn('CZ PDF: nenhuma imagem válida disponível para',tipo,'modelo',modelo);
+        pdf.setFillColor(17,24,33);pdf.rect(0,0,W,H,'F');
+        return;
+      }
+      pdf.addImage(alternativa.bytes,alternativa.formato,0,0,W,H);
     };
     const marcaDagua=()=>{
       const img=modelo==='cha_revelacao'?CZ_CAPA_CHA_W:modelo==='padrao'?CZ_CAPA_PADRAO_W:CZ_ORCAMENTO_MARCA_DAGUA;
-      imagemA4(img);
+      imagemA4(img,'marca d’água');
     };
     const ouro=[178,125,47],preto=[28,28,28],cinza=[115,115,115];
     const linhaTitulo=(n,titulo,y)=>{
