@@ -2533,25 +2533,31 @@ function codigoCadastroAtivo(a){return String(a?.codigo_interno||a?.codigo_barra
 // V181: códigos independentes da quantidade, compartilhados no cadastro Supabase.
 // Guardados em observacoes como metadado, sem exigir nova coluna no banco.
 const CZ181_TAG='[CZ_RASTREIO_V181]';
-function cz181ExtrairNotas(v){
- const texto=String(v||'');
+const CZ186_AUDIT='[CZ_BAIXAS_RASTREIO_V186]';
+function cz186ExtrairNotas(v){
+ let texto=String(v||''),codigos=[],baixas=[],temRastreio=false;
  const pos=texto.lastIndexOf('\n'+CZ181_TAG);
- if(pos<0)return {texto,codigos:[]};
- try{
-  const arr=JSON.parse(texto.slice(pos+1+CZ181_TAG.length));
-  if(Array.isArray(arr))return {texto:texto.slice(0,pos),codigos:arr.map(x=>String(x).trim()).filter(Boolean)};
- }catch(_){}
- return {texto,codigos:[]};
+ if(pos>=0){
+  try{const arr=JSON.parse(texto.slice(pos+1+CZ181_TAG.length));if(Array.isArray(arr)){codigos=arr.map(x=>String(x).trim()).filter(Boolean);temRastreio=true;texto=texto.slice(0,pos)}}catch(_){}
+ }
+ const posBaixa=texto.lastIndexOf('\n'+CZ186_AUDIT);
+ if(posBaixa>=0){
+  try{const arr=JSON.parse(texto.slice(posBaixa+1+CZ186_AUDIT.length));if(Array.isArray(arr)){baixas=arr;texto=texto.slice(0,posBaixa)}}catch(_){}
+ }
+ return {texto,codigos,baixas,temRastreio};
 }
-function cz181MontarNotas(texto,codigos){
- const t=String(texto||'').trim(),lista=codigos.map(x=>String(x).trim()).filter(Boolean);
- return t+(lista.length?'\n'+CZ181_TAG+JSON.stringify(lista):'')||null;
+function cz181ExtrairNotas(v){return cz186ExtrairNotas(v)}
+function cz181MontarNotas(texto,codigos,baixas=[]){
+ let base=String(texto||'').trim();
+ if(baixas.length)base+='\n'+CZ186_AUDIT+JSON.stringify(baixas);
+ // Tag presente mesmo com zero códigos para não restaurar rastreios antigos do navegador.
+ base+='\n'+CZ181_TAG+JSON.stringify(codigos.map(x=>String(x).trim()).filter(Boolean));
+ return base;
 }
 function cz155Load(){try{return JSON.parse(localStorage.getItem('cz155_codigos_unidades')||'{}')}catch(e){return {}}}
 function unidadesAtivo(a){
- const codigos=cz181ExtrairNotas(a?.observacoes).codigos;
- // Compatibilidade de leitura com rastreios editados em versões anteriores.
- if(codigos.length)return codigos;
+ const info=cz181ExtrairNotas(a?.observacoes);
+ if(info.temRastreio)return info.codigos;
  return (cz155Load()[String(a?.id)]||[]).map(x=>String(x).trim()).filter(Boolean);
 }
 function cz181AdicionarRastreio(valor=''){
@@ -2560,8 +2566,109 @@ function cz181AdicionarRastreio(valor=''){
  linha.className='row cz181RastreioLinha';
  linha.style.cssText='align-items:end;gap:8px;margin:7px 0';
  linha.innerHTML=`<div class="field" style="flex:1"><label>Código de rastreio</label><input class="cz181Rastreio" placeholder="Digite ou leia o código individual" value="${esc(valor)}"></div><button type="button" class="btn danger" title="Remover este código" style="margin-bottom:3px">×</button>`;
- linha.querySelector('button').onclick=()=>linha.remove();
+ linha.querySelector('button').onclick=()=>cz186SolicitarBaixa(linha);
  box.appendChild(linha);
+}
+
+// V186 — retirada definitiva de um rastreio com motivo obrigatório e trilha de auditoria.
+let cz186BaixaEmCurso=false;
+async function cz186SolicitarBaixa(linha){
+ const rastreio=linha.querySelector('.cz181Rastreio')?.value.trim()||'';
+ const id=$('#assetId').value;
+ const ativo=assets.find(x=>String(x.id)===String(id));
+ if(!rastreio){linha.remove();return}
+ if(!ativo||!unidadesAtivo(ativo).some(x=>x.toUpperCase()===rastreio.toUpperCase())){
+  // Código novo, ainda não salvo: pode retirar sem gerar baixa.
+  linha.remove();return;
+ }
+ if(cz186BaixaEmCurso)return;
+ if(!contaMaster()){await czAlert('Somente a conta Master pode dar baixa definitiva em códigos de rastreio.','Acesso restrito');return}
+ const outros=cz181LerRastreios().filter(x=>x.toUpperCase()!==rastreio.toUpperCase());
+ const atuais=unidadesAtivo(ativo);
+ const diferencas=atuais.filter(x=>x.toUpperCase()!==rastreio.toUpperCase()&&!outros.some(y=>y.toUpperCase()===x.toUpperCase()));
+ if(diferencas.length){await czAlert('Salve ou restaure os outros códigos antes de realizar esta baixa.','Rastreios pendentes');return}
+ const motivo=await cz186ModalBaixa(ativo,rastreio);
+ if(!motivo)return;
+ cz186BaixaEmCurso=true;
+ try{
+  // Bloqueia baixa de equipamento que consta em evento operacional ainda em andamento.
+  const {data:mat,error:errMat}=await db.from('evento_materiais').select('evento_id,quantidade_bipada,quantidade_devolvida')
+   .eq('tipo','ativo').eq('item_id',ativo.id);
+  if(errMat)throw errMat;
+  const eventosEmAberto=(mat||[]).filter(m=>Number(m.quantidade_bipada||0)>Number(m.quantidade_devolvida||0));
+  if(eventosEmAberto.length)throw new Error('Este cadastro tem equipamento com saída pendente de retorno. Regularize o evento antes de dar baixa no rastreio.');
+  // Reconsulta para impedir retirada com cadastro desatualizado.
+  const {data:atual,error:errAtual}=await db.from('ativos').select('*').eq('id',ativo.id).single();
+  if(errAtual)throw errAtual;
+  const codigos=unidadesAtivo(atual);
+  if(!codigos.some(x=>x.toUpperCase()===rastreio.toUpperCase()))throw new Error('O código já não está ativo. Atualize o cadastro.');
+  const info=cz186ExtrairNotas(atual.observacoes);
+  const registro={codigo:rastreio,motivo:motivo.motivo,valor:motivo.motivo==='Venda'?motivo.valor:null,data:finISODate(),registrado_em:new Date().toISOString()};
+  const restante=codigos.filter(x=>x.toUpperCase()!==rastreio.toUpperCase());
+  const notas=cz181MontarNotas(info.texto,restante,[...info.baixas,registro]);
+  const quantidade=Math.max(0,Number(atual.quantidade||0)-1);
+  let caixaId=null;
+  if(motivo.motivo==='Venda'){
+   const {data:lancamento,error:errCaixa}=await db.from('caixa_movimentacoes').insert({
+    origem_id:'venda-ativo:'+String(ativo.id)+':'+rastreio+':'+crypto.randomUUID(),
+    tipo:'entrada',data:finISODate(),valor:motivo.valor,
+    cliente_nome:motivo.comprador||null,proposta_numero:null,orcamento_id:null,
+    descricao:'Venda de equipamento — '+atual.nome+' — rastreio '+rastreio,
+    categoria:'Venda de ativo / equipamento',forma:'A definir',
+    observacao:'[VENDA_ATIVO:'+String(ativo.id)+'] [RASTREIO:'+rastreio+'] [VENCIMENTO:'+finISODate()+'] Aguardando confirmação de recebimento'
+   }).select('id').single();
+   if(errCaixa)throw new Error('Não foi possível criar o recebimento pendente no Caixa: '+errCaixa.message);
+   caixaId=lancamento.id;
+  }
+  let atualizacao=db.from('ativos').update({observacoes:notas,quantidade,atualizado_em:new Date().toISOString()}).eq('id',ativo.id);
+  atualizacao=atual.observacoes==null?atualizacao.is('observacoes',null):atualizacao.eq('observacoes',atual.observacoes);
+  const {data:gravados,error:errGravar}=await atualizacao.select('id');
+  if(errGravar||!gravados?.length){
+   if(caixaId){
+    const {error:errReverter}=await db.from('caixa_movimentacoes').delete().eq('id',caixaId);
+    if(errReverter)throw new Error('A baixa do rastreio não foi concluída, mas o recebimento foi criado. Confira o Caixa antes de tentar novamente: '+errReverter.message);
+   }
+   throw new Error(errGravar?.message||'O cadastro foi alterado em outra sessão. Atualize e tente novamente.');
+  }
+  await renderAssets();
+  const recarregado=assets.find(x=>String(x.id)===String(ativo.id));
+  if(recarregado)openAsset(recarregado);
+  await czAlert('Baixa registrada: '+rastreio+' — '+motivo.motivo+'. '+(caixaId?'Venda de '+money(motivo.valor)+' enviada para Recebimentos aguardando confirmação no Caixa.':'Histórico da baixa salvo no cadastro.'),'Baixa concluída');
+ }catch(e){await czAlert(e.message||String(e),'Não foi possível dar baixa')}
+ finally{cz186BaixaEmCurso=false}
+}
+function cz186ModalBaixa(ativo,rastreio){
+ return new Promise(resolve=>{
+  document.getElementById('cz186BaixaOverlay')?.remove();
+  const ov=document.createElement('div');ov.id='cz186BaixaOverlay';
+  ov.style.cssText='position:fixed;inset:0;z-index:200080;background:rgba(0,0,0,.84);display:flex;align-items:center;justify-content:center;padding:15px';
+  const box=document.createElement('div');box.style.cssText='background:#151b26;border:1px solid #405068;border-radius:15px;color:#fff;padding:23px;width:min(530px,100%);max-height:94vh;overflow:auto';
+  box.innerHTML=`<div style="font-size:12px;color:#ff641f;font-weight:900">CZ EFEITOS ESPECIAIS • BAIXA DE EQUIPAMENTO</div>
+   <h2 style="margin:8px 0 12px">Excluir código de rastreio</h2>
+   <p><b>Equipamento:</b> ${esc(ativo.nome)}<br><b>Rastreio:</b> ${esc(rastreio)}</p>
+   <div class="field"><label>Motivo da baixa *</label><select id="cz186Motivo">
+   <option value="">Selecione</option><option value="Perda do equipamento">Perda do equipamento</option>
+   <option value="Venda">Venda</option><option value="Sucata">Sucata</option></select></div>
+   <div id="cz186VendaCampos" style="display:none"><div class="field"><label>Valor da venda (R$) *</label><input id="cz186Valor" inputmode="decimal" placeholder="0,00"></div>
+   <div class="field"><label>Comprador (opcional)</label><input id="cz186Comprador" placeholder="Nome do comprador"></div>
+   <p class="muted">A venda irá para Recebimentos aguardando confirmação. O saldo só aumenta depois de confirmar o recebimento e selecionar a conta.</p></div>
+   <p class="muted">O código será desativado e a quantidade física do cadastro será reduzida em uma unidade. O histórico da baixa será preservado.</p>
+   <div id="cz186Erro" style="color:#ff8585;min-height:20px"></div>
+   <div class="actions" style="justify-content:flex-end"><button type="button" class="btn secondary" id="cz186Cancelar">Cancelar</button>
+   <button type="button" class="btn danger" id="cz186Confirmar">Confirmar baixa</button></div>`;
+  ov.appendChild(box);document.body.appendChild(ov);
+  const q=id=>box.querySelector('#'+id);
+  const fechar=x=>{ov.remove();resolve(x)};
+  q('cz186Cancelar').onclick=()=>fechar(null);
+  q('cz186Motivo').onchange=()=>{q('cz186VendaCampos').style.display=q('cz186Motivo').value==='Venda'?'block':'none'};
+  q('cz186Confirmar').onclick=()=>{
+   const motivo=q('cz186Motivo').value;
+   if(!motivo)return q('cz186Erro').textContent='Selecione o motivo da baixa.';
+   const cent=motivo==='Venda'?cz177LerValor(q('cz186Valor').value):0;
+   if(motivo==='Venda'&&(!Number.isFinite(cent)||cent<=0))return q('cz186Erro').textContent='Informe um valor de venda maior que zero.';
+   fechar({motivo,valor:cent/100,comprador:q('cz186Comprador').value.trim()});
+  };
+ });
 }
 function cz181LerRastreios(){return [...document.querySelectorAll('#assetUnitsList .cz181Rastreio')].map(x=>x.value.trim()).filter(Boolean)}
 function renderAssetUnitsPreview(){
@@ -2576,7 +2683,7 @@ async function renderAssets(){
   if(error){$('#content').innerHTML=`<div class="msg">Erro ao carregar ativos: ${error.message}</div>`;return}
   assets=data||[];
   $('#content').innerHTML=`<div class="sectionhead"><div><h2>Ativos / Equipamentos</h2><div class="muted">${assets.length} cadastro(s)</div></div><button class="btn primary" onclick="openAsset()">+ Novo ativo</button></div>
-  <div class="tablewrap">${assets.length?`<table><thead><tr><th>Foto</th><th>Equipamento</th><th>Código cadastro / rastreios individuais</th><th>Quantidade</th><th>Compra</th><th>Valor compra</th><th>Status</th><th>Ações</th></tr></thead><tbody>${assets.map(a=>`<tr><td>${a.foto_url?`<img class="thumb" src="${esc(a.foto_url)}">`:'—'}</td><td>${esc(a.nome)}</td><td><b>${esc(codigoCadastroAtivo(a))}</b><div class="muted">${unidadesAtivo(a).length?unidadesAtivo(a).map(c=>esc(c)).join(' · '):'Nenhum código de rastreio cadastrado'}</div></td><td>${esc(a.quantidade??1)}</td><td>${a.data_compra?new Date(a.data_compra+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${money(a.valor_compra)}</td><td>${esc(a.status||'')}</td><td><div class="actions"><button class="btn secondary" onclick="editAsset('${a.id}')">Editar / Etiquetas</button>${contaMaster()?`<button type="button" title="Excluir equipamento" aria-label="Excluir equipamento" onclick="excluirAtivo('${a.id}')" style="width:28px;height:28px;border:1px solid #63303a;background:#2a151a;color:#ff7b88;border-radius:7px;font-size:14px;font-weight:900;cursor:pointer;padding:0">×</button>`:''}</div></td></tr>`).join('')}</tbody></table>`:`<div class="empty">Nenhum ativo cadastrado.</div>`}</div>`;
+  <div class="tablewrap">${assets.length?`<table><thead><tr><th>Foto</th><th>Equipamento</th><th>Código cadastro / rastreios individuais</th><th>Quantidade</th><th>Compra</th><th>Valor compra</th><th>Status</th><th>Ações</th></tr></thead><tbody>${assets.map(a=>`<tr><td>${a.foto_url?`<img class="thumb" src="${esc(a.foto_url)}">`:'—'}</td><td>${esc(a.nome)}</td><td><b>${esc(codigoCadastroAtivo(a))}</b><div class="muted">${unidadesAtivo(a).length?unidadesAtivo(a).map(c=>esc(c)).join(' · '):'Nenhum código de rastreio cadastrado'}</div></td><td>${esc(a.quantidade??1)}</td><td>${a.data_compra?new Date(a.data_compra+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${money(a.valor_compra)}</td><td>${esc(a.status||'')}</td><td><div class="actions"><button class="btn secondary" onclick="editAsset('${a.id}')">Editar</button>${contaMaster()?`<button type="button" title="Excluir equipamento" aria-label="Excluir equipamento" onclick="excluirAtivo('${a.id}')" style="width:28px;height:28px;border:1px solid #63303a;background:#2a151a;color:#ff7b88;border-radius:7px;font-size:14px;font-weight:900;cursor:pointer;padding:0">×</button>`:''}</div></td></tr>`).join('')}</tbody></table>`:`<div class="empty">Nenhum ativo cadastrado.</div>`}</div>`;
 }
 async function excluirAtivo(id){
  if(!contaMaster()){await czAlert('Somente a conta Master pode excluir equipamentos.','Acesso restrito');return}
@@ -2596,6 +2703,10 @@ function openAsset(a=null){
  $('#assetModal').classList.remove('hidden');$('#assetModalTitle').textContent=a?'Editar ativo':'Novo ativo';$('#assetId').value=a?.id||'';$('#assetName').value=a?.nome||'';
  $('#assetCode').value=a?codigoCadastroAtivo(a):'';$('#assetSupplier').value=a?.fornecedor||'';$('#assetQuantity').value=a?.quantidade??1;$('#assetPurchaseDate').value=a?.data_compra||'';$('#assetPurchaseValue').value=moedaInputValor(a?.valor_compra??0);$('#assetRent1').value=a?.valor_locacao_tabela1??0;$('#assetRent2').value=a?.valor_locacao_tabela2??0;$('#assetWeight').value=a?.peso??'';$('#assetCase').value=String(a?.possui_case??false);$('#assetMontagem').checked=a?.material_montagem===true;$('#assetNotes').value=cz181ExtrairNotas(a?.observacoes).texto;$('#assetPhoto').value='';
  const im=$('#assetPreview');if(a?.foto_url){im.src=a.foto_url;im.classList.remove('hidden')}else im.classList.add('hidden');$('#assetMsg').textContent='';$('#assetUnitsList').innerHTML='';const codigos=a?unidadesAtivo(a):[];if(codigos.length)codigos.forEach(c=>cz181AdicionarRastreio(c));else cz181AdicionarRastreio();
+ const historico=cz186ExtrairNotas(a?.observacoes).baixas;
+ let hist=$('#cz186Historico');
+ if(!hist){hist=document.createElement('div');hist.id='cz186Historico';$('#assetUnitsList').parentElement.appendChild(hist)}
+ hist.innerHTML=historico.length?`<div class="muted" style="margin-top:10px"><b>Histórico de baixas:</b> ${historico.map(h=>esc(h.codigo)+' — '+esc(h.motivo)+(h.motivo==='Venda'?' ('+money(h.valor)+')':'')).join(' · ')}</div>`:'';
 }
 function closeAsset(){$('#assetModal').classList.add('hidden')}
 function editAsset(id){openAsset(assets.find(a=>String(a.id)===String(id)))}
@@ -2620,17 +2731,22 @@ function imprimirEtiquetasAtivoAtual(){
 }
 $('#saveAssetBtn').onclick=async()=>{
  const id=$('#assetId').value;$('#assetMsg').textContent='Salvando...';const qtd=Number($('#assetQuantity').value);
- if($('#assetQuantity').value===''||!Number.isInteger(qtd)||qtd<1){$('#assetMsg').textContent='Informe uma quantidade inteira maior que zero.';return}
+ if($('#assetQuantity').value===''||!Number.isInteger(qtd)||qtd<0){$('#assetMsg').textContent='Informe uma quantidade inteira maior ou igual a zero.';return}
  try{
   let foto_url=id?assets.find(p=>String(p.id)===String(id))?.foto_url:null;const f=$('#assetPhoto').files[0];if(f)foto_url=await uploadPhoto(f,'ativos');
   const atual=id?assets.find(a=>String(a.id)===String(id)):null;
   const rastreios=cz181LerRastreios(),normalizados=rastreios.map(x=>x.toUpperCase());
+  if(atual){
+   const antigos=unidadesAtivo(atual);
+   const removidos=antigos.filter(c=>!normalizados.includes(c.toUpperCase()));
+   if(removidos.length)throw new Error('Para retirar um código de rastreio existente, use o botão × ao lado dele e informe Perda, Venda ou Sucata. Código(s): '+removidos.join(', '));
+  }
   if(new Set(normalizados).size!==normalizados.length)throw new Error('Existem códigos de rastreio repetidos neste cadastro.');
   const emUso=new Set(assets.filter(a=>String(a.id)!==String(id)).flatMap(a=>unidadesAtivo(a).map(c=>c.toUpperCase())));
   if(rastreios.some(c=>emUso.has(c.toUpperCase())))throw new Error('Um código de rastreio já está cadastrado em outro equipamento.');
   const codigo=$('#assetCode').value.trim();
   if(!codigo)throw new Error('Informe o código principal do ativo.');
-  const payload={nome:$('#assetName').value.trim(),quantidade:qtd,codigo_interno:codigo,fornecedor:$('#assetSupplier').value.trim()||null,data_compra:$('#assetPurchaseDate').value||null,valor_compra:moedaInputNumero($('#assetPurchaseValue').value),valor_locacao_tabela1:+$('#assetRent1').value||0,valor_locacao_tabela2:+$('#assetRent2').value||0,peso:$('#assetWeight').value?+$('#assetWeight').value:null,possui_case:$('#assetCase').value==='true',material_montagem:$('#assetMontagem').checked,observacoes:cz181MontarNotas($('#assetNotes').value,rastreios),foto_url,atualizado_em:new Date().toISOString()};
+  const payload={nome:$('#assetName').value.trim(),quantidade:qtd,codigo_interno:codigo,fornecedor:$('#assetSupplier').value.trim()||null,data_compra:$('#assetPurchaseDate').value||null,valor_compra:moedaInputNumero($('#assetPurchaseValue').value),valor_locacao_tabela1:+$('#assetRent1').value||0,valor_locacao_tabela2:+$('#assetRent2').value||0,peso:$('#assetWeight').value?+$('#assetWeight').value:null,possui_case:$('#assetCase').value==='true',material_montagem:$('#assetMontagem').checked,observacoes:cz181MontarNotas($('#assetNotes').value,rastreios,cz186ExtrairNotas(atual?.observacoes).baixas),foto_url,atualizado_em:new Date().toISOString()};
   if(!payload.nome)throw new Error('Informe o nome do equipamento.');
   const {data,error}=id?await db.from('ativos').update(payload).eq('id',id).select():await db.from('ativos').insert({...payload,status:'disponivel'}).select();
   if(error)throw error;
