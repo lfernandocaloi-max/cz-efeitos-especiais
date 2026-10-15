@@ -3143,24 +3143,112 @@ async function abrirRetornoEvento(id){
  const [evr,matr]=await Promise.all([db.from('eventos_operacionais').select('*').eq('id',id).single(),db.from('evento_materiais').select('*').eq('evento_id',id).order('criado_em')]);if(evr.error||matr.error){alert((evr.error||matr.error).message);return}
  const e=evr.data,mats=(matr.data||[]).filter(m=>Number(m.quantidade_bipada||0)>0);const finalizado=e.status==='finalizado';
  const linhas=mats.map(m=>{const r=retornoInfoMaterial(m,e),esperado=Number(m.quantidade_bipada||0),qDev=Math.min(Number(r.qtd||0),esperado),qOc=Number(r.qtd_perda||0)+Number(r.qtd_manutencao||0),q=Math.min(qDev+qOc,esperado),ok=q>=esperado,perda=r.status==='perda',man=r.status==='manutencao';return `<tr><td>${esperado}</td><td><b>${esc(m.nome_item)}</b><div class="muted">${m.tipo==='ativo'?'Ativo':'Consumo'}</div></td><td><b>${esc(m.codigo||'—')}</b></td><td>${q}/${esperado}</td><td>${dataUltimoRetornoMaterial(m,e)}</td><td>${man?'🛠️ Manutenção':perda?'⚠️ Perda':ok?'✅ Devolvido':'🟥 Pendente'}</td><td>${m.tipo==='ativo'&&!finalizado&&!perda&&!man&&!ok?`<button class="btn secondary" onclick="marcarManutencaoRetorno('${id}','${m.id}','${m.item_id||''}')">Manutenção</button> <button class="btn danger" onclick="marcarPerdaRetorno('${id}','${m.id}','${m.item_id||''}')">Perda</button>`:(m.tipo==='produto'?'<span class="muted">Conferir devolução</span>':'—')}</td></tr>`}).join('');
- $('#content').innerHTML=`<div class="sectionhead"><div><h2>↩️ Retorno — ${esc(e.nome_evento)}</h2><div class="muted">${esc(e.cliente_nome||'')} • compare a devolução com a conferência de saída</div></div><button class="btn secondary" onclick="renderRetornoEventos()">Voltar</button></div><div class="card" style="margin-bottom:16px"><div><b>Status:</b> ${statusEventoLabel(e.status)}</div>${!finalizado?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><input id="scanRetorno" placeholder="Bipe o código devolvido" autocomplete="off" style="flex:1;min-width:240px;background:#0b1118;color:#fff;border:1px solid var(--line);border-radius:9px;padding:12px"><button class="btn primary" id="btnRetorno">CONF. DEVOLUÇÃO</button></div><div id="retMsg" class="msg"></div>`:''}</div><div class="tablewrap"><table><thead><tr><th>Qtd. saída</th><th>Descrição</th><th>Cód.</th><th>Retorno</th><th>Data e hora</th><th>Status</th><th>Ocorrência</th></tr></thead><tbody>${linhas||'<tr><td colspan="7">Nenhum item registrado na saída.</td></tr>'}</tbody></table></div>${!finalizado?`<div class="card" style="margin-top:16px"><div class="muted">Ativos precisam ser devolvidos, enviados para manutenção ou marcados como perda. Consumíveis e ativos devolvidos voltam ao estoque no momento da conferência.</div><div class="actions"><button class="btn primary" onclick="finalizarRetornoEvento('${id}')">CONCLUIR RETORNO DO EVENTO</button></div></div>`:''}`;
+ $('#content').innerHTML=`<div class="sectionhead"><div><h2>↩️ Retorno — ${esc(e.nome_evento)}</h2><div class="muted">${esc(e.cliente_nome||'')} • compare a devolução com a conferência de saída</div></div><button class="btn secondary" onclick="renderRetornoEventos()">Voltar</button></div><div class="card" style="margin-bottom:16px"><div><b>Status:</b> ${statusEventoLabel(e.status)}</div>${!finalizado?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><input id="scanRetorno" placeholder="Bipe o rastreio do ativo ou código de barras do produto" autocomplete="off" style="flex:1;min-width:240px;background:#0b1118;color:#fff;border:1px solid var(--line);border-radius:9px;padding:12px"><button class="btn primary" id="btnRetorno">CONF. DEVOLUÇÃO</button></div><div id="retMsg" class="msg"></div>`:''}</div><div class="tablewrap"><table><thead><tr><th>Qtd. saída</th><th>Descrição</th><th>Cód.</th><th>Retorno</th><th>Data e hora</th><th>Status</th><th>Ocorrência</th></tr></thead><tbody>${linhas||'<tr><td colspan="7">Nenhum item registrado na saída.</td></tr>'}</tbody></table></div>${!finalizado?`<div class="card" style="margin-top:16px"><div class="muted">Ativos precisam ser devolvidos, enviados para manutenção ou marcados como perda. Consumíveis e ativos devolvidos voltam ao estoque no momento da conferência.</div><div class="actions"><button class="btn primary" onclick="finalizarRetornoEvento('${id}')">CONCLUIR RETORNO DO EVENTO</button></div></div>`:''}`;
  if(!finalizado){const scan=$('#scanRetorno');$('#btnRetorno').onclick=()=>biparRetornoEvento(id);let timerAutoRetorno=null;scan.addEventListener('keydown',x=>{if(x.key==='Enter'){if(timerAutoRetorno)clearTimeout(timerAutoRetorno);biparRetornoEvento(id)}});scan.addEventListener('input',()=>{if(timerAutoRetorno)clearTimeout(timerAutoRetorno);if(!scan.value.trim())return;timerAutoRetorno=setTimeout(()=>{if(scan.value.trim())biparRetornoEvento(id)},350)});scan.focus()}
 }
+// V185: o operador lê o RASTREIO individual no retorno.
+// O RPC legado ainda recebe o código do MATERIAL; a tradução ocorre apenas
+// após validar a identidade do equipamento e a leitura feita na saída.
+let cz185RetornoEmAndamento=false;
+function cz185Lidos(eventoId,etapa){
+ try{
+  const chave=etapa==='saida'?'cz184_rastreios_saida_':'cz185_rastreios_retorno_';
+  const arr=JSON.parse(localStorage.getItem(chave+String(eventoId))||'[]');
+  return Array.isArray(arr)?arr.map(normalizarCodigoEvento):[];
+ }catch(_){return []}
+}
+function cz185GravarRetorno(eventoId,rastreio){
+ const chave='cz185_rastreios_retorno_'+String(eventoId);
+ const lista=cz185Lidos(eventoId,'retorno');
+ if(!lista.includes(rastreio))localStorage.setItem(chave,JSON.stringify([...lista,rastreio]));
+}
 async function biparRetornoEvento(eventoId){
- const c=$('#scanRetorno'),codigo=c.value.trim();if(!codigo){$('#retMsg').textContent='Bipe ou digite um código.';return}
- const {data:e,error:evErro}=await db.from('eventos_operacionais').select('saida_baixada_em,status').eq('id',eventoId).single();
- if(evErro){$('#retMsg').textContent=evErro.message;return}
- if(e.saida_baixada_em){
-   const {error}=await db.rpc('cz_confirmar_retorno_evento',{p_evento_id:eventoId,p_codigo:codigo});
-   if(error){$('#retMsg').textContent='Não foi possível conferir: '+error.message;return}
-   c.value='';await abrirRetornoEvento(eventoId);return;
- }
- const {data,error}=await db.from('evento_materiais').select('*').eq('evento_id',eventoId).eq('codigo',codigo);if(error){$('#retMsg').textContent=error.message;return}
- const m=(data||[]).find(x=>Number(x.quantidade_bipada||0)>0);if(!m){$('#retMsg').textContent='Este código não consta na saída deste evento.';return}
- const esperado=Number(m.quantidade_bipada||0),r=retornoInfo(m.id);if(Number(r.qtd||0)>=esperado){$('#retMsg').textContent='A devolução deste item já está completa.';return}
- r.qtd=Number(r.qtd||0)+1;r.registros=[...(r.registros||[]),new Date().toISOString()];r.status='devolvido';salvarRetorno(m.id,r);
- if(m.tipo==='produto'&&m.item_id){const {data:p}=await db.from('produtos').select('estoque_atual').eq('id',m.item_id).single();if(p){const {error:up}=await db.from('produtos').update({estoque_atual:Number(p.estoque_atual||0)+1}).eq('id',m.item_id);if(up){r.qtd--;r.registros.pop();salvarRetorno(m.id,r);$('#retMsg').textContent='Não foi possível devolver ao estoque: '+up.message;return}}}
- if(m.tipo==='ativo'&&m.item_id)await db.from('ativos').update({status:'disponivel'}).eq('id',m.item_id);c.value='';abrirRetornoEvento(eventoId)
+ const campo=$('#scanRetorno'),msg=$('#retMsg');
+ if(cz185RetornoEmAndamento)return;
+ const codigo=normalizarCodigoEvento(campo?.value);
+ if(!codigo){if(msg)msg.textContent='Bipe ou digite o código de rastreio do equipamento.';return}
+ cz185RetornoEmAndamento=true;
+ try{
+  const [er,mr]=await Promise.all([
+   db.from('eventos_operacionais').select('saida_baixada_em,status').eq('id',eventoId).single(),
+   db.from('evento_materiais').select('*').eq('evento_id',eventoId)
+  ]);
+  if(er.error||mr.error)throw er.error||mr.error;
+  const e=er.data,materiais=mr.data||[];
+  const ids=[...new Set(materiais.filter(m=>m.tipo==='ativo'&&m.item_id).map(m=>m.item_id))];
+  let ativos=[];
+  if(ids.length){
+   const r=await db.from('ativos').select('id,observacoes').in('id',ids);
+   if(r.error)throw r.error;
+   ativos=r.data||[];
+  }
+  const correspondentes=ativos.filter(a=>unidadesAtivo(a).some(c=>normalizarCodigoEvento(c)===codigo));
+  if(correspondentes.length>1)throw new Error('Este código de rastreio está duplicado em mais de um cadastro de ativo.');
+  const ativo=correspondentes[0]||null;
+  let material=null,rastreio=false;
+  if(ativo){
+   rastreio=true;
+   const candidatos=materiais.filter(m=>m.tipo==='ativo'&&String(m.item_id)===String(ativo.id)&&Number(m.quantidade_bipada||0)>0);
+   if(!candidatos.length)throw new Error('O equipamento deste rastreio não consta na saída deste evento.');
+   const enviados=cz185Lidos(eventoId,'saida');
+   if(!enviados.includes(codigo))throw new Error('Este rastreio não foi registrado na saída deste evento neste dispositivo. Não é seguro conferir o retorno sem o registro individual da saída.');
+   if(cz185Lidos(eventoId,'retorno').includes(codigo))throw new Error('Este equipamento já foi bipado no retorno deste evento.');
+   material=candidatos.find(m=>{
+    const dev=e.saida_baixada_em?Number(m.quantidade_devolvida||0):Number(retornoInfo(m.id).qtd||0);
+    return dev<Number(m.quantidade_bipada||0);
+   });
+   if(!material)throw new Error('A devolução deste tipo de equipamento já está completa.');
+  }else{
+   // Consumíveis permanecem com a leitura do código de barras do produto.
+   const produtos=materiais.filter(m=>m.tipo==='produto'&&Number(m.quantidade_bipada||0)>0);
+   material=produtos.find(m=>normalizarCodigoEvento(m.codigo)===codigo);
+   if(!material&&produtos.some(m=>m.item_id)){
+    const pids=[...new Set(produtos.map(m=>m.item_id).filter(Boolean))];
+    const r=await db.from('produtos').select('id,codigo_barras').in('id',pids);
+    if(r.error)throw r.error;
+    const achado=(r.data||[]).find(p=>normalizarCodigoEvento(p.codigo_barras)===codigo);
+    if(achado)material=produtos.find(m=>String(m.item_id)===String(achado.id));
+   }
+   if(!material)throw new Error('Código não encontrado. Para ativos, bիպe exclusivamente o código de rastreio individual.');
+  }
+  const esperado=Number(material.quantidade_bipada||0);
+  const devolvido=e.saida_baixada_em?Number(material.quantidade_devolvida||0):Number(retornoInfo(material.id).qtd||0);
+  if(devolvido>=esperado)throw new Error('A devolução deste item já está completa.');
+  if(e.saida_baixada_em){
+   // O banco possui RPC antiga por código de material; não usa o código de cadastro como entrada de bipagem.
+   const codigoMaterial=String(material.codigo||'').trim();
+   if(!codigoMaterial)throw new Error('Material sem código de referência no evento. Não foi possível registrar a devolução.');
+   const {error}=await db.rpc('cz_confirmar_retorno_evento',{p_evento_id:eventoId,p_codigo:codigoMaterial});
+   if(error)throw error;
+   // Reconsulta para não registrar o rastreio como devolvido se o RPC não atualizou a linha correta.
+   const r=await db.from('evento_materiais').select('quantidade_devolvida').eq('id',material.id).single();
+   if(r.error)throw r.error;
+   if(Number(r.data?.quantidade_devolvida||0)<=devolvido)throw new Error('O banco não confirmou a devolução deste material. Verifique o evento antes de repetir a bipagem.');
+  }else{
+   const r=retornoInfo(material.id);
+   r.qtd=Number(r.qtd||0)+1;
+   r.registros=[...(r.registros||[]),new Date().toISOString()];
+   r.status='devolvido';
+   salvarRetorno(material.id,r);
+   if(material.tipo==='produto'&&material.item_id){
+    const pr=await db.from('produtos').select('estoque_atual').eq('id',material.item_id).single();
+    if(pr.error){r.qtd--;r.registros.pop();salvarRetorno(material.id,r);throw pr.error}
+    const up=await db.from('produtos').update({estoque_atual:Number(pr.data.estoque_atual||0)+1}).eq('id',material.item_id);
+    if(up.error){r.qtd--;r.registros.pop();salvarRetorno(material.id,r);throw up.error}
+   }
+   if(material.tipo==='ativo'&&material.item_id){
+    const up=await db.from('ativos').update({status:'disponivel'}).eq('id',material.item_id);
+    if(up.error)throw up.error;
+   }
+  }
+  if(rastreio)cz185GravarRetorno(eventoId,codigo);
+  if(campo)campo.value='';
+  await abrirRetornoEvento(eventoId);
+ }catch(err){
+  if(msg){msg.style.color='#ffb0b0';msg.textContent='Não foi possível registrar o retorno: '+(err?.message||err)}
+  else await czAlert(String(err?.message||err),'Retorno de evento');
+  campo?.focus();campo?.select();
+ }finally{cz185RetornoEmAndamento=false}
 }
 async function registrarOcorrenciaRetorno(eventoId,mid,ativoId,tipo){
  if(tipo==='perda'&&!await czConfirm('Confirmar este ativo como perda?','Registrar perda','Confirmar perda'))return;
