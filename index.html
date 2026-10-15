@@ -2604,22 +2604,53 @@ async function editarProjetoEvento(id){
     }catch(err){msg.textContent='Erro ao salvar: '+err.message+' Atualize o projeto antes de tentar novamente.';btn.disabled=false}
   };
 }
+// V175 — status de pagamento dos eventos, consultado diretamente no Caixa.
+function cz175StatusPagamentoEvento(evento, mapaOrcamentos, parcelas, movimentos){
+ const id=String(evento.origem_orcamento_id||'');
+ if(!id)return '<span style="color:#aab4c2">Sem proposta vinculada</span>';
+ const orc=mapaOrcamentos.get(id);
+ if(!orc)return '<span style="color:#aab4c2">Não disponível</span>';
+ const total=Math.round(Number(orc.valor_total||0)*100);
+ if(!(total>0))return '<span style="color:#aab4c2">Sem valor definido</span>';
+ const recebidos=(movimentos||[]).filter(x=>x.tipo==='entrada'&&caixaConfirmado(x)&&String(x.orcamento_id||'')===id)
+  .reduce((sum,x)=>sum+Math.max(0,Math.round(Number(x.valor||0)*100)),0);
+ const falta=Math.max(0,total-recebidos);
+ if(falta<=1)return '<span style="color:#57d88c;font-weight:900">✅ Quitado</span>';
+ const pendentes=parcelas.filter(x=>String(x.orcamento_id||'')===id&&Number(x.saldo||0)>.009).length;
+ const geradas=(movimentos||[]).filter(x=>x.tipo==='entrada'&&String(x.orcamento_id||'')===id&&String(x.origem_id||'').startsWith('orc-confirmado:')).length;
+ const rotulo=pendentes>0?`${pendentes} parcela${pendentes===1?'':'s'} pendente${pendentes===1?'':'s'}`:geradas>0?'saldo pendente':'pagamento pendente';
+ return `<span style="color:#ffcb76;font-weight:800" title="Saldo não quitado: ${money(falta/100)}">🟡 Em aberto — ${rotulo}</span>`;
+}
 async function renderEventos(){
   await atualizarContaMaster();
   const {data,error}=await db.from('eventos_operacionais').select('*').order('data_evento',{ascending:true});
   if(error){$('#content').innerHTML=`<div class="sectionhead"><h2>Eventos</h2></div><div class="msg">Para ativar Eventos, execute primeiro o SQL desta versão no Supabase.<br>${esc(error.message)}</div>`;return}
   const eventos=data||[],hojeEventos=finISODate();
+  // Consultas somente de leitura; não alteram eventos, propostas ou lançamentos.
+  const ids=[...new Set(eventos.map(e=>e.origem_orcamento_id).filter(Boolean).map(String))];
+  let mapaOrcamentos=new Map(),parcelasEvento=[],movimentosEvento=[],falhaFinanceiro='';
+  if(ids.length){
+   try{
+    const [_,resOrc]=await Promise.all([carregarCaixa(),db.from('orcamentos').select('id,valor_total').in('id',ids)]);
+    if(caixaErro)throw new Error(caixaErro);
+    if(resOrc.error)throw resOrc.error;
+    mapaOrcamentos=new Map((resOrc.data||[]).map(o=>[String(o.id),o]));
+    movimentosEvento=caixaCache||[];
+    parcelasEvento=cz172ParcelasFinanceiras(movimentosEvento).parcelas;
+   }catch(err){falhaFinanceiro=err.message||String(err)}
+  }
   const conclusao=eventos.filter(e=>['aguardando_retorno','finalizado'].includes(e.status));
   const operacionais=eventos.filter(e=>e.data_evento&&e.data_evento>=hojeEventos&&e.status!=='finalizado').sort((a,b)=>String(a.data_evento).localeCompare(String(b.data_evento)));
   $('#content').innerHTML=`
-    <div class="sectionhead"><div><h2>📅 Eventos</h2><div class="muted">Agenda operacional — sem valores financeiros</div></div><button class="btn secondary" id="novoEventoBtn">Criar pelo orçamento</button></div>
+    <div class="sectionhead"><div><h2>📅 Eventos</h2><div class="muted">Agenda operacional — com situação de pagamento atualizada pelo Caixa</div></div><button class="btn secondary" id="novoEventoBtn">Criar pelo orçamento</button></div>
     <div class="cards" style="margin-bottom:16px">
       <div class="card"><div class="muted">Próximos eventos</div><div class="n">${operacionais.length}</div></div>
       <div class="card"><div class="muted">Aguardando evento / separação</div><div class="n">${eventos.filter(e=>['aguardando_evento','pronto','aguardando_separacao','separando','material_pronto'].includes(e.status)).length}</div></div>
       <div class="card"><div class="muted">Aguardando retorno</div><div class="n">${eventos.filter(e=>e.status==='aguardando_retorno').length}</div></div>
     </div>
+    ${falhaFinanceiro?`<div class="msg" style="color:#ff8b78">Não foi possível consultar os pagamentos: ${esc(falhaFinanceiro)}. Confira a conexão com o Caixa.</div>`:''}
     <h3>Próximos eventos — do mais próximo para o mais distante</h3>
-    <div class="tablewrap">${operacionais.length?`<table><thead><tr><th>Data</th><th>Cliente</th><th>Evento</th><th>Local</th><th>Status</th><th>Projeto</th><th>Operação</th>${contaMaster()?'<th style="width:46px"></th>':''}</tr></thead><tbody>${operacionais.map(e=>`<tr><td>${e.data_evento?new Date(e.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${esc(e.cliente_nome||'')}</td><td>${esc(e.nome_evento||'')}</td><td>${esc(e.local_evento||'')}</td><td>${statusEventoLabel(e.status)}</td><td><button type="button" class="btn secondary" title="Ver projeto" aria-label="Ver projeto" onclick="visualizarProjetoEvento('${e.id}')" style="padding:5px 8px;min-height:28px">${iconeOlhoEvento()}</button></td><td><button class="btn primary" onclick="${e.status==='pendente'?`abrirTecnicaEventoExistente('${e.id}')`:`iniciarEvento('${e.id}')`}">${e.status==='pendente'?'Editar técnica':e.status==='material_pronto'?'Ver conferência':'Iniciar separação'}</button></td>${contaMaster()?`<td><button type="button" title="Excluir evento" aria-label="Excluir evento" onclick="excluirEvento('${e.id}','eventos')" style="width:28px;height:28px;border:1px solid #63303a;background:#2a151a;color:#ff7b88;border-radius:7px;font-size:14px;font-weight:900;cursor:pointer;padding:0">×</button></td>`:''}</tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhum evento em separação.</div>'}</div>
+    <div class="tablewrap">${operacionais.length?`<table><thead><tr><th>Data</th><th>Cliente</th><th>Evento</th><th>Local</th><th>Pagamento</th><th>Status</th><th>Projeto</th><th>Operação</th>${contaMaster()?'<th style="width:46px"></th>':''}</tr></thead><tbody>${operacionais.map(e=>`<tr><td>${e.data_evento?new Date(e.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${esc(e.cliente_nome||'')}</td><td>${esc(e.nome_evento||'')}</td><td>${esc(e.local_evento||'')}</td><td>${falhaFinanceiro?'<span class="muted">Indisponível</span>':cz175StatusPagamentoEvento(e,mapaOrcamentos,parcelasEvento,movimentosEvento)}</td><td>${statusEventoLabel(e.status)}</td><td><button type="button" class="btn secondary" title="Ver projeto" aria-label="Ver projeto" onclick="visualizarProjetoEvento('${e.id}')" style="padding:5px 8px;min-height:28px">${iconeOlhoEvento()}</button></td><td><button class="btn primary" onclick="${e.status==='pendente'?`abrirTecnicaEventoExistente('${e.id}')`:`iniciarEvento('${e.id}')`}">${e.status==='pendente'?'Editar técnica':e.status==='material_pronto'?'Ver conferência':'Iniciar separação'}</button></td>${contaMaster()?`<td><button type="button" title="Excluir evento" aria-label="Excluir evento" onclick="excluirEvento('${e.id}','eventos')" style="width:28px;height:28px;border:1px solid #63303a;background:#2a151a;color:#ff7b88;border-radius:7px;font-size:14px;font-weight:900;cursor:pointer;padding:0">×</button></td>`:''}</tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhum evento em separação.</div>'}</div>
 `;
   $('#novoEventoBtn').onclick=()=>renderOrcamentos();
 }
@@ -3537,12 +3568,22 @@ function coStatusBadge(st){
  const c=st==='Assinado'||st==='Confirmado'?'#45b879':st==='Enviado'?'#d7a73b':st==='Gerado'?'#4f8fd1':'#7b8794';
  return `<span style="border:1px solid ${c};background:${c}22;padding:4px 9px;border-radius:999px;font-size:12px">${coEsc(st||'Não gerado')}</span>`;
 }
+// V176 — situação de pagamento dos contratos, igual à tela Eventos.
 async function renderContratosOficialCZ(){
  $('#pageTitle').textContent='Contratos';
  try{
-  const os=await coOrcs(),map=coLoad();
+  const os=await coOrcs();
+  let falhaFinanceiro='',mapaOrcamentos=new Map(os.map(p=>[String(p.id),p]));
+  let movimentosContrato=[],parcelasContrato=[];
+  try{
+   await carregarCaixa();
+   if(caixaErro)throw new Error(caixaErro);
+   movimentosContrato=caixaCache||[];
+   parcelasContrato=cz172ParcelasFinanceiras(movimentosContrato).parcelas;
+  }catch(err){falhaFinanceiro=err.message||String(err)}
   $('#content').innerHTML=`<div class="sectionhead"><div><h2>Contratos</h2><div class="muted">Modelo oficial CZ • contrato vinculado à proposta e ao cliente.</div></div><button class="btn secondary" onclick="abrirMapaReservasV140()">Reservas</button></div>
-  <div class="tablewrap">${os.length?`<table><thead><tr><th>Proposta</th><th>Cliente</th><th>Evento</th><th>Data</th><th>Contrato</th><th>Ação</th></tr></thead><tbody>${os.map(p=>{const c=coGet(p.id)||{};return `<tr><td><b>${coEsc(p.numero||'—')}</b></td><td>${coEsc(p.cliente_nome||'')}</td><td>${coEsc(p.evento_nome||'')}</td><td>${finDate(p.data_evento)}</td><td>${coStatusBadge(c.status)}</td><td><button class="btn primary" onclick="abrirContratoOficialCZ('${p.id}')">${!c.status||c.status==='Não gerado'?'Preencher contrato':'Abrir contrato'}</button></td></tr>`}).join('')}</tbody></table>`:'<div class="empty">Nenhuma proposta encontrada.</div>'}</div>`;
+  ${falhaFinanceiro?`<div class="msg" style="color:#ff8b78">Não foi possível consultar os pagamentos: ${coEsc(falhaFinanceiro)}. Confira a conexão com o Caixa.</div>`:''}
+  <div class="tablewrap">${os.length?`<table><thead><tr><th>Proposta</th><th>Cliente</th><th>Evento</th><th>Data</th><th>Contrato</th><th>Pagamento</th><th>Ação</th></tr></thead><tbody>${os.map(p=>{const c=coGet(p.id)||{};const pagamento=falhaFinanceiro?'<span class="muted">Indisponível</span>':cz175StatusPagamentoEvento({origem_orcamento_id:p.id},mapaOrcamentos,parcelasContrato,movimentosContrato);return `<tr><td><b>${coEsc(p.numero||'—')}</b></td><td>${coEsc(p.cliente_nome||'')}</td><td>${coEsc(p.evento_nome||'')}</td><td>${finDate(p.data_evento)}</td><td>${coStatusBadge(c.status)}</td><td>${pagamento}</td><td><button class="btn primary" onclick="abrirContratoOficialCZ('${p.id}')">${!c.status||c.status==='Não gerado'?'Preencher contrato':'Abrir contrato'}</button></td></tr>`}).join('')}</tbody></table>`:'<div class="empty">Nenhuma proposta encontrada.</div>'}</div>`;
  }catch(e){$('#content').innerHTML=`<div class="msg">Erro: ${coEsc(e.message)}</div>`}
 }
 async function abrirContratoOficialCZ(id){
