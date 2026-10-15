@@ -351,7 +351,7 @@ async function confirmarEntradaCaixa(id){
  await renderCaixa();
 }
 async function registrarCaixa(mov){const {error}=await db.from('caixa_movimentacoes').insert(mov);if(error)throw new Error('Não foi possível registrar no Caixa: '+error.message)}
-function finPagamentos(orcId){return caixaCache.filter(x=>x.tipo==='entrada'&&String(x.orcamento_id||'')===String(orcId||''))}
+function finPagamentos(orcId){return caixaCache.filter(x=>x.tipo==='entrada'&&caixaConfirmado(x)&&String(x.orcamento_id||'')===String(orcId||''))}
 function finPagoOrc(orcId){return finPagamentos(orcId).reduce((s,x)=>s+Number(x.valor||0),0)}
 function finStatus(total,pago,venc){const saldo=Math.max(0,total-pago),hoje=finISODate();if(saldo<=.009)return '✅ Pago';if(venc<hoje)return '🔴 Vencido';return '🟡 A receber'}
 async function finRecebiveis(){
@@ -650,7 +650,7 @@ async function abrirFechamentoEvento(id){
  <div class="card"><h3>Despesas extras vinculadas</h3><div class="tablewrap">${despesas.length?`<table><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Valor</th></tr></thead><tbody>${despesas.map(x=>`<tr><td>${finDate(x.data||x.vencimento)}</td><td>${esc(x.descricao||'')}</td><td>${esc(x.categoria||'')}</td><td>${money(x.valor)}</td></tr>`).join('')}</tbody></table>`:'<div class="muted">Nenhuma despesa extra vinculada pelo nome do evento/cliente/proposta.</div>'}</div></div><div class="actions"><button class="btn primary" onclick="window.print()">Imprimir / Salvar PDF</button><button class="btn secondary" onclick="relFechamentoEventos()">Voltar</button></div>`;
 }
 async function relFinanceiro(){const r=(await finRecebiveis()).filter(x=>relNoPeriodo(x.vencimento));await carregarCaixa();const mov=caixaCache.filter(x=>relNoPeriodo(relDataMov(x))),entradas=mov.filter(x=>x.tipo==='entrada').reduce((s,x)=>s+Number(x.valor||0),0),aberto=r.reduce((s,x)=>s+x.saldo,0);$('#content').innerHTML=relTopo('💰 Relatório Financeiro','Visão geral dos recebimentos')+relFiltroPeriodo('relFinanceiro')+`<div class="cards"><div class="card"><div class="muted">Recebido</div><div class="n">${money(entradas)}</div></div><div class="card"><div class="muted">A receber</div><div class="n">${money(aberto)}</div></div><div class="card"><div class="muted">Propostas com saldo</div><div class="n">${r.filter(x=>x.saldo>0).length}</div></div></div>`}
-async function relDRE(){await carregarCaixa();const a=caixaCache.filter(x=>relNoPeriodo(relDataMov(x))),ent=a.filter(x=>x.tipo==='entrada').reduce((s,x)=>s+Number(x.valor||0),0),sai=a.filter(x=>x.tipo==='saida').reduce((s,x)=>s+Number(x.valor||0),0),confirmados=a.filter(x=>caixaConfirmado(x)),movEnt=confirmados.filter(x=>x.tipo==='entrada').reduce((s,x)=>s+Number(x.valor||0),0),movSai=confirmados.filter(x=>x.tipo==='saida').reduce((s,x)=>s+Number(x.valor||0),0);$('#content').innerHTML=relTopo('📊 DRE','Demonstrativo simplificado com base no Caixa')+relFiltroPeriodo('relDRE')+`<div class="card" style="margin-bottom:16px"><div style="font-weight:900;margin-bottom:12px">Total de movimentação</div><div class="grid2"><div><div class="muted">Entrada</div><div style="font-size:25px;font-weight:900;color:#55d884">${money(movEnt)}</div></div><div><div class="muted">Saída</div><div style="font-size:25px;font-weight:900;color:#ff7474">${money(movSai)}</div></div></div></div><div class="card"><div class="tablewrap"><table><tbody><tr><td>Receitas</td><td>${money(ent)}</td></tr><tr><td>Despesas</td><td>${money(sai)}</td></tr><tr><td><b>Resultado</b></td><td><b>${money(ent-sai)}</b></td></tr></tbody></table></div></div>`}
+async function relDRE(){await carregarCaixa();const a=caixaCache.filter(x=>relNoPeriodo(relDataMov(x))&&(!caixaPrecisaConfirmar(x))),ent=a.filter(x=>x.tipo==='entrada').reduce((s,x)=>s+Number(x.valor||0),0),sai=a.filter(x=>x.tipo==='saida').reduce((s,x)=>s+Number(x.valor||0),0),confirmados=a.filter(x=>caixaConfirmado(x)),movEnt=confirmados.filter(x=>x.tipo==='entrada').reduce((s,x)=>s+Number(x.valor||0),0),movSai=confirmados.filter(x=>x.tipo==='saida').reduce((s,x)=>s+Number(x.valor||0),0);$('#content').innerHTML=relTopo('📊 DRE','Demonstrativo simplificado com base no Caixa')+relFiltroPeriodo('relDRE')+`<div class="card" style="margin-bottom:16px"><div style="font-weight:900;margin-bottom:12px">Total de movimentação</div><div class="grid2"><div><div class="muted">Entrada</div><div style="font-size:25px;font-weight:900;color:#55d884">${money(movEnt)}</div></div><div><div class="muted">Saída</div><div style="font-size:25px;font-weight:900;color:#ff7474">${money(movSai)}</div></div></div></div><div class="card"><div class="tablewrap"><table><tbody><tr><td>Receitas</td><td>${money(ent)}</td></tr><tr><td>Despesas</td><td>${money(sai)}</td></tr><tr><td><b>Resultado</b></td><td><b>${money(ent-sai)}</b></td></tr></tbody></table></div></div>`}
 async function relEstoque(){const {data}=await db.from('produtos').select('nome,estoque_atual,estoque_minimo,valor_custo,data_compra').order('nome');const a=(data||[]).filter(x=>relNoPeriodo(x.data_compra)),valor=a.reduce((s,x)=>s+Number(x.estoque_atual||0)*Number(x.valor_custo||0),0);$('#content').innerHTML=relTopo('📦 Relatório de Estoque','Posição dos produtos por período de compra')+relFiltroPeriodo('relEstoque')+`<div class="card"><b>Valor de custo em estoque: ${money(valor)}</b></div><div class="tablewrap"><table><thead><tr><th>Produto</th><th>Estoque</th><th>Mínimo</th><th>Custo un.</th><th>Custo total</th></tr></thead><tbody>${a.map(x=>`<tr><td>${esc(x.nome)}</td><td>${x.estoque_atual??0}</td><td>${x.estoque_minimo??0}</td><td>${money(x.valor_custo)}</td><td>${money(Number(x.estoque_atual||0)*Number(x.valor_custo||0))}</td></tr>`).join('')}</tbody></table></div>`}
 async function relAtivos(){
  const {data,error}=await db.from('ativos').select('*').order('nome');
@@ -4203,6 +4203,49 @@ async function cz151MateriaisEvento(evento,p){
    if(error)throw error;
  }
 }
+// V169: registra a cobrança do orçamento confirmado na fila de recebimentos,
+// sem lançar dinheiro no Caixa antes da confirmação manual e escolha da conta.
+async function cz169RegistrarRecebimentosPendentes(p){
+ const totalCent=Math.round(Number(p.valor_total||0)*100);
+ if(!Number.isFinite(totalCent)||totalCent<=0)return;
+ const pg=p.dados?.pagamento||{};
+ let partes=[];
+ if(pg.modo==='contratual'){
+   const entradaCent=Math.round(Number(pg.entrada_valor||0)*100);
+   if(entradaCent>0&&entradaCent<=totalCent){
+     partes.push({rotulo:'Entrada',cent:entradaCent,data:pg.data_entrada||finISODate(),forma:pg.forma_entrada||'A definir'});
+   }
+   const parcelas=Array.isArray(pg.parcelas_detalhes)?pg.parcelas_detalhes:[];
+   parcelas.forEach((x,i)=>{
+     const cent=Math.round(Number(x.valor||0)*100);
+     if(cent>0)partes.push({rotulo:`Parcela ${i+1}/${parcelas.length}`,cent,data:x.data||finISODate(),forma:x.forma||'A definir'});
+   });
+ }
+ // Dados de pagamentos antigos/incompletos: usa cobrança única pelo valor total.
+ if(!partes.length||partes.reduce((s,x)=>s+x.cent,0)!==totalCent){
+   partes=[{rotulo:'Valor total',cent:totalCent,data:finISODate(),forma:pg.forma||'A definir'}];
+ }
+ for(let i=0;i<partes.length;i++){
+   const item=partes[i];
+   const origem=`orc-confirmado:${p.id}:${i+1}`;
+   const {data:ja,error:erroBusca}=await db.from('caixa_movimentacoes').select('id').eq('origem_id',origem).limit(1);
+   if(erroBusca)throw new Error('Falha ao verificar recebimento existente: '+erroBusca.message);
+   if(ja?.length)continue;
+   await registrarCaixa({
+     origem_id:origem,
+     tipo:'entrada',
+     data:item.data,
+     valor:item.cent/100,
+     cliente_nome:p.cliente_nome||'',
+     proposta_numero:p.numero||null,
+     orcamento_id:p.id,
+     descricao:`Proposta ${p.numero||''} - ${item.rotulo} - ${p.evento_nome||'Evento'}`,
+     categoria:'Recebimento de orçamento',
+     forma:item.forma,
+     observacao:'[AGUARDANDO_CONFIRMACAO]'
+   });
+ }
+}
 async function cz151ConfirmarOrcamento(id){
  const p=(window.propostasExibidas||[]).find(x=>String(x.id)===String(id))
    || (await db.from('orcamentos').select('*').eq('id',id).single()).data;
@@ -4229,18 +4272,21 @@ async function cz151ConfirmarOrcamento(id){
    const contrato=cz151ContratoBase(p);
    try{coSet(String(id),contrato)}catch(_){}
 
-   // 3. Event is created immediately, independent of payment
+   // 3. Cria os recebimentos pendentes antes do evento, sem registrar pagamento.
+   // A origem fixa impede duplicação caso seja necessário tentar novamente.
+   await cz169RegistrarRecebimentosPendentes(p);
+
+   // 4. Event is created immediately, independent of payment
    const evento=await cz151CriarEvento(p);
    await cz151MateriaisEvento(evento,p);
 
-   // 4. Finance: the existing finance engine reads closed/confirmed budget payment data.
-   // Mark the local contract as confirmed so the current finance integration includes it immediately.
+   // 5. Mark the local contract as confirmed.
    contrato.status='Confirmado';
    contrato.confirmado_em=new Date().toISOString();
    try{coSet(String(id),contrato)}catch(_){}
 
    await czAlert(
-     'Orçamento confirmado. Contrato gerado, financeiro liberado e evento criado em PREPARAÇÃO.',
+     'Orçamento confirmado. Recebimentos enviados para Caixa → Recebimentos aguardando confirmação. Contrato gerado e evento criado em PREPARAÇÃO.',
      'Ciclo CZ'
    );
    await renderOrcamentos();
