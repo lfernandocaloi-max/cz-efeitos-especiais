@@ -4602,7 +4602,7 @@ async function prep141Abrir(eventoId){
   const grupos={
    contratado:mats.filter(x=>String(x.origem||'').toLowerCase()==='orcamento'),
    extra:mats.filter(x=>String(x.origem||'').toLowerCase()==='extra'),
-   montagem:mats.filter(x=>String(x.origem||'').toLowerCase()==='montagem')
+   montagem:mats.filter(x=>String(x.origem||'').toLowerCase()==='montagem'||(String(x.origem||'').toLowerCase()==='orcamento'&&x.tipo==='ativo'))
   };
   const linha=(x,extra=false)=>`<tr><td>${coEsc(x.nome_item||x.descricao||'Material')}</td><td>${coEsc(x.quantidade_necessaria||1)}</td><td>${coEsc(x.codigo||'')}</td><td>${extra?`<button class="btn secondary" onclick="prep145RemoverExtra('${x.id}','${eventoId}')">Remover</button>`:'—'}</td></tr>`;
   $('#content').innerHTML=`<div class="sectionhead"><div><h2>${coEsc(e.nome_evento||'Evento')}</h2><div class="muted">${coEsc(e.cliente_nome||'')} • ${finDate(e.data_evento)} • ${coEsc(e.cidade_evento||'')}</div></div><button class="btn secondary" onclick="renderEventos()">Voltar</button></div>
@@ -4612,12 +4612,12 @@ async function prep141Abrir(eventoId){
    ${grupos.contratado.length?`<div class="tablewrap"><table><thead><tr><th>Descrição</th><th>Qtd.</th><th>Código</th><th>Ação</th></tr></thead><tbody>${grupos.contratado.map(x=>linha(x)).join('')}</tbody></table></div>`:'<div class="empty">Nenhum produto contratado foi vinculado a este evento.</div>'}
   </div>
 
-  <div class="card"><div class="sectionhead"><div><h3 style="margin:0">3. Produto Extra</h3><div class="muted">Adicione o material extra que será levado como reserva para o evento.</div></div><button class="btn secondary" onclick="prep145AdicionarExtra('${eventoId}')">+ Adicionar produto extra</button></div>
-   ${grupos.extra.length?`<div class="tablewrap"><table><thead><tr><th>Descrição</th><th>Qtd.</th><th>Código</th><th>Ação</th></tr></thead><tbody>${grupos.extra.map(x=>linha(x,true)).join('')}</tbody></table></div>`:'<div class="empty">Nenhum produto extra adicionado.</div>'}
+  <div class="card"><div class="sectionhead"><div><h3 style="margin:0">3. Produto Extra</h3><div class="muted">Selecione produtos e informe a quantidade.</div></div><button class="btn secondary" onclick="prep192AdicionarMaterial('${eventoId}','extra')">+ Adicionar produto extra</button></div>
+   ${grupos.extra.length?`<div class="tablewrap"><table><thead><tr><th>Produto</th><th>Quantidade</th><th>Ação</th></tr></thead><tbody>${grupos.extra.map(x=>`<tr><td>${coEsc(x.nome_item)}</td><td>${Number(x.quantidade_necessaria||0)}</td><td><button class="btn secondary" onclick="prep192RemoverMaterial('${x.id}','${eventoId}','extra')">Remover</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Nenhum produto extra adicionado.</div>'}
   </div>
 
-  <div class="card"><div class="sectionhead"><div><h3 style="margin:0">4. Materiais de Montagem</h3><div class="muted">Gerenciados dentro do Projeto de execução.</div></div></div>
-   ${grupos.montagem.length?`<div class="tablewrap"><table><thead><tr><th>Descrição</th><th>Qtd.</th><th>Código</th><th>Ação</th></tr></thead><tbody>${grupos.montagem.map(x=>linha(x)).join('')}</tbody></table></div>`:'<div class="empty">Nenhum material de montagem adicionado.</div>'}
+  <div class="card"><div class="sectionhead"><div><h3 style="margin:0">4. Materiais de Montagem</h3><div class="muted">Ativos do orçamento aparecem automaticamente. Adicione outros ativos, se necessário.</div></div><button class="btn secondary" onclick="prep192AdicionarMaterial('${eventoId}','montagem')">+ Adicionar material de montagem</button></div>
+   ${grupos.montagem.length?`<div class="tablewrap"><table><thead><tr><th>Ativo / Equipamento</th><th>Quantidade</th><th>Ação</th></tr></thead><tbody>${grupos.montagem.map(x=>`<tr><td>${coEsc(x.nome_item)}</td><td>${Number(x.quantidade_necessaria||0)}</td><td>${x.origem==='orcamento'?'<span class="muted">Do orçamento</span>':`<button class="btn secondary" onclick="prep192RemoverMaterial('${x.id}','${eventoId}','montagem')">Remover</button>`}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Nenhum ativo de montagem selecionado.</div>'}
   </div>
 
   <div class="card"><div class="sectionhead"><div><h3 style="margin:0">5. Projeto de execução</h3><div class="muted">Desenho técnico, montagem, técnico responsável e materiais de montagem.</div></div><button class="btn primary" onclick="editarProjetoEvento('${eventoId}')">Editar projeto de execução</button></div>
@@ -4635,27 +4635,42 @@ async function prep145Salvar(id){
  if(error){if(msg)msg.textContent='Erro ao salvar: '+error.message;return}
  await czAlert('Preparação salva.','Evento');prep141Abrir(id);
 }
-async function prep145AdicionarExtra(eventoId){
- const [pr,ar]=await Promise.all([
-  db.from('produtos').select('id,nome,codigo_barras').order('nome'),
-  db.from('ativos').select('id,nome,codigo_barras,codigo_interno,status').order('nome')
- ]);
- if(pr.error||ar.error)return czAlert((pr.error||ar.error).message,'Produto extra');
- const op=[...(pr.data||[]).map(x=>({tipo:'produto',...x,codigo:x.codigo_barras||''})),...(ar.data||[]).filter(x=>!['em_manutencao','perdido'].includes(String(x.status||'').toLowerCase())).map(x=>({tipo:'ativo',...x,codigo:x.codigo_barras||x.codigo_interno||''}))];
- const busca=await czPrompt('Digite parte do nome ou código do produto extra:','','Produto extra');if(!busca)return;
- const q=textoFiltro(busca),achados=op.filter(x=>textoFiltro(x.nome).includes(q)||textoFiltro(x.codigo).includes(q));
- if(!achados.length)return czAlert('Produto não encontrado.','Produto extra');
- let item=achados[0];
- if(achados.length>1){
-  const lista=achados.slice(0,10).map((x,i)=>`${i+1} - ${x.nome} (${x.codigo||'sem código'})`).join('\n');
-  const n=Number(await czPrompt('Escolha o número:\n'+lista,'','Produto extra'));if(!n||!achados[n-1])return;item=achados[n-1];
- }
- const qtd=Number(await czPrompt('Quantidade que será levada:','1','Produto extra'));
- if(!Number.isInteger(qtd)||qtd<1)return czAlert('Informe uma quantidade inteira maior que zero.','Produto extra');
- const {error}=await db.from('evento_materiais').insert({evento_id:eventoId,tipo:item.tipo,item_id:item.id,nome_item:item.nome,codigo:item.codigo||null,quantidade_necessaria:qtd,quantidade_bipada:0,origem:'extra'});
- if(error)return czAlert(error.message,'Produto extra');
- prep141Abrir(eventoId);
+async function prep192AdicionarMaterial(eventoId,origem){
+ const ativo=origem==='montagem';
+ const tabela=ativo?'ativos':'produtos';
+ const {data,error}=await db.from(tabela).select(ativo?'id,nome,quantidade,status,codigo_interno':'id,nome,estoque_atual,codigo_barras').order('nome');
+ if(error)return czAlert(error.message,'Selecionar material');
+ const itens=(data||[]).filter(x=>!ativo||(!['manutencao','em_manutencao','perdido','indisponivel'].includes(String(x.status||'').toLowerCase())&&Number(x.quantidade||0)>0));
+ if(!itens.length)return czAlert('Nenhum item disponível para seleção.','Materiais');
+ const {data:atuais,error:em}=await db.from('evento_materiais').select('id,item_id,origem,tipo,quantidade_necessaria').eq('evento_id',eventoId);
+ if(em)return czAlert(em.message,'Materiais');
+ const ja=(atuais||[]).filter(x=>x.tipo===(ativo?'ativo':'produto'));
+ const ov=document.createElement('div');ov.style.cssText='position:fixed;inset:0;z-index:200090;background:#000c;display:flex;align-items:center;justify-content:center;padding:16px';
+ const box=document.createElement('div');box.style.cssText='background:#17202b;color:white;border:1px solid #44556a;border-radius:14px;padding:20px;width:min(690px,100%);max-height:90vh;overflow:auto';
+ box.innerHTML=`<h3>${ativo?'Adicionar material de montagem':'Adicionar produto extra'}</h3><div class="row"><div class="field" style="flex:3"><label>${ativo?'Ativo / Equipamento':'Produto'}</label><select id="prep192Item"><option value="">Selecione</option>${itens.map(x=>`<option value="${esc(x.id)}">${esc(x.nome)}</option>`).join('')}</select></div><div class="field" style="flex:1"><label>Quantidade</label><input id="prep192Qtd" type="number" min="1" step="1" value="1"></div></div><div id="prep192Erro" class="msg"></div><div class="actions"><button type="button" class="btn secondary" id="prep192Cancelar">Cancelar</button><button type="button" class="btn primary" id="prep192Salvar">Adicionar</button></div>`;
+ ov.appendChild(box);document.body.appendChild(ov);
+ box.querySelector('#prep192Cancelar').onclick=()=>ov.remove();
+ box.querySelector('#prep192Salvar').onclick=async()=>{
+  const item=itens.find(x=>String(x.id)===box.querySelector('#prep192Item').value),q=Number(box.querySelector('#prep192Qtd').value),msg=box.querySelector('#prep192Erro');
+  if(!item)return msg.textContent='Selecione um item.';
+  if(!Number.isInteger(q)||q<1)return msg.textContent='Informe uma quantidade inteira maior que zero.';
+  if(ja.some(x=>String(x.item_id)===String(item.id)))return msg.textContent='Este item já está no evento (orçamento ou preparação).';
+  const limite=Number(ativo?item.quantidade:item.estoque_atual);
+  if(q>limite)return msg.textContent='Quantidade maior que a disponível no cadastro ('+limite+').';
+  const btn=box.querySelector('#prep192Salvar');btn.disabled=true;msg.textContent='Salvando...';
+  const {error}=await db.from('evento_materiais').insert({evento_id:eventoId,tipo:ativo?'ativo':'produto',item_id:item.id,nome_item:item.nome,codigo:ativo?(item.codigo_interno||null):(item.codigo_barras||null),quantidade_necessaria:q,quantidade_bipada:0,origem});
+  if(error){btn.disabled=false;return msg.textContent=error.message}
+  ov.remove();await prep141Abrir(eventoId);
+ };
 }
+async function prep192RemoverMaterial(id,eventoId,origem){
+ if(!await czConfirm('Remover este item da preparação?','Remover material','Remover'))return;
+ const {data,error}=await db.from('evento_materiais').delete().eq('id',id).eq('evento_id',eventoId).eq('origem',origem).eq('quantidade_bipada',0).select('id');
+ if(error)return czAlert(error.message,'Materiais');
+ if(!data?.length)return czAlert('Este material já foi conferido ou pertence ao orçamento e não pode ser removido aqui.','Materiais');
+ await prep141Abrir(eventoId);
+}
+async function prep145AdicionarExtra(eventoId){return prep192AdicionarMaterial(eventoId,'extra')}
 async function prep145RemoverExtra(id,eventoId){
  if(!await czConfirm('Remover este produto extra da preparação?','Produto extra','Remover'))return;
  const {data,error}=await db.from('evento_materiais').delete().eq('id',id).eq('evento_id',eventoId).eq('origem','extra').eq('quantidade_bipada',0).select('id');
