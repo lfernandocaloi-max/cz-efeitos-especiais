@@ -3997,20 +3997,35 @@ function coEsc(v){return esc(v==null?'':String(v))}
 async function coOrcs(){const {data,error}=await db.from('orcamentos').select('*').order('criado_em',{ascending:false}).limit(300);if(error)throw error;return data||[]}
 function coNorm(v){return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim().toLowerCase()}
 function coDigits(v){return String(v||'').replace(/\D/g,'')}
+// V188 — vínculo do cliente guardado em dados.cliente_id no orçamento.
+// Retorna o cadastro completo, inclusive CPF/RG ou CNPJ/IE.
 async function coCliente(p){
- // 1) vínculo direto, quando o orçamento possui cliente_id
- if(p?.cliente_id){
-   const {data,error}=await db.from('clientes').select('*').eq('id',p.cliente_id).maybeSingle();
-   if(!error&&data)return data;
+ const d=p?.dados||{};
+ const ids=[p?.cliente_id,d.cliente_id,d.clienteId].filter(Boolean);
+ for(const id of [...new Set(ids.map(String))]){
+  const {data,error}=await db.from('clientes').select('*').eq('id',id).maybeSingle();
+  if(error)throw new Error('Erro ao consultar o cadastro do cliente vinculado: '+error.message);
+  if(data)return data;
  }
- // 2) busca todos e cruza telefone/nome; cobre orçamentos antigos sem cliente_id
+ // Orçamentos antigos sem vínculo: primeiro telefone, depois nome exato.
  const {data,error}=await db.from('clientes').select('*');
- if(error)return {};
- const lista=data||[], tel=coDigits(p?.cliente_telefone), nome=coNorm(p?.cliente_nome);
- let c=null;
- if(tel)c=lista.find(x=>[x.telefone,x.celular,x.whatsapp,x.telefone_contato].some(v=>coDigits(v)===tel));
- if(!c&&nome)c=lista.find(x=>coNorm(x.nome)===nome||coNorm(x.razao_social)===nome||coNorm(x.nome_fantasia)===nome);
- return c||{};
+ if(error)throw new Error('Erro ao consultar os clientes: '+error.message);
+ const lista=data||[];
+ const tel=coDigits(p?.cliente_telefone||d.telefone),nome=coNorm(p?.cliente_nome||d.cliente);
+ if(tel){
+  const achados=lista.filter(x=>[x.telefone,x.celular,x.whatsapp,x.telefone_contato].some(v=>coDigits(v)&&coDigits(v)===tel));
+  if(achados.length===1)return achados[0];
+  if(achados.length>1){const porNome=achados.filter(x=>coNorm(x.nome)===nome||coNorm(x.razao_social)===nome);if(porNome.length===1)return porNome[0]}
+ }
+ if(nome){
+  const achados=lista.filter(x=>coNorm(x.nome)===nome||coNorm(x.razao_social)===nome||coNorm(x.nome_fantasia)===nome);
+  if(achados.length===1)return achados[0];
+ }
+ return {};
+}
+function co188CampoContrato(salvo,cadastro){
+ // Campos antigos salvos em branco não devem encobrir documentos preenchidos no cadastro.
+ return String(salvo??'').trim()?salvo:cadastro;
 }
 function coVal(obj,...keys){for(const k of keys){if(obj&&obj[k]!=null&&String(obj[k]).trim()!=='')return obj[k]}return ''}
 function coEnderecoCliente(cli){
@@ -4150,15 +4165,23 @@ async function abrirContratoOficialCZ(id){
   await czAlert('Este contrato e orçamento estão cancelados. O preenchimento está bloqueado.','Contrato cancelado');
   return renderContratosOficialCZ();
  }
- const cli=await coCliente(p),d=p.dados||{},c=coGet(id)||{},end=coEnderecoCliente(cli);
- const nomeBase=coVal(cli,'nome','razao_social','nome_fantasia')||p.cliente_nome||'';
- const telBase=coVal(cli,'telefone','celular','whatsapp','telefone_contato')||p.cliente_telefone||'';
- const cpfBase=coVal(cli,'cpf','cnpj','cpf_cnpj','documento');
- const rgBase=coVal(cli,'rg','ie','inscricao_estadual');
+ let cli;
+ try{cli=await coCliente(p)}catch(e){await czAlert(e.message||String(e),'Erro ao carregar cliente');return}
+ const d=p.dados||{},c=coGet(id)||{},end=coEnderecoCliente(cli);
+ const pj=String(cli.tipo_pessoa||'').toLowerCase()==='pj'||!!coVal(cli,'cnpj');
+ const nomeBase=coVal(cli,pj?'razao_social':'nome','nome','razao_social','nome_fantasia')||p.cliente_nome||d.cliente||'';
+ const telBase=coVal(cli,'telefone','celular','whatsapp','telefone_contato')||p.cliente_telefone||d.telefone||'';
+ const cpfBase=pj?coVal(cli,'cnpj','cpf_cnpj','documento'):coVal(cli,'cpf','cpf_cnpj','documento');
+ const rgBase=pj?coVal(cli,'ie','inscricao_estadual'):coVal(cli,'rg');
+ const nomeContrato=co188CampoContrato(c.nome,nomeBase);
+ const telefoneContrato=co188CampoContrato(c.telefone,telBase);
+ const documentoContrato=co188CampoContrato(c.cpf,cpfBase);
+ const rgContrato=co188CampoContrato(c.rg,rgBase);
+ const enderecoContrato=co188CampoContrato(c.endereco,end);
  const prod=coProdutos(p);
  $('#content').innerHTML=`<div class="sectionhead"><div><h2>Preenchimento do Contrato Oficial CZ</h2><div class="muted">Proposta ${coEsc(p.numero||'')} • os dados encontrados já foram preenchidos automaticamente.</div></div><button class="btn secondary" onclick="renderContratosOficialCZ()">Voltar</button></div>
- <div class="card"><h3 style="margin-top:0">CONTRATANTE</h3>${Object.keys(cli).length?`<div class="msg" style="margin-bottom:10px">✓ Cadastro do cliente localizado e carregado automaticamente.</div>`:`<div class="msg" style="margin-bottom:10px">Cadastro do cliente não foi localizado pelo vínculo, telefone ou nome.</div>`}<div class="row"><div class="field"><label>Nome *</label><input id="coNome" value="${coEsc(c.nome??nomeBase)}"></div><div class="field"><label>Telefone *</label><input id="coTel" value="${coEsc(c.telefone??telBase)}"></div></div>
- <div class="row"><div class="field"><label>CPF / CNPJ *</label><input id="coCpf" value="${coEsc(c.cpf??cpfBase)}"></div><div class="field"><label>RG / IE</label><input id="coRg" value="${coEsc(c.rg??rgBase)}"></div></div><div class="field"><label>Endereço completo *</label><input id="coEnd" value="${coEsc(c.endereco??end)}"></div></div>
+ <div class="card"><h3 style="margin-top:0">CONTRATANTE</h3>${Object.keys(cli).length?`<div class="msg" style="margin-bottom:10px">Cadastro ${pj?'Pessoa Jurídica (CNPJ / IE)':'Pessoa Física (CPF / RG)'} localizado. Confira os documentos antes de gerar o contrato.${!cpfBase?'<br><b>Atenção:</b> o documento não está preenchido no cadastro do cliente.':''}</div>`:`<div class="msg" style="margin-bottom:10px;color:#ffb0b0">Cadastro completo não localizado. Confira o cliente vinculado ao orçamento; os documentos precisam ser preenchidos manualmente.</div>`}<div class="row"><div class="field"><label>Nome *</label><input id="coNome" value="${coEsc(nomeContrato)}"></div><div class="field"><label>Telefone *</label><input id="coTel" value="${coEsc(telefoneContrato)}"></div></div>
+ <div class="row"><div class="field"><label>${pj?'CNPJ':'CPF'} *</label><input id="coCpf" value="${coEsc(documentoContrato)}"></div><div class="field"><label>${pj?'IE':'RG'}</label><input id="coRg" value="${coEsc(rgContrato)}"></div></div><div class="field"><label>Endereço completo *</label><input id="coEnd" value="${coEsc(enderecoContrato)}"></div></div>
  <div class="card"><h3 style="margin-top:0">EVENTO</h3><div class="row"><div class="field"><label>Data *</label><input id="coData" type="date" value="${coEsc(c.data_evento??p.data_evento??'')}"></div><div class="field"><label>Horário</label><input id="coHora" type="time" value="${coEsc(c.horario??d.horario??d.horario_evento??'')}"></div></div>
  <div class="row"><div class="field"><label>Local *</label><input id="coLocal" value="${coEsc(c.local??d.local_evento??'')}"></div><div class="field"><label>Cidade</label><input id="coCidade" value="${coEsc(c.cidade??d.cidade_evento??cli.cidade??'')}"></div></div></div>
  <div class="card"><h3 style="margin-top:0">SERVIÇOS CONTRATADOS</h3><textarea id="coServicos" style="min-height:145px">${coEsc(c.servicos??(prod.length?prod.map(x=>`${x.qtd} - ${x.nome}${x.cor?` | COR: ${x.cor}`:''}`).join('\n'):'') )}</textarea><div class="muted">Pode conferir ou complementar antes de gerar o contrato.</div></div>
