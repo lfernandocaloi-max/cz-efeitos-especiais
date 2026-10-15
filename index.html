@@ -105,7 +105,7 @@
 <div class="field"><label>Foto do produto (máx. 5 MB)</label><input id="productPhoto" type="file" accept="image/*"><img id="productPreview" class="preview hidden"></div><div class="field"><label>Link do vídeo do produto</label><input id="productVideoUrl" type="url" placeholder="https://..." inputmode="url"></div><div class="actions"><button id="deleteProductBtn" type="button" class="btn danger hidden" style="margin-right:auto">Excluir produto</button><button class="btn secondary" onclick="closeProduct()">Cancelar</button><button id="saveProductBtn" class="btn primary">Salvar produto</button></div><div id="productMsg" class="msg"></div></div></div>
 <div id="assetModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="assetModalTitle">Novo ativo</h2><button class="btn secondary" onclick="closeAsset()">Fechar</button></div><input id="assetId" type="hidden">
 <div class="row"><div class="field"><label>Nome do equipamento *</label><input id="assetName" placeholder="Ex.: Fire Machine P1"></div><div class="field"><label>Quantidade *</label><input id="assetQuantity" type="number" min="1" step="1" value="1" inputmode="numeric"><div class="muted" style="margin-top:5px">Quantidade de equipamentos no estoque. Não altera os códigos de rastreio.</div></div></div>
-<div class="row"><div class="field"><label>Código do cadastro</label><input id="assetCode" placeholder="Digite o código livremente"><div class="muted" style="margin-top:5px">Ex.: FOGO-01, CO2-05 ou 0001</div></div><div class="field"><label>Código de barras do cadastro (opcional)</label><input id="assetBarcode" placeholder="Código do modelo / cadastro"></div></div>
+<div class="row"><div class="field"><label>Código do cadastro</label><input id="assetCode" placeholder="Digite o código livremente"><div class="muted" style="margin-top:5px">Ex.: FOGO-01, CO2-05 ou 0001</div></div></div>
 <div class="card" style="margin:12px 0;padding:14px">
  <div class="sectionhead" style="margin-bottom:8px"><div><b>Códigos de rastreio individuais</b><div class="muted">Cada equipamento físico recebe seu próprio código. Os códigos não são gerados nem apagados ao alterar a quantidade.</div></div><button type="button" class="btn secondary" id="assetAddTracking">+ Código de rastreio</button></div>
  <div id="assetUnitsList"></div>
@@ -946,14 +946,56 @@ async function relDRE(){
  </tbody></table>`:'<div class="empty">Nenhuma parcela ou recebimento neste período.</div>'}</div></div>
  <div class="muted" style="margin-top:12px">Parcelas geradas ao confirmar orçamentos a partir da V169. Orçamentos antigos sem parcelas registradas não são incluídos automaticamente neste demonstrativo.</div>`;
 }
-async function relEstoque(){const {data}=await db.from('produtos').select('nome,estoque_atual,estoque_minimo,valor_custo,data_compra').order('nome');const a=(data||[]).filter(x=>relNoPeriodo(x.data_compra)),valor=a.reduce((s,x)=>s+Number(x.estoque_atual||0)*Number(x.valor_custo||0),0);$('#content').innerHTML=relTopo('📦 Relatório de Estoque','Posição dos produtos por período de compra')+relFiltroPeriodo('relEstoque')+`<div class="card"><b>Valor de custo em estoque: ${money(valor)}</b></div><div class="tablewrap"><table><thead><tr><th>Produto</th><th>Estoque</th><th>Mínimo</th><th>Custo un.</th><th>Custo total</th></tr></thead><tbody>${a.map(x=>`<tr><td>${esc(x.nome)}</td><td>${x.estoque_atual??0}</td><td>${x.estoque_minimo??0}</td><td>${money(x.valor_custo)}</td><td>${money(Number(x.estoque_atual||0)*Number(x.valor_custo||0))}</td></tr>`).join('')}</tbody></table></div>`}
+// V183 — relatório de estoque no mesmo padrão do relatório de ativos.
+// O estoque é uma posição atual: não filtrar pela data de compra, que pode não
+// existir no cadastro e que não indica a data da posição em estoque.
+async function relEstoque(){
+ const {data,error}=await db.from('produtos').select('*').order('nome');
+ if(error){
+  $('#content').innerHTML=relTopo('📦 Relatório de Estoque')+
+   `<div class="msg" style="color:#ff8585">Erro ao carregar produtos do Supabase: ${esc(error.message)}</div>`;
+  return;
+ }
+ const a=data||[];
+ const qtd=a.reduce((v,x)=>v+Number(x.estoque_atual||0),0);
+ const valorTotal=a.reduce((v,x)=>v+Number(x.estoque_atual||0)*Number(x.valor_custo||0),0);
+ const abaixo=a.filter(x=>Number(x.estoque_atual||0)<=Number(x.estoque_minimo||0));
+ window.relEstoqueDados=a;
+ $('#content').innerHTML=relTopo('📦 Relatório de Estoque','Posição atual dos produtos e lista para conferência física')+
+ `<div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(210px,1fr));margin-bottom:16px">
+  <div class="card"><div class="muted">Produtos cadastrados</div><div class="n">${a.length}</div></div>
+  <div class="card"><div class="muted">Quantidade total em estoque</div><div class="n">${qtd.toLocaleString('pt-BR')}</div></div>
+  <div class="card"><div class="muted">Valor total em estoque (custo)</div><div class="n">${money(valorTotal)}</div></div>
+  <div class="card"><div class="muted">Produtos no mínimo ou abaixo</div><div class="n" style="color:${abaixo.length?'#ff8585':'#55d884'}">${abaixo.length}</div></div>
+ </div>
+ <div class="card"><div class="sectionhead">
+ <div><h3 style="margin:0">Lista de produtos em estoque</h3>
+ <div class="muted">Valor total calculado por quantidade atual × custo unitário. Quantidades representam as unidades de medida de cada produto.</div></div>
+ <button type="button" class="btn primary" onclick="relImprimirEstoque()">🖨 Imprimir lista para conferência</button>
+ </div><div class="tablewrap">${a.length?`<table>
+ <thead><tr><th>Produto</th><th>Cód. barras</th><th>Unidade</th><th>Qtd. atual</th><th>Mínimo</th><th>Custo un.</th><th>Valor total</th><th>Situação</th></tr></thead>
+ <tbody>${a.map(x=>{
+ const atual=Number(x.estoque_atual||0),min=Number(x.estoque_minimo||0),baixo=atual<=min;
+ return `<tr><td><b>${esc(x.nome||'—')}</b></td><td>${esc(x.codigo_barras||'—')}</td><td>${esc(x.unidade||'un')}</td><td>${atual.toLocaleString('pt-BR')}</td><td>${min.toLocaleString('pt-BR')}</td><td>${money(x.valor_custo)}</td><td>${money(atual*Number(x.valor_custo||0))}</td><td style="color:${baixo?'#ff8585':'#55d884'}">${baixo?'Estoque mínimo':'Normal'}</td></tr>`}).join('')}</tbody>
+ <tfoot><tr><td colspan="6" style="text-align:right"><b>VALOR TOTAL EM ESTOQUE</b></td><td><b>${money(valorTotal)}</b></td><td></td></tr></tfoot></table>`:'<div class="empty">Nenhum produto cadastrado no estoque.</div>'}</div></div>`;
+}
+function relImprimirEstoque(){
+ const a=window.relEstoqueDados||[];
+ if(!a.length){czAlert('Nenhum produto cadastrado para imprimir.','Relatório de Estoque');return}
+ const total=a.reduce((v,x)=>v+Number(x.estoque_atual||0)*Number(x.valor_custo||0),0);
+ const linhas=a.map(x=>`<tr><td class="check">□</td><td>${esc(x.nome||'—')}</td><td>${esc(x.codigo_barras||'—')}</td><td>${esc(x.unidade||'un')}</td><td class="num">${Number(x.estoque_atual||0).toLocaleString('pt-BR')}</td><td class="num">${Number(x.estoque_minimo||0).toLocaleString('pt-BR')}</td><td class="obs"></td></tr>`).join('');
+ const w=window.open('','_blank','width=1100,height=800');
+ if(!w){czAlert('O navegador bloqueou a janela de impressão. Libere pop-ups para este site.','Impressão');return}
+ w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Conferência de Estoque - CZ Efeitos Especiais</title><style>body{font-family:Arial,sans-serif;color:#111;margin:28px}h1{margin:0 0 4px;font-size:22px}.sub{margin-bottom:18px;color:#444}.resumo{display:flex;gap:30px;margin:14px 0 20px;font-size:14px;flex-wrap:wrap}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #777;padding:7px;vertical-align:middle}th{background:#eee;text-align:left}.check{width:28px;text-align:center;font-size:20px}.num{text-align:center}.obs{width:190px;height:25px}.assinatura{margin-top:38px;display:flex;gap:50px}.linha{flex:1;border-top:1px solid #222;padding-top:6px;text-align:center;font-size:12px}@media print{button{display:none}body{margin:10mm}}</style></head><body><h1>CZ Efeitos Especiais — Conferência de Estoque</h1><div class="sub">Lista para conferência física dos produtos de consumo</div><div class="resumo"><b>Produtos: ${a.length}</b><b>Valor de custo em estoque: ${money(total)}</b><b>Data: ${new Date().toLocaleDateString('pt-BR')}</b></div><table><thead><tr><th>Conf.</th><th>Produto</th><th>Cód. barras</th><th>Unidade</th><th>Qtd. atual</th><th>Mínimo</th><th>Observação</th></tr></thead><tbody>${linhas}</tbody></table><div class="assinatura"><div class="linha">Responsável pela conferência</div><div class="linha">Data / assinatura</div></div><script>window.onload=()=>{window.print()}<\/script></body></html>`);
+ w.document.close();
+}
 async function relAtivos(){
  const {data,error}=await db.from('ativos').select('*').order('nome');
  if(error){$('#content').innerHTML=relTopo('🧰 Relatório de Ativos')+`<div class="msg">${esc(error.message)}</div>`;return}
  const a=data||[];
  const totalUnidades=a.reduce((s,x)=>s+Number(x.quantidade??1),0);
  const valorTotal=a.reduce((s,x)=>s+(Number(x.quantidade??1)*Number(x.valor_compra||0)),0);
- $('#content').innerHTML=relTopo('🧰 Relatório de Ativos','Patrimônio em equipamentos e lista para conferência física')+`<div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(210px,1fr));margin-bottom:16px"><div class="card"><div class="muted">Modelos de ativos</div><div class="n">${a.length}</div></div><div class="card"><div class="muted">Quantidade total</div><div class="n">${totalUnidades}</div></div><div class="card"><div class="muted">Valor total em ativos</div><div class="n">${money(valorTotal)}</div></div></div><div class="card"><div class="sectionhead"><div><h3 style="margin:0">Lista de ativos</h3><div class="muted">Valor total calculado por quantidade × valor de compra.</div></div><button type="button" class="btn primary" onclick="relImprimirAtivos()">🖨 Imprimir lista para conferência</button></div><div class="tablewrap">${a.length?`<table><thead><tr><th>Ativo / Equipamento</th><th>Código</th><th>Cód. barras</th><th>Qtd.</th><th>Valor un.</th><th>Valor total</th><th>Status</th></tr></thead><tbody>${a.map(x=>`<tr><td><b>${esc(x.nome||'—')}</b></td><td>${esc(x.codigo_interno||'—')}</td><td>${esc(x.codigo_barras||'—')}</td><td>${Number(x.quantidade??1)}</td><td>${money(x.valor_compra)}</td><td>${money(Number(x.quantidade??1)*Number(x.valor_compra||0))}</td><td>${esc(x.status||'—')}</td></tr>`).join('')}</tbody><tfoot><tr><td colspan="5" style="text-align:right"><b>VALOR TOTAL EM ATIVOS</b></td><td><b>${money(valorTotal)}</b></td><td></td></tr></tfoot></table>`:'<div class="empty">Nenhum ativo cadastrado.</div>'}</div></div>`;
+ $('#content').innerHTML=relTopo('🧰 Relatório de Ativos','Patrimônio em equipamentos e lista para conferência física')+`<div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(210px,1fr));margin-bottom:16px"><div class="card"><div class="muted">Modelos de ativos</div><div class="n">${a.length}</div></div><div class="card"><div class="muted">Quantidade total</div><div class="n">${totalUnidades}</div></div><div class="card"><div class="muted">Valor total em ativos</div><div class="n">${money(valorTotal)}</div></div></div><div class="card"><div class="sectionhead"><div><h3 style="margin:0">Lista de ativos</h3><div class="muted">Valor total calculado por quantidade × valor de compra.</div></div><button type="button" class="btn primary" onclick="relImprimirAtivos()">🖨 Imprimir lista para conferência</button></div><div class="tablewrap">${a.length?`<table><thead><tr><th>Ativo / Equipamento</th><th>Código cadastro</th><th>Códigos de rastreio</th><th>Qtd.</th><th>Valor un.</th><th>Valor total</th><th>Status</th></tr></thead><tbody>${a.map(x=>`<tr><td><b>${esc(x.nome||'—')}</b></td><td>${esc(x.codigo_interno||'—')}</td><td>${unidadesAtivo(x).map(esc).join(' · ')||'—'}</td><td>${Number(x.quantidade??1)}</td><td>${money(x.valor_compra)}</td><td>${money(Number(x.quantidade??1)*Number(x.valor_compra||0))}</td><td>${esc(x.status||'—')}</td></tr>`).join('')}</tbody><tfoot><tr><td colspan="5" style="text-align:right"><b>VALOR TOTAL EM ATIVOS</b></td><td><b>${money(valorTotal)}</b></td><td></td></tr></tfoot></table>`:'<div class="empty">Nenhum ativo cadastrado.</div>'}</div></div>`;
  window.relAtivosDados=a;
 }
 function relImprimirAtivos(){
@@ -961,7 +1003,7 @@ function relImprimirAtivos(){
  if(!a.length){czAlert('Nenhum ativo cadastrado para imprimir.','Relatório de Ativos');return}
  const totalUnidades=a.reduce((s,x)=>s+Number(x.quantidade??1),0);
  const valorTotal=a.reduce((s,x)=>s+(Number(x.quantidade??1)*Number(x.valor_compra||0)),0);
- const linhas=a.map(x=>`<tr><td class="check">□</td><td>${esc(x.nome||'—')}</td><td>${esc(x.codigo_interno||'—')}</td><td>${esc(x.codigo_barras||'—')}</td><td class="num">${Number(x.quantidade??1)}</td><td>${esc(x.status||'—')}</td><td class="obs"></td></tr>`).join('');
+ const linhas=a.map(x=>`<tr><td class="check">□</td><td>${esc(x.nome||'—')}</td><td>${esc(x.codigo_interno||'—')}</td><td>${unidadesAtivo(x).map(esc).join(' · ')||'—'}</td><td class="num">${Number(x.quantidade??1)}</td><td>${esc(x.status||'—')}</td><td class="obs"></td></tr>`).join('');
  const w=window.open('','_blank','width=1100,height=800');
  if(!w){czAlert('O navegador bloqueou a janela de impressão. Libere pop-ups para este site.','Impressão');return}
  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Conferência de Ativos - CZ Efeitos Especiais</title><style>body{font-family:Arial,sans-serif;color:#111;margin:28px}h1{margin:0 0 4px;font-size:22px}.sub{margin-bottom:18px;color:#444}.resumo{display:flex;gap:30px;margin:14px 0 20px;font-size:14px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #777;padding:7px;vertical-align:middle}th{background:#eee;text-align:left}.check{width:28px;text-align:center;font-size:20px}.num{text-align:center}.obs{width:190px;height:25px}.assinatura{margin-top:38px;display:flex;gap:50px}.linha{flex:1;border-top:1px solid #222;padding-top:6px;text-align:center;font-size:12px}@media print{button{display:none}body{margin:10mm}}</style></head><body><h1>CZ Efeitos Especiais — Conferência de Ativos</h1><div class="sub">Lista para conferência física dos equipamentos</div><div class="resumo"><b>Modelos: ${a.length}</b><b>Quantidade total: ${totalUnidades}</b><b>Valor patrimonial: ${money(valorTotal)}</b><b>Data: ${new Date().toLocaleDateString('pt-BR')}</b></div><table><thead><tr><th>Conf.</th><th>Ativo / Equipamento</th><th>Código</th><th>Cód. barras</th><th>Qtd.</th><th>Status</th><th>Observação</th></tr></thead><tbody>${linhas}</tbody></table><div class="assinatura"><div class="linha">Responsável pela conferência</div><div class="linha">Data / assinatura</div></div><script>window.onload=()=>{window.print()}<\/script></body></html>`);
@@ -2534,7 +2576,7 @@ async function renderAssets(){
   if(error){$('#content').innerHTML=`<div class="msg">Erro ao carregar ativos: ${error.message}</div>`;return}
   assets=data||[];
   $('#content').innerHTML=`<div class="sectionhead"><div><h2>Ativos / Equipamentos</h2><div class="muted">${assets.length} cadastro(s)</div></div><button class="btn primary" onclick="openAsset()">+ Novo ativo</button></div>
-  <div class="tablewrap">${assets.length?`<table><thead><tr><th>Foto</th><th>Equipamento</th><th>Cód. cadastro / rastreio</th><th>Quantidade</th><th>Compra</th><th>Valor compra</th><th>Status</th><th>Ações</th></tr></thead><tbody>${assets.map(a=>`<tr><td>${a.foto_url?`<img class="thumb" src="${esc(a.foto_url)}">`:'—'}</td><td>${esc(a.nome)}</td><td><b>${esc(codigoCadastroAtivo(a))}</b><div class="muted">${unidadesAtivo(a).length?unidadesAtivo(a).map(c=>esc(c)).join(' · '):'Nenhum código de rastreio cadastrado'}</div></td><td>${esc(a.quantidade??1)}</td><td>${a.data_compra?new Date(a.data_compra+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${money(a.valor_compra)}</td><td>${esc(a.status||'')}</td><td><div class="actions"><button class="btn secondary" onclick="editAsset('${a.id}')">Editar / Etiquetas</button>${contaMaster()?`<button type="button" title="Excluir equipamento" aria-label="Excluir equipamento" onclick="excluirAtivo('${a.id}')" style="width:28px;height:28px;border:1px solid #63303a;background:#2a151a;color:#ff7b88;border-radius:7px;font-size:14px;font-weight:900;cursor:pointer;padding:0">×</button>`:''}</div></td></tr>`).join('')}</tbody></table>`:`<div class="empty">Nenhum ativo cadastrado.</div>`}</div>`;
+  <div class="tablewrap">${assets.length?`<table><thead><tr><th>Foto</th><th>Equipamento</th><th>Código cadastro / rastreios individuais</th><th>Quantidade</th><th>Compra</th><th>Valor compra</th><th>Status</th><th>Ações</th></tr></thead><tbody>${assets.map(a=>`<tr><td>${a.foto_url?`<img class="thumb" src="${esc(a.foto_url)}">`:'—'}</td><td>${esc(a.nome)}</td><td><b>${esc(codigoCadastroAtivo(a))}</b><div class="muted">${unidadesAtivo(a).length?unidadesAtivo(a).map(c=>esc(c)).join(' · '):'Nenhum código de rastreio cadastrado'}</div></td><td>${esc(a.quantidade??1)}</td><td>${a.data_compra?new Date(a.data_compra+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${money(a.valor_compra)}</td><td>${esc(a.status||'')}</td><td><div class="actions"><button class="btn secondary" onclick="editAsset('${a.id}')">Editar / Etiquetas</button>${contaMaster()?`<button type="button" title="Excluir equipamento" aria-label="Excluir equipamento" onclick="excluirAtivo('${a.id}')" style="width:28px;height:28px;border:1px solid #63303a;background:#2a151a;color:#ff7b88;border-radius:7px;font-size:14px;font-weight:900;cursor:pointer;padding:0">×</button>`:''}</div></td></tr>`).join('')}</tbody></table>`:`<div class="empty">Nenhum ativo cadastrado.</div>`}</div>`;
 }
 async function excluirAtivo(id){
  if(!contaMaster()){await czAlert('Somente a conta Master pode excluir equipamentos.','Acesso restrito');return}
@@ -2550,15 +2592,9 @@ async function proximoCodigoAtivo(){
  return String(maior+1).padStart(4,'0');
 }
 async function previewCodigoAtivo(){renderAssetUnitsPreview()}
-function renderAssetUnitsPreview(){
- const base=String($('#assetCode')?.value||'').trim(),q=Math.max(0,Number($('#assetQuantity')?.value)||0),box=$('#assetUnitsList');if(!box)return;
- const id=$('#assetId').value,exist=cz155Load()[String(id)]||[];
- const anterior=[...box.querySelectorAll('[data-unidade-codigo]')].map(x=>x.value);
- box.innerHTML=Array.from({length:q},(_,i)=>`<div class="field" style="margin:5px 0"><label>Unidade ${i+1}</label><input data-unidade-codigo="${i}" value="${esc(anterior[i]??exist[i]??(base?`${base}-${String(i+1).padStart(3,'0')}`:''))}" placeholder="Código individual livre"></div>`).join('');
-}
 function openAsset(a=null){
  $('#assetModal').classList.remove('hidden');$('#assetModalTitle').textContent=a?'Editar ativo':'Novo ativo';$('#assetId').value=a?.id||'';$('#assetName').value=a?.nome||'';
- $('#assetCode').value=a?codigoCadastroAtivo(a):'';$('#assetBarcode').value=a?.codigo_barras||'';$('#assetSupplier').value=a?.fornecedor||'';$('#assetQuantity').value=a?.quantidade??1;$('#assetPurchaseDate').value=a?.data_compra||'';$('#assetPurchaseValue').value=moedaInputValor(a?.valor_compra??0);$('#assetRent1').value=a?.valor_locacao_tabela1??0;$('#assetRent2').value=a?.valor_locacao_tabela2??0;$('#assetWeight').value=a?.peso??'';$('#assetCase').value=String(a?.possui_case??false);$('#assetMontagem').checked=a?.material_montagem===true;$('#assetNotes').value=cz181ExtrairNotas(a?.observacoes).texto;$('#assetPhoto').value='';
+ $('#assetCode').value=a?codigoCadastroAtivo(a):'';$('#assetSupplier').value=a?.fornecedor||'';$('#assetQuantity').value=a?.quantidade??1;$('#assetPurchaseDate').value=a?.data_compra||'';$('#assetPurchaseValue').value=moedaInputValor(a?.valor_compra??0);$('#assetRent1').value=a?.valor_locacao_tabela1??0;$('#assetRent2').value=a?.valor_locacao_tabela2??0;$('#assetWeight').value=a?.peso??'';$('#assetCase').value=String(a?.possui_case??false);$('#assetMontagem').checked=a?.material_montagem===true;$('#assetNotes').value=cz181ExtrairNotas(a?.observacoes).texto;$('#assetPhoto').value='';
  const im=$('#assetPreview');if(a?.foto_url){im.src=a.foto_url;im.classList.remove('hidden')}else im.classList.add('hidden');$('#assetMsg').textContent='';$('#assetUnitsList').innerHTML='';const codigos=a?unidadesAtivo(a):[];if(codigos.length)codigos.forEach(c=>cz181AdicionarRastreio(c));else cz181AdicionarRastreio();
 }
 function closeAsset(){$('#assetModal').classList.add('hidden')}
@@ -2592,9 +2628,9 @@ $('#saveAssetBtn').onclick=async()=>{
   if(new Set(normalizados).size!==normalizados.length)throw new Error('Existem códigos de rastreio repetidos neste cadastro.');
   const emUso=new Set(assets.filter(a=>String(a.id)!==String(id)).flatMap(a=>unidadesAtivo(a).map(c=>c.toUpperCase())));
   if(rastreios.some(c=>emUso.has(c.toUpperCase())))throw new Error('Um código de rastreio já está cadastrado em outro equipamento.');
-  const codigo=$('#assetCode').value.trim(),barras=$('#assetBarcode').value.trim()||codigo;
+  const codigo=$('#assetCode').value.trim();
   if(!codigo)throw new Error('Informe o código principal do ativo.');
-  const payload={nome:$('#assetName').value.trim(),quantidade:qtd,codigo_interno:codigo,codigo_barras:barras,fornecedor:$('#assetSupplier').value.trim()||null,data_compra:$('#assetPurchaseDate').value||null,valor_compra:moedaInputNumero($('#assetPurchaseValue').value),valor_locacao_tabela1:+$('#assetRent1').value||0,valor_locacao_tabela2:+$('#assetRent2').value||0,peso:$('#assetWeight').value?+$('#assetWeight').value:null,possui_case:$('#assetCase').value==='true',material_montagem:$('#assetMontagem').checked,observacoes:cz181MontarNotas($('#assetNotes').value,rastreios),foto_url,atualizado_em:new Date().toISOString()};
+  const payload={nome:$('#assetName').value.trim(),quantidade:qtd,codigo_interno:codigo,fornecedor:$('#assetSupplier').value.trim()||null,data_compra:$('#assetPurchaseDate').value||null,valor_compra:moedaInputNumero($('#assetPurchaseValue').value),valor_locacao_tabela1:+$('#assetRent1').value||0,valor_locacao_tabela2:+$('#assetRent2').value||0,peso:$('#assetWeight').value?+$('#assetWeight').value:null,possui_case:$('#assetCase').value==='true',material_montagem:$('#assetMontagem').checked,observacoes:cz181MontarNotas($('#assetNotes').value,rastreios),foto_url,atualizado_em:new Date().toISOString()};
   if(!payload.nome)throw new Error('Informe o nome do equipamento.');
   const {data,error}=id?await db.from('ativos').update(payload).eq('id',id).select():await db.from('ativos').insert({...payload,status:'disponivel'}).select();
   if(error)throw error;
@@ -2924,20 +2960,36 @@ async function biparEvento(eventoId){
  try{
    const {data:mats,error}=await db.from('evento_materiais').select('*').eq('evento_id',eventoId).order('criado_em');
    if(error)throw error;
-   let candidatos=(mats||[]).filter(m=>normalizarCodigoEvento(m.codigo)===codigoLido);
-
-   // Compatibilidade com eventos antigos: se o código não foi gravado em evento_materiais,
-   // confere o cadastro atual do produto/ativo pelo item_id e corrige o código do evento.
-   if(!candidatos.length){
-     const produtos=(mats||[]).filter(m=>m.tipo==='produto'&&m.item_id).map(m=>m.item_id);
-     const ativos=(mats||[]).filter(m=>m.tipo==='ativo'&&m.item_id).map(m=>m.item_id);
-     let codigos=new Map();
-     if(produtos.length){const r=await db.from('produtos').select('id,codigo_barras').in('id',produtos);if(r.error)throw r.error;(r.data||[]).forEach(x=>codigos.set('produto:'+x.id,x.codigo_barras||''))}
-     if(ativos.length){const r=await db.from('ativos').select('id,codigo_barras,codigo_interno').in('id',ativos);if(r.error)throw r.error;(r.data||[]).forEach(x=>codigos.set('ativo:'+x.id,x.codigo_barras||x.codigo_interno||''))}
-     candidatos=(mats||[]).filter(m=>normalizarCodigoEvento(codigos.get(m.tipo+':'+m.item_id))===codigoLido);
-     for(const m of candidatos){if(!normalizarCodigoEvento(m.codigo)){await db.from('evento_materiais').update({codigo:codigos.get(m.tipo+':'+m.item_id)}).eq('id',m.id)}}
+   const ativosEvento=(mats||[]).filter(m=>m.tipo==='ativo'&&m.item_id);
+   let ativoEncontrado=null;
+   if(ativosEvento.length){
+    const ids=[...new Set(ativosEvento.map(m=>m.item_id))];
+    const r=await db.from('ativos').select('id,observacoes').in('id',ids);
+    if(r.error)throw r.error;
+    const encontrados=(r.data||[]).filter(x=>unidadesAtivo(x).some(c=>normalizarCodigoEvento(c)===codigoLido));
+    if(encontrados.length>1)throw new Error('Código de rastreio duplicado em cadastros diferentes.');
+    ativoEncontrado=encontrados[0]||null;
    }
-
+   let candidatos=ativoEncontrado
+    ?(mats||[]).filter(m=>m.tipo==='ativo'&&String(m.item_id)===String(ativoEncontrado.id))
+    :(mats||[]).filter(m=>m.tipo==='produto'&&normalizarCodigoEvento(m.codigo)===codigoLido);
+   if(!candidatos.length){
+    const ids=(mats||[]).filter(m=>m.tipo==='produto'&&m.item_id).map(m=>m.item_id);
+    if(ids.length){
+     const r=await db.from('produtos').select('id,codigo_barras').in('id',ids);
+     if(r.error)throw r.error;
+     const mapa=new Map((r.data||[]).map(x=>[String(x.id),normalizarCodigoEvento(x.codigo_barras)]));
+     candidatos=(mats||[]).filter(m=>m.tipo==='produto'&&mapa.get(String(m.item_id))===codigoLido);
+    }
+   }
+   const rastreioLido=!!ativoEncontrado;
+   const chaveLeituras='cz184_rastreios_saida_'+String(eventoId);
+   let leituras=[];
+   try{leituras=JSON.parse(localStorage.getItem(chaveLeituras)||'[]')}catch(_){}
+   if(rastreioLido&&leituras.includes(codigoLido)){
+    if(msg){msg.style.color='#ffb0b0';msg.textContent='Este rastreio já foi bipado na saída deste evento.'}
+    campo?.select();campo?.focus();return;
+   }
    const item=candidatos.find(m=>Number(m.quantidade_bipada||0)<Number(m.quantidade_necessaria||0));
    if(!item){
      if(msg){msg.style.color='#ffb0b0';msg.textContent=candidatos.length?'Quantidade deste item já está completa.':'Código '+codigoLido+' não pertence aos materiais deste evento.'}
@@ -2948,7 +3000,10 @@ async function biparEvento(eventoId){
    if(up)throw up;
    if(!salvo)throw new Error('O banco não autorizou a atualização deste material. Verifique as permissões da tabela evento_materiais.');
    if(Number(salvo.quantidade_bipada)!==novo)throw new Error('A quantidade não foi gravada corretamente no banco.');
-   try{localStorage.setItem('cz_conf_'+item.id,new Date().toISOString())}catch(_){}
+   try{
+    localStorage.setItem('cz_conf_'+item.id,new Date().toISOString());
+    if(rastreioLido)localStorage.setItem(chaveLeituras,JSON.stringify([...leituras,codigoLido]));
+   }catch(_){}
    if(campo)campo.value='';
    await abrirEvento(eventoId);
  }catch(err){
@@ -3671,16 +3726,24 @@ function abrirBipInventarioV135(id,itens){
  const s=cz135Load(),sess=(s.inventario||[]).find(x=>x.id===id);if(!sess)return;
  const total=itens.reduce((a,x)=>a+Number(x.quantidade??x.estoque_atual??0),0),cont=Object.values(sess.contagem||{}).reduce((a,x)=>a+Number(x||0),0);
  $('#content').innerHTML=`<div class="sectionhead"><div><h2>📡 Inventário por bipagem</h2><div class="muted">Responsável: ${esc(sess.responsavel)} • ${cont}/${total} unidades contadas</div></div><button class="btn secondary" onclick="renderInventarioV135()">Sair</button></div>
- <div class="card"><div class="row"><div class="field"><label>Código</label><input id="inv135Cod" autofocus placeholder="Bipe o código"></div><div class="field"><label>Quantidade desta leitura</label><input id="inv135Qtd" type="number" min="1" step="1" value="1"></div></div><button class="btn primary" onclick="lerInventarioV135('${id}','${sess.tipo}')">Confirmar leitura</button></div>
+ <div class="card"><div class="row"><div class="field"><label>${sess.tipo==='ativos'?'Código de rastreio':'Código de barras'}</label><input id="inv135Cod" autofocus placeholder="${sess.tipo==='ativos'?'Bipe o rastreio do equipamento':'Bipe o código'}"></div><div class="field"><label>Quantidade desta leitura</label><input id="inv135Qtd" type="number" min="1" step="1" value="1" ${sess.tipo==='ativos'?'readonly':''}></div></div><button class="btn primary" onclick="lerInventarioV135('${id}','${sess.tipo}')">Confirmar leitura</button></div>
  <div class="tablewrap"><table><thead><tr><th>Descrição</th><th>Código</th><th>Sistema</th><th>Contado</th><th>Diferença</th></tr></thead><tbody>${itens.map(x=>{const cod=sess.tipo==='ativos'?codigoCadastroAtivo(x):String(x.codigo_barras||x.codigo_interno||''),q=Number(x.quantidade??x.estoque_atual??0),c=Number(sess.contagem?.[cod]||0),dif=c-q;return `<tr><td>${esc(x.nome||'')}</td><td><b>${esc(cod||'—')}</b></td><td>${q}</td><td>${c}</td><td>${dif===0?'🟢 0':`<span style="color:#ffd36a">${dif>0?'+':''}${dif}</span>`}</td></tr>`}).join('')}</tbody></table></div>
  <div class="actions"><button class="btn primary" onclick="finalizarInventarioV135('${id}','${sess.tipo}')">Finalizar contagem</button><button class="btn secondary" onclick="window.print()">Imprimir</button></div>`;
 }
 async function lerInventarioV135(id,tipo){
  const cod=($('#inv135Cod').value||'').trim(),q=Number($('#inv135Qtd').value||1);if(!cod||!Number.isFinite(q)||q<=0)return czAlert('Informe um código e uma quantidade válida.','Inventário');
  const {data}=await db.from(tipo).select('*').order('nome');const itens=data||[];
- let x;if(tipo==='ativos'){x=itens.find(a=>codigoCadastroAtivo(a)===cod||unidadesAtivo(a).includes(cod))}else{x=itens.find(a=>String(a.codigo_barras||a.codigo_interno||'')===cod)}
+ let x;if(tipo==='ativos'){x=itens.find(a=>unidadesAtivo(a).some(c=>normalizarCodigoEvento(c)===normalizarCodigoEvento(cod)))}else{x=itens.find(a=>String(a.codigo_barras||a.codigo_interno||'')===cod)}
  if(!x)return czAlert('Código não encontrado neste cadastro.','Inventário');
- const base=tipo==='ativos'?codigoCadastroAtivo(x):String(x.codigo_barras||x.codigo_interno||cod),s=cz135Load(),sess=(s.inventario||[]).find(v=>v.id===id);sess.contagem[base]=Number(sess.contagem[base]||0)+q;cz135Save(s);abrirBipInventarioV135(id,itens);
+ const base=tipo==='ativos'?codigoCadastroAtivo(x):String(x.codigo_barras||x.codigo_interno||cod),s=cz135Load(),sess=(s.inventario||[]).find(v=>v.id===id);
+ if(tipo==='ativos'){
+  if(q!==1)return czAlert('Cada rastreio identifica um equipamento. Faça uma leitura por equipamento.','Inventário');
+  sess.rastreiosLidos=sess.rastreiosLidos||[];
+  const rastreio=normalizarCodigoEvento(cod);
+  if(sess.rastreiosLidos.includes(rastreio))return czAlert('Este equipamento já foi bipado neste inventário.','Código repetido');
+  sess.rastreiosLidos.push(rastreio);
+ }
+ sess.contagem[base]=Number(sess.contagem[base]||0)+q;cz135Save(s);abrirBipInventarioV135(id,itens);
 }
 async function finalizarInventarioV135(id,tipo){
  const s=cz135Load(),sess=(s.inventario||[]).find(v=>v.id===id);if(!sess)return;
