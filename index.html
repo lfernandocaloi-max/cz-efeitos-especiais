@@ -147,93 +147,103 @@ ordemMenu.splice(11,0,16);
 $('#nav').innerHTML=ordemMenu.map(i=>`<button data-i="${i}" class="${i===0?'active':''}">${modules[i]}</button>`).join('');
 $('#nav').onclick=e=>{const b=e.target.closest('button');if(!b)return;document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');$('.side').classList.remove('mobile-open');renderModule(+b.dataset.i)};
 $('#menuBtn').onclick=()=>$('.side').classList.toggle('mobile-open');
-let modoRecuperacao = false;
-
-db.auth.onAuthStateChange((event, session) => {
-  if (event === 'PASSWORD_RECOVERY') {
-    modoRecuperacao = true;
-    setTimeout(() => mostrarNovaSenha(), 100);
-  }
+// CZ V191 — recuperação de senha na tela de login (sem alterar a página Usuários).
+const cz191LoginOriginal=$('.loginbox').innerHTML;
+const cz191UrlInicial=window.location.href;
+const cz191Params=new URLSearchParams(window.location.search);
+const cz191Hash=new URLSearchParams(window.location.hash.replace(/^#/,''));
+let modoRecuperacao=false;
+let cz191RecuperacaoLink=cz191Params.get('type')==='recovery'||cz191Hash.get('type')==='recovery';
+let cz191RecuperacaoErro=cz191Params.get('error_description')||cz191Hash.get('error_description')||'';
+let cz191SalvandoSenha=false;
+function cz191RestaurarLogin(){
+ $('.loginbox').innerHTML=cz191LoginOriginal;
+ const botao=$('#loginBtn');if(botao)botao.onclick=entrarSistemaCZ;
+}
+function cz191MensagemLogin(texto){
+ cz191RestaurarLogin();showLogin();
+ const msg=$('#loginMsg');if(msg)msg.textContent=texto;
+}
+db.auth.onAuthStateChange((event,session)=>{
+ if(event==='PASSWORD_RECOVERY'){
+  modoRecuperacao=true;
+  cz191RecuperacaoLink=true;
+  setTimeout(()=>mostrarNovaSenha(),0);
+ }else if(event==='SIGNED_IN'&&cz191RecuperacaoLink&&!cz191RecuperacaoErro&&session){
+  // Compatibilidade com links em que o SDK emite SIGNED_IN ao invés de PASSWORD_RECOVERY.
+  modoRecuperacao=true;
+  setTimeout(()=>mostrarNovaSenha(),0);
+ }
 });
-
 async function boot(){
-  const {data:{session}} = await db.auth.getSession();
-
-  if (modoRecuperacao) return;
-
-  if (session) {
-    showApp(session.user);
-  } else {
-    showLogin();
+ try{
+  const {data,error}=await db.auth.getSession();
+  if(cz191RecuperacaoErro){
+   modoRecuperacao=false;
+   cz191MensagemLogin('O link de recuperação expirou ou é inválido. Solicite um novo em “Esqueci minha senha”.');
+   return;
   }
+  if(modoRecuperacao)return;
+  if(cz191RecuperacaoLink){
+   if(data?.session){modoRecuperacao=true;mostrarNovaSenha();return}
+   // Aguarda a troca do token de recuperação pelo SDK do Supabase.
+   showLogin();
+   const msg=$('#loginMsg');if(msg)msg.textContent='Validando link de recuperação...';
+   setTimeout(async()=>{
+    if(modoRecuperacao)return;
+    const r=await db.auth.getSession();
+    if(r.data?.session){modoRecuperacao=true;mostrarNovaSenha()}
+    else cz191MensagemLogin('Não foi possível validar o link. Ele pode estar expirado ou já ter sido usado. Solicite outro em “Esqueci minha senha”.');
+   },1600);
+   return;
+  }
+  if(error)throw error;
+  if(data?.session)await showApp(data.session.user);
+  else showLogin();
+ }catch(e){cz191MensagemLogin('Erro ao verificar acesso: '+(e.message||e))}
 }
-
 function mostrarNovaSenha(){
-  $('#app').classList.add('hidden');
-  $('#login').style.display='grid';
-  $('#login').classList.remove('hidden');
-
-  $('.loginbox').innerHTML = `
-    <div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div>
-    <h3>Redefinir senha</h3>
-
-    <div class="field">
-      <label>Nova senha</label>
-      <input id="novaSenha" type="password">
-    </div>
-
-    <div class="field">
-      <label>Confirmar nova senha</label>
-      <input id="confirmarSenha" type="password">
-    </div>
-
-    <button type="button" class="btn primary full"
-      style="margin-top:18px"
-      onclick="salvarNovaSenha()">
-      SALVAR NOVA SENHA
-    </button>
-
-    <div id="novaSenhaMsg" class="msg"></div>
-  `;
+ modoRecuperacao=true;
+ $('#app').classList.add('hidden');
+ $('#login').style.display='grid';
+ $('#login').classList.remove('hidden');
+ $('.loginbox').innerHTML=`
+  <div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div>
+  <h3>Redefinir senha</h3>
+  <div class="muted">Digite e confirme a nova senha de acesso ao sistema.</div>
+  <form id="cz191FormNovaSenha" autocomplete="off">
+   <div class="field"><label>Nova senha</label><input id="novaSenha" type="password" minlength="6" autocomplete="new-password" required></div>
+   <div class="field"><label>Confirmar nova senha</label><input id="confirmarSenha" type="password" minlength="6" autocomplete="new-password" required></div>
+   <button id="cz191SalvarSenha" type="submit" class="btn primary full" style="margin-top:18px">SALVAR NOVA SENHA</button>
+  </form>
+  <div id="novaSenhaMsg" class="msg" role="status"></div>`;
+ $('#cz191FormNovaSenha').onsubmit=e=>{e.preventDefault();salvarNovaSenha()};
 }
-
 async function salvarNovaSenha(){
-  const senha = $('#novaSenha').value;
-  const confirmar = $('#confirmarSenha').value;
-  const msg = $('#novaSenhaMsg');
-
-  if (!senha || !confirmar) {
-    msg.textContent = 'Preencha os dois campos.';
-    return;
-  }
-
-  if (senha.length < 6) {
-    msg.textContent = 'A senha precisa ter pelo menos 6 caracteres.';
-    return;
-  }
-
-  if (senha !== confirmar) {
-    msg.textContent = 'As senhas não são iguais.';
-    return;
-  }
-
-  msg.textContent = 'Salvando nova senha...';
-
-  const {error} = await db.auth.updateUser({
-    password: senha
-  });
-
-  if (error) {
-    msg.textContent = 'Erro: ' + error.message;
-    return;
-  }
-
+ if(cz191SalvandoSenha)return;
+ const senha=$('#novaSenha')?.value||'',confirmar=$('#confirmarSenha')?.value||'',msg=$('#novaSenhaMsg');
+ if(!msg)return;
+ if(!senha||!confirmar)return void(msg.textContent='Preencha os dois campos.');
+ if(senha.length<6)return void(msg.textContent='A senha precisa ter pelo menos 6 caracteres.');
+ if(senha!==confirmar)return void(msg.textContent='As senhas não são iguais.');
+ cz191SalvandoSenha=true;
+ const botao=$('#cz191SalvarSenha');if(botao)botao.disabled=true;
+ msg.textContent='Salvando nova senha...';
+ try{
+  const {data,error}=await db.auth.getSession();
+  if(error||!data?.session)throw new Error('O link expirou ou a sessão de recuperação não está válida. Solicite outro link.');
+  const result=await db.auth.updateUser({password:senha});
+  if(result.error)throw result.error;
   await db.auth.signOut();
-
-  alert('Senha alterada com sucesso! Entre com sua nova senha.');
-  window.location.href = 'https://cz-efeitos-especiais.vercel.app';
+  modoRecuperacao=false;cz191RecuperacaoLink=false;
+  window.history.replaceState({},document.title,window.location.pathname);
+  cz191MensagemLogin('Senha redefinida com sucesso! Entre com sua nova senha.');
+ }catch(e){msg.textContent='Não foi possível redefinir a senha: '+(e.message||e)}
+ finally{cz191SalvandoSenha=false;const b=$('#cz191SalvarSenha');if(b)b.disabled=false}
 }
-function showLogin(){$('#login').style.display='grid';$('#login').classList.remove('hidden');$('#app').classList.add('hidden')}
+function showLogin(){
+ $('#login').style.display='grid';$('#login').classList.remove('hidden');$('#app').classList.add('hidden');
+}
 let currentAuthUser=null;
 function contaMaster(){
  const email=String(currentAuthUser?.email||'').trim().toLowerCase();
@@ -241,20 +251,35 @@ function contaMaster(){
  return email===CZ_MASTER_EMAIL || perfil==='master' || perfil==='master_principal' || perfil==='master_autorizado';
 }
 async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#login').style.display='none';$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V156';reconstruirMenuPermissoes();renderModule(0)}
-$('#loginBtn').onclick=async()=>{const email=$('#email').value.trim(),password=$('#password').value;$('#loginMsg').textContent='Entrando...';const {data,error}=await db.auth.signInWithPassword({email,password});if(error){$('#loginMsg').textContent='Não foi possível entrar: '+error.message;return}$('#loginMsg').textContent='';showApp(data.user)};
-$('#logoutBtn').onclick=async()=>{await db.auth.signOut();showLogin()};
-  async function recuperarSenha(){
-  const email = $('#email').value.trim();
-  if(!email){
-    $('#loginMsg').textContent='Digite seu e-mail primeiro.';
-    return;
-  }
-  const {error}=await db.auth.resetPasswordForEmail(email,{
-    redirectTo:'https://cz-efeitos-especiais.vercel.app'
-  });
-  $('#loginMsg').textContent=error
-    ? 'Erro: '+error.message
-    : 'Link de recuperação enviado para seu e-mail.';
+async function entrarSistemaCZ(){
+ const email=$('#email')?.value.trim()||'',password=$('#password')?.value||'',msg=$('#loginMsg');
+ if(!email||!password){if(msg)msg.textContent='Informe seu e-mail e sua senha.';return}
+ if(msg)msg.textContent='Entrando...';
+ try{
+  const {data,error}=await db.auth.signInWithPassword({email,password});
+  if(error)throw error;
+  if(msg)msg.textContent='';
+  await showApp(data.user);
+ }catch(e){if(msg)msg.textContent='Não foi possível entrar: '+(e.message||e)}
+}
+$('#loginBtn').onclick=entrarSistemaCZ;
+$('#logoutBtn').onclick=async()=>{await db.auth.signOut();cz191RestaurarLogin();showLogin()};
+async function recuperarSenha(){
+ const email=$('#email')?.value.trim()||'',msg=$('#loginMsg');
+ if(!email||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+  if(msg)msg.textContent='Digite um e-mail válido primeiro.';return;
+ }
+ const btn=$('.loginbox button[onclick="recuperarSenha()"]');if(btn)btn.disabled=true;
+ if(msg)msg.textContent='Solicitando link de recuperação...';
+ try{
+  // Usa o endereço em que a CZ está instalada, evitando redirecionar a outra versão do sistema.
+  const redirectTo=window.location.origin+window.location.pathname;
+  const {error}=await db.auth.resetPasswordForEmail(email,{redirectTo});
+  if(error)throw error;
+  if(msg)msg.textContent='Se este e-mail estiver cadastrado, você receberá um link para redefinir a senha. Confira também a caixa de spam.';
+ }catch(e){
+  if(msg)msg.textContent='Não foi possível solicitar o link: '+(e.message||e)+'. Confira no Supabase Auth > URL Configuration se este endereço está em Redirect URLs.';
+ }finally{if(btn)btn.disabled=false}
 }
 async function renderModule(i){$('#pageTitle').textContent=modules[i];if(i===0)return renderDashboard();if(i===1)return renderClients();if(i===2)return renderOrcamentos();if(i===3)return renderContratosOficialCZ();if(i===4)return renderEventos();if(i===5)return renderRetornoEventos();if(i===6)return renderProducts();if(i===7)return renderAssets();if(i===8)return renderColaboradores();if(i===9)return renderManutencao();if(i===10)return renderFinanceiro();if(i===11)return renderAgenda();if(i===12)return renderRelatorios();if(i===13)return renderUsuariosPermissoes();if(i===14)return renderShoppingList();if(i===15)return renderVehicles();if(i===16)return renderCaixa();if(i===17)return renderPDV();if(i===18)return renderSairEventoV135();if(i===19)return renderOficinaV135();if(i===20)return renderInventarioV135();$('#content').innerHTML=`<div class="sectionhead"><h2>${modules[i]}</h2></div><div class="placeholder">Módulo já previsto no banco de dados. A tela operacional será ativada nas próximas versões sem precisar recriar sua estrutura.</div>`}
 let agendaMesRef=null,agendaConsulta=0;
