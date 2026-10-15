@@ -104,9 +104,9 @@
 <div class="field"><label>Fornecedor</label><input id="productSupplier" type="text"></div><div class="field"><label>Tempo</label><input id="productTime" type="text"></div><div class="field"><label>Efeito</label><input id="productEffect" type="text"></div><div class="field"><label>Cor</label><input id="productColor" type="text"></div><div class="field"><label>Ruído</label><select id="productNoise"><option value="">Selecione</option><option value="baixo">Baixo ruído</option><option value="alto">Alto ruído</option></select></div><div class="field"><label>Ambiente</label><select id="productEnvironment"><option value="">Selecione</option><option value="Indoor">Indoor</option><option value="Outdoor">Outdoor</option></select></div>
 <div class="field"><label>Foto do produto (máx. 5 MB)</label><input id="productPhoto" type="file" accept="image/*"><img id="productPreview" class="preview hidden"></div><div class="field"><label>Link do vídeo do produto</label><input id="productVideoUrl" type="url" placeholder="https://..." inputmode="url"></div><div class="actions"><button id="deleteProductBtn" type="button" class="btn danger hidden" style="margin-right:auto">Excluir produto</button><button class="btn secondary" onclick="closeProduct()">Cancelar</button><button id="saveProductBtn" class="btn primary">Salvar produto</button></div><div id="productMsg" class="msg"></div></div></div>
 <div id="assetModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="assetModalTitle">Novo ativo</h2><button class="btn secondary" onclick="closeAsset()">Fechar</button></div><input id="assetId" type="hidden">
-<div class="row"><div class="field"><label>Nome do equipamento *</label><input id="assetName" placeholder="Ex.: Fire Machine P1"></div><div class="field"><label>Quantidade *</label><input id="assetQuantity" type="number" min="1" step="1" value="1" inputmode="numeric"><div class="muted" style="margin-top:5px">Ao aumentar a quantidade, as novas unidades são criadas automaticamente.</div></div></div>
-<div class="row"><div class="field"><label>Código do cadastro</label><input id="assetCode" readonly placeholder="Gerado automaticamente"><div class="muted" style="margin-top:5px">Ex.: 0001</div></div><div class="field"><label>Código de barras</label><input id="assetBarcode" readonly placeholder="Mesmo código do cadastro"></div></div>
-<div id="assetUnitsBox" class="card" style="margin:10px 0"><div class="sectionhead"><div><b>Unidades / Etiquetas</b><div class="muted">Cada unidade recebe automaticamente um código como 0001-001.</div></div><button type="button" class="btn secondary" onclick="imprimirEtiquetasAtivoAtual()">Imprimir todas</button></div><div id="assetUnitsList" class="muted">Salve o ativo para gerar as unidades.</div></div>
+<div class="row"><div class="field"><label>Nome do equipamento *</label><input id="assetName" placeholder="Ex.: Fire Machine P1"></div><div class="field"><label>Quantidade *</label><input id="assetQuantity" type="number" min="1" step="1" value="1" inputmode="numeric"><div class="muted" style="margin-top:5px">Ao aumentar a quantidade, preencha o código das novas unidades.</div></div></div>
+<div class="row"><div class="field"><label>Código do cadastro</label><input id="assetCode" placeholder="Digite o código livremente"><div class="muted" style="margin-top:5px">Ex.: FOGO-01, CO2-05 ou 0001</div></div><div class="field"><label>Código de barras</label><input id="assetBarcode" placeholder="Digite o código de barras"></div></div>
+<div id="assetUnitsBox" class="card" style="margin:10px 0"><div class="sectionhead"><div><b>Unidades / Etiquetas</b><div class="muted">Preencha o código de cada unidade manualmente.</div></div><button type="button" class="btn secondary" onclick="imprimirEtiquetasAtivoAtual()">Imprimir todas</button></div><div id="assetUnitsList" class="muted">Salve o ativo para gerar as unidades.</div></div>
 <div class="row"><div class="field"><label>Fornecedor</label><input id="assetSupplier"></div><div class="field"><label>Data da compra</label><input id="assetPurchaseDate" type="date"></div></div>
 <div class="row"><div class="field"><label>Valor da compra</label><input id="assetPurchaseValue" type="text" inputmode="decimal" placeholder="R$ 0,00"></div><div class="field"></div></div>
 <div class="row"><div class="field"><label>Locação tabela 1</label><input id="assetRent1" type="number" step="0.01"></div><div class="field"><label>Locação tabela 2</label><input id="assetRent2" type="number" step="0.01"></div></div>
@@ -235,7 +235,7 @@ function contaMaster(){
  const perfil=String(czPerfilUsuario?.perfil||'').trim().toLowerCase();
  return email===CZ_MASTER_EMAIL || perfil==='master' || perfil==='master_principal' || perfil==='master_autorizado';
 }
-async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#login').style.display='none';$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V154';reconstruirMenuPermissoes();renderModule(0)}
+async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#login').style.display='none';$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V155';reconstruirMenuPermissoes();renderModule(0)}
 $('#loginBtn').onclick=async()=>{const email=$('#email').value.trim(),password=$('#password').value;$('#loginMsg').textContent='Entrando...';const {data,error}=await db.auth.signInWithPassword({email,password});if(error){$('#loginMsg').textContent='Não foi possível entrar: '+error.message;return}$('#loginMsg').textContent='';showApp(data.user)};
 $('#logoutBtn').onclick=async()=>{await db.auth.signOut();showLogin()};
   async function recuperarSenha(){
@@ -1716,15 +1716,15 @@ Obrigado!`;
     const origensComEvento=new Set(eventosVinculados.filter(x=>x.status!=='pendente').map(x=>String(x.origem_orcamento_id)).filter(Boolean));
     const eventosExistentes=new Set(eventosVinculados.filter(x=>x.status!=='pendente').map(x=>String(x.id)));
     const propostasExibidas=(data||[]).filter(x=>{const fechado=origensComEvento.has(String(x.id))||eventosExistentes.has(String(x.dados?.evento_operacional_id||''));return orcamentosFechadosModo?fechado:!fechado});
-    box.innerHTML=propostasExibidas.length?`<div class="tablewrap"><table class="orcamentos-lista"><thead><tr><th>Cliente</th><th>Data</th><th>Evento</th><th>Valor</th><th>Status</th><th>Nº Proposta</th><th style="min-width:190px">Fechamento</th><th>Ações</th></tr></thead><tbody>${propostasExibidas.map(x=>`<tr><td>${esc(x.cliente_nome||'')}</td><td>${x.data_evento?new Date(x.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${esc(x.evento_nome||'')}</td><td>${money(x.valor_total)}</td><td>${esc(x.status||'')}</td><td><b>${esc(x.numero||'')}</b></td><td>${(origensComEvento.has(String(x.id))||eventosExistentes.has(String(x.dados?.evento_operacional_id||'')))?'<span style="display:inline-flex;padding:8px 12px;border:1px solid #2f9e63;border-radius:999px;font-size:11px;font-weight:900">FECHADO</span>':`<button type="button" class="btn primary btnConfirmarOrcamentoV154" data-id="${esc(x.id)}" style="font-weight:900;white-space:nowrap;padding:9px 12px">CONFIRMAR ORÇAMENTO</button>`}</td><td><div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap"><button type="button" class="btn secondary btnVisualizarProposta" data-id="${esc(x.id)}" title="Visualizar proposta" aria-label="Visualizar proposta" style="padding:5px 7px;min-height:auto">${iconeOlho()}</button><button type="button" class="btn secondary btnEnviarProposta" data-id="${esc(x.id)}" title="Enviar proposta pelo WhatsApp" aria-label="Enviar proposta pelo WhatsApp" style="padding:5px 7px;min-height:auto">${iconeEnviarProposta()}</button><button type="button" class="btn secondary btnWhatsProposta" data-id="${esc(x.id)}" title="Enviar preenchimento pelo WhatsApp" aria-label="Enviar preenchimento pelo WhatsApp" style="padding:5px 7px;min-height:auto">${iconeWhats()}</button><button type="button" class="btn danger btnExcluirProposta" data-id="${esc(x.id)}" title="Excluir proposta" aria-label="Excluir proposta" style="font-size:14px;padding:4px 8px;min-height:auto">×</button></div></td></tr>`).join('')}</tbody></table></div>`:'<div class="muted">Nenhuma proposta gerada ainda.</div>';
-    box.querySelectorAll('.btnConfirmarOrcamentoV154').forEach(btn=>{btn.onclick=()=>cz151ConfirmarOrcamento(btn.dataset.id)});
+    box.innerHTML=propostasExibidas.length?`<div class="tablewrap"><table class="orcamentos-lista"><thead><tr><th>Cliente</th><th>Data</th><th>Evento</th><th>Valor</th><th>Status</th><th>Nº Proposta</th><th style="min-width:190px">Fechamento</th><th>Ações</th></tr></thead><tbody>${propostasExibidas.map(x=>`<tr><td>${esc(x.cliente_nome||'')}</td><td>${x.data_evento?new Date(x.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${esc(x.evento_nome||'')}</td><td>${money(x.valor_total)}</td><td>${esc(x.status||'')}</td><td><b>${esc(x.numero||'')}</b></td><td>${(origensComEvento.has(String(x.id))||eventosExistentes.has(String(x.dados?.evento_operacional_id||'')))?'<span style="display:inline-flex;padding:8px 12px;border:1px solid #2f9e63;border-radius:999px;font-size:11px;font-weight:900">FECHADO</span>':`<button type="button" class="btn primary btnConfirmarOrcamentoV155" data-id="${esc(x.id)}" style="font-weight:900;white-space:nowrap;padding:9px 12px">CONFIRMAR ORÇAMENTO</button>`}</td><td><div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap"><button type="button" class="btn secondary btnVisualizarProposta" data-id="${esc(x.id)}" title="Visualizar proposta" aria-label="Visualizar proposta" style="padding:5px 7px;min-height:auto">${iconeOlho()}</button><button type="button" class="btn secondary btnEnviarProposta" data-id="${esc(x.id)}" title="Enviar proposta pelo WhatsApp" aria-label="Enviar proposta pelo WhatsApp" style="padding:5px 7px;min-height:auto">${iconeEnviarProposta()}</button><button type="button" class="btn secondary btnWhatsProposta" data-id="${esc(x.id)}" title="Enviar preenchimento pelo WhatsApp" aria-label="Enviar preenchimento pelo WhatsApp" style="padding:5px 7px;min-height:auto">${iconeWhats()}</button><button type="button" class="btn danger btnExcluirProposta" data-id="${esc(x.id)}" title="Excluir proposta" aria-label="Excluir proposta" style="font-size:14px;padding:4px 8px;min-height:auto">×</button></div></td></tr>`).join('')}</tbody></table></div>`:'<div class="muted">Nenhuma proposta gerada ainda.</div>';
+    box.querySelectorAll('.btnConfirmarOrcamentoV155').forEach(btn=>{btn.onclick=()=>cz151ConfirmarOrcamento(btn.dataset.id)});
     box.querySelectorAll('.btnVisualizarProposta').forEach(btn=>{btn.onclick=()=>{const p=propostasExibidas.find(x=>String(x.id)===String(btn.dataset.id));if(!p)return;if(!p.dados||typeof p.dados!=='object'){czAlert('Esta proposta não possui os dados completos salvos para visualização.','Orçamento');return}visualizarOrcamentoSalvo(p)}});
     box.insertAdjacentHTML('beforeend','<div id="orcEnvioMsg" class="msg" role="status"></div>');
     box.querySelectorAll('.btnEnviarProposta').forEach(btn=>{btn.onclick=()=>{const p=propostasExibidas.find(x=>String(x.id)===String(btn.dataset.id));if(p)enviarPropostaWhats(p,btn)}});
     box.querySelectorAll('.btnEventoProposta').forEach(btn=>{btn.style.display='none';btn.setAttribute('data-v150-ciclo-antigo','1')});
     box.querySelectorAll('.btnWhatsProposta').forEach(btn=>{btn.onclick=()=>{const p=propostasExibidas.find(x=>String(x.id)===String(btn.dataset.id));if(p)abrirWhatsPreenchimento(p)}});
     box.querySelectorAll('.btnExcluirProposta').forEach(btn=>{btn.onclick=()=>excluirProposta(btn.dataset.id)});
-    // V154: fechamento agora é uma coluna fixa da tabela, sem injeção dinâmica.
+    // V155: fechamento agora é uma coluna fixa da tabela, sem injeção dinâmica.
 
   }
   prepararItensOrcamento();
@@ -1996,17 +1996,13 @@ $('#deleteProductBtn').onclick=async()=>{
 };
 $('#productPhoto').onchange=e=>{const f=e.target.files[0];if(f){$('#productPreview').src=URL.createObjectURL(f);$('#productPreview').classList.remove('hidden')}};
 $('#saveProductBtn').onclick=async()=>{const id=$('#productId').value;$('#productMsg').textContent='Salvando...';try{let foto_url=id?products.find(p=>p.id===id)?.foto_url:null;const f=$('#productPhoto').files[0];if(f)foto_url=await uploadPhoto(f,'produtos');const payload={nome:$('#productName').value.trim(),codigo_barras:$('#productBarcode').value.trim()||null,marca:$('#productBrand').value.trim()||null,consumivel:$('#productConsumable').checked,unidade:$('#productUnit').value.trim()||'unidade',estoque_atual:+$('#productStock').value||0,estoque_minimo:+$('#productMin').value||0,valor_custo:moedaInputNumero($('#productCost').value),ambiente:$('#productEnvironment').value||null,valor_varejo:+$('#productRetail').value||0,valor_atacado:+$('#productWholesale').value||0,tempo:$('#productTime').value.trim()||null,fornecedor:$('#productSupplier').value.trim()||null,efeito:$('#productEffect').value.trim()||null,cor:$('#productColor').value.trim()||null,ruido:$('#productNoise').value||null,foto_url,video_url:$('#productVideoUrl').value.trim()||null,atualizado_em:new Date().toISOString()};if(!payload.nome)throw new Error('Informe o nome do produto.');if(payload.video_url&&!safeHttpUrl(payload.video_url))throw new Error('Informe um link de vídeo válido começando com https:// ou http://.');const {error}=await(id?db.from('produtos').update(payload).eq('id',id):db.from('produtos').insert(payload));if(error)throw error;closeProduct();renderProducts()}catch(e){$('#productMsg').textContent='Erro: '+e.message}};
-function codigoCadastroAtivo(a){
-  const raw=String(a?.codigo_interno||a?.codigo_barras||'').trim();
-  let m=raw.match(/^(\d{1,4})(?:-\d{3})?$/); if(m)return String(Number(m[1])).padStart(4,'0');
-  m=raw.match(/^AT-(\d+)$/i); if(m)return String(Number(m[1])).padStart(4,'0');
-  return raw||'';
-}
+function codigoCadastroAtivo(a){return String(a?.codigo_interno||a?.codigo_barras||'').trim()}
+function cz155Load(){try{return JSON.parse(localStorage.getItem('cz155_codigos_unidades')||'{}')}catch(e){return {}}}
+function cz155Save(v){localStorage.setItem('cz155_codigos_unidades',JSON.stringify(v))}
 function unidadesAtivo(a,qtdOverride=null){
-  const base=codigoCadastroAtivo(a);
-  const qtd=Math.max(0,Number(qtdOverride??a?.quantidade??0)||0);
-  if(!base)return [];
-  return Array.from({length:qtd},(_,i)=>`${base}-${String(i+1).padStart(3,'0')}`);
+ const base=codigoCadastroAtivo(a),q=Math.max(0,Number(qtdOverride??a?.quantidade??0)||0);
+ const salvos=cz155Load()[String(a?.id)]||[];
+ return Array.from({length:q},(_,i)=>salvos[i]||`${base}-${String(i+1).padStart(3,'0')}`);
 }
 async function renderAssets(){
   await atualizarContaMaster();
@@ -2029,27 +2025,23 @@ async function proximoCodigoAtivo(){
  let maior=0;(data||[]).forEach(a=>{const c=String(a.codigo_interno||a.codigo_barras||'');let m=c.match(/^(\d{1,4})(?:-\d{3})?$/);if(!m)m=c.match(/^AT-(\d+)$/i);if(m)maior=Math.max(maior,Number(m[1])||0)});
  return String(maior+1).padStart(4,'0');
 }
-async function previewCodigoAtivo(){
- if($('#assetId').value)return;
- try{const c=await proximoCodigoAtivo();$('#assetCode').value=c;$('#assetBarcode').value=c;renderAssetUnitsPreview()}
- catch(e){$('#assetCode').value='Automático';$('#assetBarcode').value='Automático'}
-}
+async function previewCodigoAtivo(){renderAssetUnitsPreview()}
 function renderAssetUnitsPreview(){
- const base=String($('#assetCode')?.value||'').trim(),qtd=Math.max(0,Number($('#assetQuantity')?.value)||0),box=$('#assetUnitsList');if(!box)return;
- if(!base||base==='Automático'){box.innerHTML='<span class="muted">Salve o ativo para gerar as unidades.</span>';return}
- const cods=Array.from({length:qtd},(_,i)=>`${base}-${String(i+1).padStart(3,'0')}`);
- box.innerHTML=cods.length?`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:7px">${cods.map(c=>`<div style="border:1px solid var(--line);border-radius:8px;padding:7px"><b>${esc(c)}</b></div>`).join('')}</div>`:'<span class="muted">Informe a quantidade.</span>';
+ const base=String($('#assetCode')?.value||'').trim(),q=Math.max(0,Number($('#assetQuantity')?.value)||0),box=$('#assetUnitsList');if(!box)return;
+ const id=$('#assetId').value,exist=cz155Load()[String(id)]||[];
+ const anterior=[...box.querySelectorAll('[data-unidade-codigo]')].map(x=>x.value);
+ box.innerHTML=Array.from({length:q},(_,i)=>`<div class="field" style="margin:5px 0"><label>Unidade ${i+1}</label><input data-unidade-codigo="${i}" value="${esc(anterior[i]??exist[i]??(base?`${base}-${String(i+1).padStart(3,'0')}`:''))}" placeholder="Código individual livre"></div>`).join('');
 }
 function openAsset(a=null){
  $('#assetModal').classList.remove('hidden');$('#assetModalTitle').textContent=a?'Editar ativo / etiquetas':'Novo ativo';$('#assetId').value=a?.id||'';$('#assetName').value=a?.nome||'';
- $('#assetCode').value=a?codigoCadastroAtivo(a):'';$('#assetBarcode').value=a?codigoCadastroAtivo(a):'';$('#assetSupplier').value=a?.fornecedor||'';$('#assetQuantity').value=a?.quantidade??1;$('#assetPurchaseDate').value=a?.data_compra||'';$('#assetPurchaseValue').value=moedaInputValor(a?.valor_compra??0);$('#assetRent1').value=a?.valor_locacao_tabela1??0;$('#assetRent2').value=a?.valor_locacao_tabela2??0;$('#assetWeight').value=a?.peso??'';$('#assetCase').value=String(a?.possui_case??false);$('#assetMontagem').checked=a?.material_montagem===true;$('#assetNotes').value=a?.observacoes||'';$('#assetPhoto').value='';
- const im=$('#assetPreview');if(a?.foto_url){im.src=a.foto_url;im.classList.remove('hidden')}else im.classList.add('hidden');$('#assetMsg').textContent='';
- if(a)renderAssetUnitsPreview();else previewCodigoAtivo();
+ $('#assetCode').value=a?codigoCadastroAtivo(a):'';$('#assetBarcode').value=a?.codigo_barras||'';$('#assetSupplier').value=a?.fornecedor||'';$('#assetQuantity').value=a?.quantidade??1;$('#assetPurchaseDate').value=a?.data_compra||'';$('#assetPurchaseValue').value=moedaInputValor(a?.valor_compra??0);$('#assetRent1').value=a?.valor_locacao_tabela1??0;$('#assetRent2').value=a?.valor_locacao_tabela2??0;$('#assetWeight').value=a?.peso??'';$('#assetCase').value=String(a?.possui_case??false);$('#assetMontagem').checked=a?.material_montagem===true;$('#assetNotes').value=a?.observacoes||'';$('#assetPhoto').value='';
+ const im=$('#assetPreview');if(a?.foto_url){im.src=a.foto_url;im.classList.remove('hidden')}else im.classList.add('hidden');$('#assetMsg').textContent='';$('#assetUnitsList').innerHTML='';renderAssetUnitsPreview();
 }
 function closeAsset(){$('#assetModal').classList.add('hidden')}
 function editAsset(id){openAsset(assets.find(a=>String(a.id)===String(id)))}
 $('#assetPhoto').onchange=e=>{const f=e.target.files[0];if(f){$('#assetPreview').src=URL.createObjectURL(f);$('#assetPreview').classList.remove('hidden')}};
 $('#assetQuantity').addEventListener('input',renderAssetUnitsPreview);
+$('#assetCode').addEventListener('change',()=>{$('#assetUnitsList').innerHTML='';renderAssetUnitsPreview()});
 
 function imprimirEtiquetasAtivo(a,codigos=null){
  if(!a)return;
@@ -2062,7 +2054,9 @@ function imprimirEtiquetasAtivoAtual(){
  const id=$('#assetId').value,a=assets.find(x=>String(x.id)===String(id));
  if(!a){czAlert('Salve o ativo primeiro. Depois as etiquetas ficarão disponíveis dentro do cadastro.','Etiquetas');return}
  const qtd=Math.max(1,Number($('#assetQuantity').value)||1),tmp={...a,quantidade:qtd,codigo_interno:$('#assetCode').value};
- imprimirEtiquetasAtivo(tmp);
+ const codigos=[...document.querySelectorAll('#assetUnitsList [data-unidade-codigo]')].map(x=>x.value.trim());
+ if(codigos.some(x=>!x))return czAlert('Preencha os códigos das unidades.','Etiquetas');
+ imprimirEtiquetasAtivo(tmp,codigos);
 }
 $('#saveAssetBtn').onclick=async()=>{
  const id=$('#assetId').value;$('#assetMsg').textContent='Salvando...';const qtd=Number($('#assetQuantity').value);
@@ -2070,15 +2064,20 @@ $('#saveAssetBtn').onclick=async()=>{
  try{
   let foto_url=id?assets.find(p=>String(p.id)===String(id))?.foto_url:null;const f=$('#assetPhoto').files[0];if(f)foto_url=await uploadPhoto(f,'ativos');
   const atual=id?assets.find(a=>String(a.id)===String(id)):null,antigaQtd=Number(atual?.quantidade||0);
-  const codigo=id?codigoCadastroAtivo(atual):await proximoCodigoAtivo();
-  const payload={nome:$('#assetName').value.trim(),quantidade:qtd,codigo_interno:codigo,codigo_barras:codigo,fornecedor:$('#assetSupplier').value.trim()||null,data_compra:$('#assetPurchaseDate').value||null,valor_compra:moedaInputNumero($('#assetPurchaseValue').value),valor_locacao_tabela1:+$('#assetRent1').value||0,valor_locacao_tabela2:+$('#assetRent2').value||0,peso:$('#assetWeight').value?+$('#assetWeight').value:null,possui_case:$('#assetCase').value==='true',material_montagem:$('#assetMontagem').checked,observacoes:$('#assetNotes').value.trim()||null,foto_url,atualizado_em:new Date().toISOString()};
+  const codigo=$('#assetCode').value.trim(),barras=$('#assetBarcode').value.trim()||codigo;
+  if(!codigo)throw new Error('Informe o código principal do ativo.');
+  const unidades=[...document.querySelectorAll('#assetUnitsList [data-unidade-codigo]')].map(x=>x.value.trim());
+  if(unidades.length!==qtd||unidades.some(x=>!x))throw new Error('Preencha o código de todas as unidades.');
+  if(new Set(unidades.map(x=>x.toLowerCase())).size!==unidades.length)throw new Error('Os códigos das unidades devem ser diferentes.');
+  const payload={nome:$('#assetName').value.trim(),quantidade:qtd,codigo_interno:codigo,codigo_barras:barras,fornecedor:$('#assetSupplier').value.trim()||null,data_compra:$('#assetPurchaseDate').value||null,valor_compra:moedaInputNumero($('#assetPurchaseValue').value),valor_locacao_tabela1:+$('#assetRent1').value||0,valor_locacao_tabela2:+$('#assetRent2').value||0,peso:$('#assetWeight').value?+$('#assetWeight').value:null,possui_case:$('#assetCase').value==='true',material_montagem:$('#assetMontagem').checked,observacoes:$('#assetNotes').value.trim()||null,foto_url,atualizado_em:new Date().toISOString()};
   if(!payload.nome)throw new Error('Informe o nome do equipamento.');
   const {data,error}=id?await db.from('ativos').update(payload).eq('id',id).select():await db.from('ativos').insert({...payload,status:'disponivel'}).select();
   if(error)throw error;
   const salvo=(data||[])[0]||{...atual,...payload,id};
+  const mapa=cz155Load();mapa[String(salvo.id)]=unidades;cz155Save(mapa);
   assets=id?assets.map(x=>String(x.id)===String(id)?salvo:x):[...assets,salvo];
   if(id&&qtd>antigaQtd){
-    const novas=unidadesAtivo(salvo).slice(antigaQtd);
+    const novas=unidades.slice(antigaQtd);
     closeAsset();await renderAssets();
     await czAlert(`${novas.length} nova(s) unidade(s) criada(s): ${novas[0]} até ${novas.at(-1)}. As unidades antigas foram preservadas.`,'Novas unidades');
     imprimirEtiquetasAtivo(salvo,novas);
@@ -3738,7 +3737,7 @@ async function duplicarOrcamentoV146(id){
 }
 
 
-/* ===== V154 — ORÇAMENTO NOVO APLICADO NA TELA REAL ===== */
+/* ===== V155 — ORÇAMENTO NOVO APLICADO NA TELA REAL ===== */
 function orc147AplicarAcoes(){
  document.querySelectorAll('#orcPropostasSalvas tr').forEach(tr=>{
    if(tr.querySelector('.orc147dup'))return;
@@ -3756,7 +3755,7 @@ orc147Obs.observe(document.documentElement,{childList:true,subtree:true});
 document.addEventListener('DOMContentLoaded',orc147AplicarAcoes);
 
 
-/* ===== V154 — FINANCEIRO DENTRO DO ORÇAMENTO ===== */
+/* ===== V155 — FINANCEIRO DENTRO DO ORÇAMENTO ===== */
 function orc148ISO(d){return d.toISOString().slice(0,10)}
 function orc148GerarDatas(){
  const tipo=$('#orcTipoDatasParcelas')?.value||'manual';
@@ -3791,7 +3790,7 @@ orc148Obs.observe(document.documentElement,{childList:true,subtree:true});
 document.addEventListener('DOMContentLoaded',orc148UI);
 
 
-/* ===== V154 — CICLO ÚNICO DO NOVO ORÇAMENTO =====
+/* ===== V155 — CICLO ÚNICO DO NOVO ORÇAMENTO =====
    O orçamento novo passa a ser o único fluxo operacional.
    O histórico antigo continua preservado somente para consulta.
 */
@@ -3826,7 +3825,7 @@ function orc149AplicarCicloUnico(){
    }
  });
 
- // Keep old records as history only; new proposals use the current V154 workflow.
+ // Keep old records as history only; new proposals use the current V155 workflow.
  const box=document.querySelector('#orcPropostasSalvas');
  if(box && !box.querySelector('.orc149-info')){
    const info=document.createElement('div');
@@ -3844,7 +3843,7 @@ orc149Observer.observe(document.documentElement,{childList:true,subtree:true});
 document.addEventListener('DOMContentLoaded',orc149AplicarCicloUnico);
 
 
-/* ===== V154 — CICLO OPERACIONAL OFICIAL CZ =====
+/* ===== V155 — CICLO OPERACIONAL OFICIAL CZ =====
  ORÇAMENTO → CONTRATO → FINANCEIRO → PREPARAÇÃO → SAÍDA/CONFERÊNCIA → EVENTO → RETORNO → FINALIZAÇÃO
  Agenda e reservas trabalham em segundo plano.
 */
@@ -3949,7 +3948,7 @@ cz150Obs.observe(document.documentElement,{childList:true,subtree:true});
 document.addEventListener('DOMContentLoaded',cz150Aplicar);
 
 
-/* ===== V154 — CONFIRMAR ORÇAMENTO É O GATILHO ÚNICO DO CICLO =====
+/* ===== V155 — CONFIRMAR ORÇAMENTO É O GATILHO ÚNICO DO CICLO =====
    EM ABERTO → CONFIRMAR ORÇAMENTO → CONTRATO + FINANCEIRO + EVENTO/PREPARAÇÃO
 */
 function cz151Norm(v){return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim()}
@@ -4033,7 +4032,7 @@ async function cz151ConfirmarOrcamento(id){
 
  try{
    // 1. Close budget
-   // V154: não grava mais o status inválido "fechado".
+   // V155: não grava mais o status inválido "fechado".
    // Mantém um status aceito pelo schema atual; o vínculo com o evento define o orçamento como fechado na interface.
    const statusAtual=String(p.status||'').toLowerCase();
    const statusPermitido=['rascunho','enviado','aceito','recusado','cancelado'].includes(statusAtual)?statusAtual:'enviado';
