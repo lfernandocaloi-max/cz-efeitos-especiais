@@ -1532,18 +1532,25 @@ var CZ_CAPA_CHA_W='data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAsICA
     if(!window.jspdf?.jsPDF)throw new Error('Não foi possível carregar o gerador de PDF.');
     const pdf=new window.jspdf.jsPDF({unit:'mm',format:'a4'});
     const W=210,H=297;
-    const modelo=['casamento','cha_revelacao','padrao'].includes(d.modelo_proposta)?d.modelo_proposta:'casamento';
+    const modelo=['casamento','cha_revelacao','padrao'].includes(d?.modelo_proposta)?d.modelo_proposta:'padrao';
     const produtos=Array.isArray(d.produtos)?d.produtos:[];
     const equipamentos=Array.isArray(d.equipamentos)?d.equipamentos:[];
+    // Converte JPEG base64 em bytes binários, evitando a interpretação
+    // automática de data URLs que falhava na biblioteca de PDF.
+    const imagemBinaria=(data)=>{
+      if(typeof data!=='string'||!/^data:image\/jpeg;base64,/i.test(data))
+        throw new Error('Imagem da proposta inválida.');
+      const bin=atob(data.slice(data.indexOf(',')+1));
+      const bytes=new Uint8Array(bin.length);
+      for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+      return bytes;
+    };
     const imagemA4=(data)=>{
-      const img=pdf.getImageProperties(data),rImg=img.width/img.height,rPag=W/H;
-      let w,h,x,z;
-      if(rImg>rPag){h=H;w=H*rImg;x=(W-w)/2;z=0}else{w=W;h=W/rImg;x=0;z=(H-h)/2}
-      pdf.addImage(data,'JPEG',x,z,w,h,undefined,'FAST');
+      pdf.addImage(imagemBinaria(data),'JPEG',0,0,W,H);
     };
     const marcaDagua=()=>{
       const img=modelo==='cha_revelacao'?CZ_CAPA_CHA_W:modelo==='padrao'?CZ_CAPA_PADRAO_W:CZ_ORCAMENTO_MARCA_DAGUA;
-      pdf.addImage(img,'JPEG',0,0,W,H,undefined,'FAST');
+      imagemA4(img);
     };
     const ouro=[178,125,47],preto=[28,28,28],cinza=[115,115,115];
     const linhaTitulo=(n,titulo,y)=>{
@@ -1809,11 +1816,17 @@ Obrigado!`;
         janela.document.title='Preparando PDF da proposta';
         janela.document.body.innerHTML='<p style="font:16px Arial;padding:24px">Preparando PDF da proposta...</p>';
         const {blob}=gerarPdfProposta(p.dados,p.numero||'sem-numero',true);
+        if(!(blob instanceof Blob)||!blob.size)throw new Error('O PDF não foi gerado corretamente.');
         const url=URL.createObjectURL(blob);
         janela.location.replace(url);
         // Liberar o objeto depois de um intervalo suficiente para o leitor de PDF carregar.
         setTimeout(()=>URL.revokeObjectURL(url),120000);
-      }catch(e){janela.close();czAlert('Erro ao visualizar PDF: '+(e?.message||e),'Orçamento')}
+      }catch(e){
+        console.error('CZ PDF - erro ao visualizar proposta',e);
+        janela.close();
+        const stack=String(e?.stack||'').split('\n').slice(0,4).join('\n');
+        czAlert('Erro ao visualizar PDF: '+(e?.message||e)+(stack?'\n\nDetalhes técnicos:\n'+stack:''),'Orçamento');
+      }
     }});
     box.querySelectorAll('.btnVisualizarProposta').forEach(btn=>{btn.onclick=()=>{const p=propostasExibidas.find(x=>String(x.id)===String(btn.dataset.id));if(!p)return;if(!p.dados||typeof p.dados!=='object'){czAlert('Esta proposta não possui os dados completos salvos para visualização.','Orçamento');return}visualizarOrcamentoSalvo(p)}});
     box.insertAdjacentHTML('beforeend','<div id="orcEnvioMsg" class="msg" role="status"></div>');
@@ -3841,7 +3854,11 @@ function orc147AplicarAcoes(){
    const td=tr.lastElementChild;if(!td)return;
    const b=document.createElement('button');b.type='button';b.className='btn secondary orc147dup';b.textContent='Duplicar';b.onclick=()=>duplicarOrcamentoV146(id);
    const excluir=td.querySelector('.btnExcluirProposta');
-   if(excluir)td.insertBefore(b,excluir);else td.appendChild(b);
+   // O botão Excluir fica dentro de uma div de ações, não diretamente no TD.
+   // insertBefore só aceita como referência um filho direto do mesmo pai.
+   const destino=excluir?.parentElement&&td.contains(excluir)?excluir.parentElement:td;
+   if(excluir&&excluir.parentElement===destino)destino.insertBefore(b,excluir);
+   else destino.appendChild(b);
  });
 }
 const orc147Obs=new MutationObserver(()=>{clearTimeout(window.__orc147);window.__orc147=setTimeout(orc147AplicarAcoes,80)});
