@@ -4728,6 +4728,109 @@ async function cz169RegistrarRecebimentosPendentes(p){
    });
  }
 }
+
+// V182 — datas de pagamento são definidas no FECHAMENTO, não na proposta.
+function cz182AddMonths(iso,n){
+ const [y,m,d]=iso.split('-').map(Number);
+ const mes=new Date(y,m-1+n,1,12);
+ const ultimo=new Date(mes.getFullYear(),mes.getMonth()+1,0).getDate();
+ return finISODate(new Date(mes.getFullYear(),mes.getMonth(),Math.min(d,ultimo),12));
+}
+function cz182ParcelasFechamento(p,fechamento){
+ const pg=p.dados?.pagamento||{},total=Math.round(Number(p.valor_total||0)*100);
+ if(pg.modo!=='contratual')return [{rotulo:'Pagamento único',cent:total,data:fechamento,forma:pg.forma||'A definir'}];
+ const entrada=Math.round(Number(pg.entrada_valor||0)*100);
+ const parcelas=Array.isArray(pg.parcelas_detalhes)?pg.parcelas_detalhes:[];
+ const lista=[];
+ if(entrada>0)lista.push({rotulo:'Entrada',cent:entrada,data:fechamento,forma:pg.forma_entrada||'A definir'});
+ const qtd=parcelas.length||1;
+ const resto=total-entrada;
+ let soma=0;
+ for(let i=0;i<qtd;i++){
+  const cent=parcelas.length?Math.round(Number(parcelas[i].valor||0)*100):i===qtd-1?resto-soma:Math.floor(resto/qtd);
+  soma+=cent;
+  const data=pg.tipo_datas==='intervalo'?finAddDays(fechamento,(i+1)*Math.max(1,Number(pg.intervalo_dias)||30)):cz182AddMonths(fechamento,i+1);
+  lista.push({rotulo:'Parcela '+(i+1)+'/'+qtd,cent,data,forma:parcelas[i]?.forma||'A definir'});
+ }
+ return lista.filter(x=>x.cent>0);
+}
+function cz182TelaFechamento(p){
+ return new Promise(resolve=>{
+  const hoje=finISODate(),base=cz182ParcelasFechamento(p,hoje);
+  document.getElementById('cz182Fechamento')?.remove();
+  const ov=document.createElement('div');ov.id='cz182Fechamento';
+  ov.style.cssText='position:fixed;inset:0;z-index:200040;background:rgba(0,0,0,.84);display:flex;align-items:center;justify-content:center;padding:16px';
+  const box=document.createElement('div');
+  box.style.cssText='width:min(760px,100%);max-height:94vh;overflow:auto;background:#151b26;border:1px solid #3c495a;border-radius:16px;padding:24px;color:#fff;box-shadow:0 24px 70px #000a';
+  const linhas=arr=>arr.map((x,i)=>`<tr data-i="${i}">
+   <td style="white-space:nowrap">${esc(x.rotulo)}</td>
+   <td><input class="cz182Valor" inputmode="decimal" value="${cz177ValorMoeda(x.cent/100)}" style="min-width:115px"></td>
+   <td><input class="cz182Data" type="date" value="${x.data}" style="min-width:150px"></td>
+   <td><input class="cz182Forma" value="${esc(x.forma)}" style="min-width:125px"></td>
+   </tr>`).join('');
+  box.innerHTML=`
+   <div style="font-size:12px;font-weight:900;color:#ff641f">CZ EFEITOS ESPECIAIS • FECHAMENTO DE ORÇAMENTO</div>
+   <h2 style="margin:8px 0">Revisar datas do financeiro</h2>
+   <p style="color:#aab6c5;margin:0 0 15px">As datas desta tela serão usadas no Caixa e no contrato. As datas enviadas na proposta original permanecem apenas como demonstrativo.</p>
+   <div style="background:#0c131b;border:1px solid #334155;border-radius:10px;padding:12px;line-height:1.7;margin-bottom:14px">
+    <div><b>Cliente:</b> ${esc(p.cliente_nome||'—')}</div>
+    <div><b>Proposta:</b> ${esc(p.numero||'—')}</div>
+    <div><b>Investimento:</b> ${money(p.valor_total)}</div>
+   </div>
+   <div class="row"><div class="field"><label>Data do fechamento *</label><input id="cz182FechadoEm" type="date" value="${hoje}"></div>
+   <div class="field"><label>Referência das parcelas</label><div class="muted" style="padding-top:10px">Entrada no fechamento; demais parcelas a partir do fechamento</div></div></div>
+   <div class="tablewrap" style="margin:12px 0"><table><thead><tr><th>Pagamento</th><th>Valor (R$)</th><th>Vencimento *</th><th>Forma</th></tr></thead><tbody id="cz182Linhas">${linhas(base)}</tbody></table></div>
+   <div style="display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap"><span>Total das parcelas: <b id="cz182Total">${money(p.valor_total)}</b></span><button type="button" class="btn secondary" id="cz182Recalcular">Recalcular datas pelo fechamento</button></div>
+   <div id="cz182Erro" role="alert" style="color:#ff8d8d;min-height:22px;margin-top:10px"></div>
+   <div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:14px"><button type="button" class="btn secondary" id="cz182Cancelar">Voltar</button><button type="button" class="btn primary" id="cz182Salvar">CONFIRMAR FECHAMENTO E GERAR FINANCEIRO</button></div>`;
+  ov.appendChild(box);document.body.appendChild(ov);
+  const q=id=>box.querySelector('#'+id);
+  const fechar=x=>{ov.remove();resolve(x)};
+  q('cz182Cancelar').onclick=()=>fechar(null);
+  const atualizar=()=>{
+   const valores=[...box.querySelectorAll('.cz182Valor')].map(x=>cz177LerValor(x.value));
+   q('cz182Total').textContent=valores.every(Number.isFinite)?money(valores.reduce((a,b)=>a+b,0)/100):'Valor inválido';
+  };
+  box.querySelectorAll('.cz182Valor').forEach(x=>x.addEventListener('input',atualizar));
+  q('cz182Recalcular').onclick=()=>{
+   const data=q('cz182FechadoEm').value;
+   if(!/^\d{4}-\d{2}-\d{2}$/.test(data))return q('cz182Erro').textContent='Informe uma data de fechamento válida.';
+   const atual=cz182ParcelasFechamento(p,data);
+   box.querySelectorAll('#cz182Linhas tr').forEach((tr,i)=>{if(atual[i])tr.querySelector('.cz182Data').value=atual[i].data});
+   q('cz182Erro').textContent='';
+  };
+  q('cz182FechadoEm').onchange=()=>q('cz182Recalcular').click();
+  q('cz182Salvar').onclick=()=>{
+   const fechamento=q('cz182FechadoEm').value;
+   if(!/^\d{4}-\d{2}-\d{2}$/.test(fechamento))return q('cz182Erro').textContent='Informe uma data de fechamento válida.';
+   const partes=[...box.querySelectorAll('#cz182Linhas tr')].map((tr,i)=>({
+    rotulo:base[i].rotulo,cent:cz177LerValor(tr.querySelector('.cz182Valor').value),
+    data:tr.querySelector('.cz182Data').value,forma:tr.querySelector('.cz182Forma').value.trim()||'A definir'
+   }));
+   if(partes.some(x=>!Number.isFinite(x.cent)||x.cent<0||!x.data||x.data<fechamento))return q('cz182Erro').textContent='Confira os valores e as datas: nenhum vencimento pode ser anterior ao fechamento.';
+   if(partes.reduce((n,x)=>n+x.cent,0)!==Math.round(Number(p.valor_total||0)*100))return q('cz182Erro').textContent='A soma das parcelas precisa ser exatamente '+money(p.valor_total)+'.';
+   if(partes.some((x,i)=>i>0&&x.data<partes[i-1].data))return q('cz182Erro').textContent='As datas devem estar em ordem de vencimento.';
+   fechar({fechamento,partes:partes.filter(x=>x.cent>0)});
+  };
+ });
+}
+function cz182PropostaFechada(p,confirmacao){
+ const pg={...(p.dados?.pagamento||{})};
+ const partes=confirmacao.partes;
+ if(pg.modo==='contratual'){
+  const entrada=partes.find(x=>x.rotulo==='Entrada');
+  pg.entrada_valor=entrada?entrada.cent/100:0;
+  pg.data_entrada=entrada?.data||confirmacao.fechamento;
+  pg.forma_entrada=entrada?.forma||pg.forma_entrada;
+  pg.parcelas_detalhes=partes.filter(x=>x.rotulo.startsWith('Parcela ')).map((x,i)=>({numero:i+1,valor:x.cent/100,data:x.data,forma:x.forma}));
+  pg.restante=pg.parcelas_detalhes.reduce((n,x)=>n+x.valor,0);
+  pg.vencimento_saldo=pg.parcelas_detalhes.at(-1)?.data||null;
+ }else{
+  pg.data_pagamento=partes[0].data;pg.forma=partes[0].forma;
+ }
+ return {...p,dados:{...p.dados,pagamento:pg},fechamento_em:confirmacao.fechamento};
+}
+
 async function cz151ConfirmarOrcamento(id){
  const p=(window.propostasExibidas||[]).find(x=>String(x.id)===String(id))
    || (await db.from('orcamentos').select('*').eq('id',id).single()).data;
@@ -4736,11 +4839,14 @@ async function cz151ConfirmarOrcamento(id){
  const {data:jaEvento}=await db.from('eventos_operacionais').select('id').eq('origem_orcamento_id',id).limit(1);
  if((jaEvento||[]).length)return czAlert('Este orçamento já está fechado e já possui evento gerado.','Confirmar orçamento');
 
+ const fechamento=await cz182TelaFechamento(p);
+ if(!fechamento)return;
  const ok=await czConfirm(
-   'Confirmar que o cliente FECHOU este orçamento? Ao confirmar, o sistema vai gerar o contrato, o financeiro e o evento automaticamente.',
+   'Confirmar fechamento da proposta '+(p.numero||'')+' em '+finDate(fechamento.fechamento)+'? Serão gerados o financeiro, o contrato pendente de preenchimento e o evento, com as novas datas de pagamento.',
    'Confirmar orçamento'
  );
  if(!ok)return;
+ const propostaFechada=cz182PropostaFechada(p,fechamento);
 
  try{
    // 1. Close budget
@@ -4752,12 +4858,13 @@ async function cz151ConfirmarOrcamento(id){
    if(eo)throw eo;
 
    // 2. Generate contract draft linked to this budget
-   const contrato=cz151ContratoBase(p);
+   const contrato=cz151ContratoBase(propostaFechada);
+   contrato.fechamento_em=fechamento.fechamento;
    try{coSet(String(id),contrato)}catch(_){}
 
    // 3. Cria os recebimentos pendentes antes do evento, sem registrar pagamento.
    // A origem fixa impede duplicação caso seja necessário tentar novamente.
-   await cz169RegistrarRecebimentosPendentes(p);
+   await cz169RegistrarRecebimentosPendentes(propostaFechada);
 
    // 4. Event is created immediately, independent of payment
    const evento=await cz151CriarEvento(p);
