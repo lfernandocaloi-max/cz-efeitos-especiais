@@ -1340,43 +1340,42 @@ async function renderVehicles(){
 // A função SQL bloqueia qualquer evento com saída movimentada para não
 // mascarar alterações de estoque que não possuem histórico reversível confiável.
 async function cz193AbrirLimpezaTestes(){
- if(!contaMaster())return czAlert('Somente a conta Master pode limpar dados de teste.','Acesso restrito');
+ if(!contaMaster())return czAlert('Somente a conta Master pode limpar os testes.','Acesso restrito');
  const box=document.createElement('div');
  box.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:200500;display:flex;align-items:center;justify-content:center;padding:18px';
- box.innerHTML=`<div style="width:min(610px,100%);background:#141b27;border:1px solid #536071;border-radius:15px;padding:23px;color:#fff;max-height:90vh;overflow:auto">
-  <h2 style="margin:0 0 12px">🧹 Limpeza geral dos testes</h2>
-  <p>Esta operação apaga <b>todos os orçamentos, contratos vinculados, eventos e materiais dos eventos, além de todos os lançamentos do Caixa</b>, inclusive testes antigos.</p>
-  <p><b>Preservados:</b> clientes, produtos, ativos, colaboradores e veículos.</p>
-  <p style="color:#ffbc84"><b>Proteção de estoque:</b> se algum evento já movimentou estoque, a operação será bloqueada. Isso evita excluir o histórico sem restaurar corretamente os saldos. Será necessário conferir o estoque antes da limpeza completa.</p>
-  <p>Primeiro faça uma cópia de segurança do Supabase. Esta ação é irreversível.</p>
-  <div class="field"><label>Digite exatamente LIMPAR TESTES para confirmar</label><input id="cz193Confirmacao" autocomplete="off" placeholder="LIMPAR TESTES"></div>
-  <div id="cz193Resultado" role="status" style="margin:12px 0;color:#ffd08c"></div>
-  <div class="actions" style="justify-content:flex-end"><button type="button" class="btn secondary" id="cz193Cancelar">Cancelar</button><button type="button" class="btn danger" id="cz193Executar">Apagar dados de teste</button></div>
- </div>`;
+ box.innerHTML=`<div style="width:min(650px,100%);background:#141b27;border:1px solid #536071;border-radius:15px;padding:23px;color:#fff;max-height:90vh;overflow:auto">
+ <h2>🧹 Limpeza geral das simulações — V195</h2>
+ <p>Exclui orçamentos, eventos, materiais e lançamentos do Caixa, inclusive eventos com saída e retorno simulados. Também limpa contratos e dados financeiros de teste armazenados <b>neste navegador</b>.</p>
+ <p><b>Preserva:</b> clientes, produtos, ativos, colaboradores, veículos e contas cadastradas.</p>
+ <p style="color:#ffbc84"><b>Estoque:</b> as quantidades de produtos e ativos NÃO serão modificadas automaticamente. O sistema salva uma cópia dos saldos atuais no banco antes da exclusão. Como não temos o saldo anterior comprovado, é necessário conferir e ajustar o estoque com o inventário físico depois da limpeza.</p>
+ <p>Faça backup do Supabase antes. A exclusão não pode ser desfeita pelo botão.</p>
+ <div class="field"><label>Digite LIMPAR TESTES para confirmar</label><input id="cz195Confirmacao" autocomplete="off" placeholder="LIMPAR TESTES"></div>
+ <div id="cz195Resultado" role="status" style="margin:12px 0;color:#ffd08c"></div>
+ <div class="actions" style="justify-content:flex-end"><button class="btn secondary" type="button" id="cz195Cancelar">Cancelar</button><button class="btn danger" type="button" id="cz195Executar">Apagar simulações</button></div></div>`;
  document.body.appendChild(box);
- const q=id=>box.querySelector('#'+id),bot=q('cz193Executar'),msg=q('cz193Resultado');
- q('cz193Cancelar').onclick=()=>box.remove();
+ const q=id=>box.querySelector('#'+id),bot=q('cz195Executar'),msg=q('cz195Resultado');
+ q('cz195Cancelar').onclick=()=>box.remove();
  bot.onclick=async()=>{
-  if(q('cz193Confirmacao').value.trim()!=='LIMPAR TESTES'){msg.textContent='Digite LIMPAR TESTES para confirmar.';return}
-  bot.disabled=true;q('cz193Cancelar').disabled=true;
-  msg.textContent='Solicitando limpeza segura ao Supabase...';
+  if(q('cz195Confirmacao').value.trim()!=='LIMPAR TESTES'){msg.textContent='Digite LIMPAR TESTES exatamente.';return}
+  bot.disabled=true;q('cz195Cancelar').disabled=true;msg.textContent='Criando cópia e limpando dados no Supabase...';
   try{
-   const {data,error}=await db.rpc('cz_limpar_todos_testes_v193');
+   const {data,error}=await db.rpc('cz_limpar_simulacoes_v195',{p_confirmacao:'LIMPAR TESTES'});
    if(error)throw error;
-   if(!data?.sucesso)throw new Error(data?.mensagem||'O Supabase não confirmou a limpeza.');
-   // Remove apenas informações de execução temporárias do navegador.
+   if(!data?.sucesso)throw new Error(data?.mensagem||'Supabase não confirmou a limpeza.');
+   // Limpar apenas chaves de contratos, financeiro e operação; preservar cadastros,
+   // categorias financeiras, contas, autenticação, equipamentos e preferências.
+   const exatas=new Set(['cz_contratos_oficial_v137','cz_fin_mov_v1','cz_fin_cob_v1','cz_v135_operacao','cz_v142_saida_eventos']);
+   const prefixos=['cz184_rastreios_saida_','cz185_rastreios_retorno_','cz_conf_','cz_saida_','cz_saida_evento_','cz_retorno_'];
+   let falhas=[];
    for(const k of Object.keys(localStorage)){
-    if(k.startsWith('cz184_rastreios_saida_')||k.startsWith('cz185_rastreios_retorno_')||k.startsWith('cz_conf_'))localStorage.removeItem(k);
+    if(exatas.has(k)||prefixos.some(p=>k.startsWith(p))){try{localStorage.removeItem(k)}catch(e){falhas.push(k)}}
    }
+   caixaCache=[];caixaImportado=false;
    msg.style.color='#79e5a4';
-   msg.textContent='Limpeza concluída no banco: '+JSON.stringify(data?.apagados||{})+'. Atualizando o sistema...';
+   msg.textContent='Banco limpo com sucesso. Cópia de segurança interna nº '+data.backup_id+'. '+(falhas.length?'Não foi possível limpar no navegador: '+falhas.join(', '):'Dados locais deste navegador limpos.')+' Estoque não foi alterado; confira os saldos antes de usar.';
    try{await carregarCaixa()}catch(_){}
-   setTimeout(()=>{box.remove();renderOrcamentos(false)},1600);
-  }catch(e){
-   msg.style.color='#ff9292';
-   msg.textContent='Limpeza NÃO concluída: '+(e.message||e)+'. Se a função não existir, execute primeiro o arquivo SQL de instalação no Supabase. Nenhuma limpeza parcial é feita pela função transacional.';
-   bot.disabled=false;q('cz193Cancelar').disabled=false;
-  }
+   setTimeout(()=>{box.remove();renderOrcamentos(false)},5000);
+  }catch(e){msg.style.color='#ff9292';msg.textContent='Limpeza não concluída: '+(e?.message||e)+'. Confira a instalação do SQL V195 e as dependências do banco.';bot.disabled=false;q('cz195Cancelar').disabled=false}
  };
 }
 let orcamentosFechadosModo=false;
