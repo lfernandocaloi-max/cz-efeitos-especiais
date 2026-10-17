@@ -79,7 +79,7 @@
 </style>
 </head><body>
 <section id="login" class="login"><div class="loginbox"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><h3>Acesso ao sistema</h3><div class="field"><label>E-mail</label><input id="email" type="email"></div><div class="field"><label>Senha</label><input id="password" type="password"></div><button id="loginBtn" class="btn primary full" style="margin-top:18px">ENTRAR</button><button type="button" class="btn secondary full" style="margin-top:8px" onclick="recuperarSenha()">Esqueci minha senha</button><div id="loginMsg" class="msg"></div></div></section>
-<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><div class="muted" style="font-size:12px">Sistema de gestão CZ · V213</div></div><div><span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
+<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><div class="muted" style="font-size:12px">Sistema de gestão CZ · V214</div></div><div><span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
 <div id="clientModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="modalTitle">Novo cliente</h2><button class="btn secondary" onclick="closeClient()">Fechar</button></div>
   <input id="clientId" type="hidden"><div class="muted" id="clientOpenedAt" style="font-size:13px">Data de abertura: será definida ao salvar</div>
   <div class="row"><div class="field"><label>Nome / Razão social *</label><input id="clientName" autocomplete="name"></div><div class="field"><label>Telefone *</label><input id="clientPhone" type="tel" inputmode="tel" autocomplete="tel"></div></div>
@@ -1093,64 +1093,57 @@ async function relClientes(){const {data}=await db.from('clientes').select('nome
 async function relDespesas(){const base=finDespesas(),cats=[...new Set(base.map(x=>x.categoria).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),'pt-BR'));const a=base.filter(x=>relNoPeriodo(x.vencimento||x.data)).filter(x=>!relDespCategoria||x.categoria===relDespCategoria).filter(x=>!relDespDescricao||String(x.descricao||'').toLowerCase().includes(relDespDescricao.toLowerCase())).filter(x=>relDespStatus==='todos'||(relDespStatus==='pago'?x.status==='pago':x.status!=='pago'));const tot=a.reduce((s,x)=>s+Number(x.valor||0),0);$('#content').innerHTML=relTopo('💸 Relatório de Despesas','Histórico de gastos e contas')+relFiltroPeriodo('relDespesas')+`<div class="card" style="padding:12px 14px"><div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap"><div><label>Categoria</label><select onchange="relDespCategoria=this.value;relDespesas()"><option value="">Todas</option>${cats.map(c=>`<option ${relDespCategoria===c?'selected':''}>${esc(c)}</option>`).join('')}</select></div><div style="min-width:220px"><label>Descrição</label><input value="${esc(relDespDescricao)}" placeholder="Pesquisar descrição" oninput="relDespDescricao=this.value" onkeydown="if(event.key==='Enter')relDespesas()"></div><div><label>Status</label><select onchange="relDespStatus=this.value;relDespesas()"><option value="todos" ${relDespStatus==='todos'?'selected':''}>Todos</option><option value="aberto" ${relDespStatus==='aberto'?'selected':''}>A pagar</option><option value="pago" ${relDespStatus==='pago'?'selected':''}>Pago</option></select></div><button class="btn secondary" onclick="relDespCategoria='';relDespDescricao='';relDespStatus='todos';relDespesas()">Limpar filtros</button></div></div><div class="card"><b>Total filtrado: ${money(tot)}</b></div><div class="tablewrap"><table><thead><tr><th>Vencimento</th><th>Descrição</th><th>Categoria</th><th>Status</th><th>Valor</th></tr></thead><tbody>${a.map(x=>`<tr><td>${finDate(x.vencimento||x.data)}</td><td>${esc(x.descricao||'')}</td><td>${esc(x.categoria||'')}</td><td>${x.status==='pago'?'Pago':'A pagar'}</td><td>${money(x.valor)}</td></tr>`).join('')}</tbody></table></div>`}
 
 async function renderDashboard(){
-  const c = await Promise.all([
-    count('clientes'),
-    count('eventos'),
-    count('ativos'),
-    count('produtos')
-  ]);
-
   $('#content').innerHTML = `
-    <div style="margin-bottom:24px">
+    <div style="margin-bottom:12px">
       <div style="font-size:13px;color:#ff641f;font-weight:800;letter-spacing:1px">
         CZ EFEITOS ESPECIAIS
       </div>
-      <h2 style="margin:5px 0 4px;font-size:30px">Painel de Controle</h2>
-      <div class="muted">Gestão rápida da sua operação</div>
+      <h2 style="margin:5px 0 4px;font-size:25px">⚡ Central Operacional</h2>
+      <div class="muted">Painel de Controle · Gestão rápida da operação</div>
     </div>
 
-    <div style="
+    <div id="dashAcessoRapido" style="
       background:linear-gradient(135deg,#ff641f,#d94700);
-      border-radius:18px;
-      padding:22px;
-      margin-bottom:24px;
+      border-radius:12px;
+      padding:12px;
+      margin-bottom:14px;
       box-shadow:0 8px 25px rgba(0,0,0,.25);
     ">
-      <div style="font-size:14px;font-weight:700;opacity:.9">
+      <div style="font-size:12px;font-weight:700;opacity:.9">
         ACESSO RÁPIDO
       </div>
 
       <div style="
         display:grid;
-        grid-template-columns:repeat(2,1fr);
-        gap:12px;
-        margin-top:16px;
+        grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
+        gap:8px;
+        margin-top:9px;
       ">
         <button class="btn"
           onclick="renderModule(2)"
-          style="background:#fff;color:#111;padding:18px 8px;border-radius:14px;font-weight:800">
-          <div style="font-size:27px;margin-bottom:6px">📝</div>
+          style="background:#fff;color:#111;padding:9px 6px;border-radius:9px;font-size:12px;font-weight:800">
+          <div style="font-size:19px;margin-bottom:3px">📝</div>
           Novo Orçamento
         </button>
 
         <button class="btn"
           onclick="renderModule(1)"
-          style="background:#fff;color:#111;padding:18px 8px;border-radius:14px;font-weight:800">
-          <div style="font-size:27px;margin-bottom:6px">👥</div>
+          style="background:#fff;color:#111;padding:9px 6px;border-radius:9px;font-size:12px;font-weight:800">
+          <div style="font-size:19px;margin-bottom:3px">👥</div>
           Clientes
         </button>
 
         <button class="btn"
           onclick="renderModule(4)"
-          style="background:#fff;color:#111;padding:18px 8px;border-radius:14px;font-weight:800">
-          <div style="font-size:27px;margin-bottom:6px">📅</div>
+          style="background:#fff;color:#111;padding:9px 6px;border-radius:9px;font-size:12px;font-weight:800">
+          <div style="font-size:19px;margin-bottom:3px">📅</div>
           Eventos
         </button>
 
         <button class="btn"
           onclick="renderModule(6)"
-          style="background:#fff;color:#111;padding:18px 8px;border-radius:14px;font-weight:800">
-          <div style="font-size:27px;margin-bottom:6px">🏷️</div>
+          style="background:#fff;color:#111;padding:9px 6px;border-radius:9px;font-size:12px;font-weight:800">
+          <div style="font-size:19px;margin-bottom:3px">🏷️</div>
           Equipamentos
         </button>
       </div>
@@ -1158,40 +1151,6 @@ async function renderDashboard(){
 
     <div id="dashFinanceiro"><div class="muted">Carregando resumo financeiro...</div></div>
 
-    <div style="margin-bottom:12px">
-      <h3 style="margin:0">Visão geral</h3>
-      <div class="muted">Resumo da operação</div>
-    </div>
-
-    <div style="
-      display:grid;
-      grid-template-columns:repeat(2,1fr);
-      gap:12px;
-    ">
-      <div class="card" style="margin:0;padding:18px">
-        <div style="font-size:25px">👥</div>
-        <div class="muted">Clientes</div>
-        <div style="font-size:28px;font-weight:800">${c[0]}</div>
-      </div>
-
-      <div class="card" style="margin:0;padding:18px">
-        <div style="font-size:25px">📅</div>
-        <div class="muted">Eventos</div>
-        <div style="font-size:28px;font-weight:800">${c[1]}</div>
-      </div>
-
-      <div class="card" style="margin:0;padding:18px">
-        <div style="font-size:25px">⚙️</div>
-        <div class="muted">Equipamentos</div>
-        <div style="font-size:28px;font-weight:800">${c[2]}</div>
-      </div>
-
-      <div class="card" style="margin:0;padding:18px">
-        <div style="font-size:25px">📦</div>
-        <div class="muted">Produtos</div>
-        <div style="font-size:28px;font-weight:800">${c[3]}</div>
-      </div>
-    </div>
   `;
   // V132 — Central Operacional (sem alterar login, autenticação ou banco)
   try{
@@ -1202,7 +1161,7 @@ async function renderDashboard(){
     const retornoOps=eventosOps.filter(e=>String(e.status||'').includes('retorno')||String(e.status||'')==='aguardando_retorno').length;
     const preparacaoOps=eventosOps.filter(e=>['pendente','material_pronto'].includes(String(e.status||''))).length;
     const central=document.createElement('div');
-    central.innerHTML=`<div class="card" style="margin:0 0 20px;padding:18px;border-color:#394654">
+    central.innerHTML=`<div class="card" style="margin:0 0 14px;padding:14px;border-color:#394654">
       <div class="sectionhead" style="margin-bottom:12px"><div><h3 style="margin:0">⚡ Central Operacional</h3><div class="muted">O que precisa de atenção na operação</div></div></div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:10px">
         <button class="btn secondary" onclick="renderModule(4)" style="text-align:left;padding:14px"><div class="muted">🎪 Eventos hoje</div><div style="font-size:26px;font-weight:900;margin-top:4px">${hojeOps}</div></button>
@@ -1212,7 +1171,9 @@ async function renderDashboard(){
       </div>
     </div>`;
     const financeiro=document.querySelector('#dashFinanceiro');
-    if(financeiro)financeiro.before(central.firstElementChild);
+    const acessoRapido=document.querySelector('#dashAcessoRapido');
+    if(acessoRapido)acessoRapido.before(central.firstElementChild);
+    else if(financeiro)financeiro.before(central.firstElementChild);
     // V213 — agenda compacta no Painel de Controle, sem substituir a agenda completa.
     try{
       const hoje=new Date();hoje.setHours(0,0,0,0);
