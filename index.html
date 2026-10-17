@@ -78,7 +78,7 @@
 </style>
 </head><body>
 <section id="login" class="login"><div class="loginbox"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><h3>Acesso ao sistema</h3><div class="field"><label>E-mail</label><input id="email" type="email"></div><div class="field"><label>Senha</label><input id="password" type="password"></div><button id="loginBtn" class="btn primary full" style="margin-top:18px">ENTRAR</button><button type="button" class="btn secondary full" style="margin-top:8px" onclick="recuperarSenha()">Esqueci minha senha</button><div id="loginMsg" class="msg"></div></div></section>
-<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><div class="muted" style="font-size:12px">Sistema de gestão CZ · V206</div></div><div><span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
+<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><div class="muted" style="font-size:12px">Sistema de gestão CZ · V207</div></div><div><span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
 <div id="clientModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="modalTitle">Novo cliente</h2><button class="btn secondary" onclick="closeClient()">Fechar</button></div>
   <input id="clientId" type="hidden"><div class="muted" id="clientOpenedAt" style="font-size:13px">Data de abertura: será definida ao salvar</div>
   <div class="row"><div class="field"><label>Nome / Razão social *</label><input id="clientName" autocomplete="name"></div><div class="field"><label>Telefone *</label><input id="clientPhone" type="tel" inputmode="tel" autocomplete="tel"></div></div>
@@ -4298,12 +4298,17 @@ async function renderContratosOficialCZ(){
   let avisoAssinaturas='';
   try{
    const ids=os.map(x=>x.id).filter(Boolean);
-   for(let i=0;i<ids.length;i+=100){
-    const {data,error}=await db.from('contratos_assinaturas').select('orcamento_id,status,pdf_assinado_path,assinado_em').in('orcamento_id',ids.slice(i,i+100));
-    if(error)throw error;
-    (data||[]).forEach(x=>assinaturaPorOrcamento.set(String(x.orcamento_id),x));
+   if(ids.length){
+    const resultados=await Promise.allSettled(ids.map(async id=>{
+     const data=await cz207AssinaturaApi('status',{orcamento_id:id});
+     return {orcamento_id:id,...data};
+    }));
+    resultados.forEach((r,i)=>{
+     if(r.status==='fulfilled')assinaturaPorOrcamento.set(String(r.value.orcamento_id),r.value);
+     else if(!avisoAssinaturas)avisoAssinaturas='Não foi possível consultar todas as assinaturas: '+(r.reason?.message||String(r.reason));
+    });
    }
-  }catch(err){avisoAssinaturas='Não foi possível consultar as assinaturas no Supabase: '+(err.message||String(err));}
+  }catch(err){avisoAssinaturas='Não foi possível consultar as assinaturas: '+(err.message||String(err));}
   let falhaFinanceiro='',mapaOrcamentos=new Map(os.map(p=>[String(p.id),p]));
   let movimentosContrato=[],parcelasContrato=[];
   try{
@@ -4450,20 +4455,29 @@ async function enviarContratoOficialCZ(id){
 
 
 
-/* CZ V206 — consulta do PDF assinado com acesso autenticado.
-   O bucket é privado: requer política de leitura apropriada no Supabase. */
+/* CZ V207 — consulta de assinaturas pela Edge Function autenticada.
+   Nenhuma política pública de leitura é necessária no bucket privado. */
+async function cz207AssinaturaApi(action,payload={}){
+ const {data:{session},error}=await db.auth.getSession();
+ if(error||!session?.access_token)throw new Error('Sua sessão expirou. Entre novamente no sistema CZ.');
+ const resposta=await fetch(SUPABASE_URL+'/functions/v1/contrato-assinatura',{
+  method:'POST',
+  headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token,'apikey':SUPABASE_KEY},
+  body:JSON.stringify({action,...payload})
+ });
+ const data=await resposta.json().catch(()=>({}));
+ if(!resposta.ok||data.error)throw new Error(data.error||'Falha na consulta de assinatura (HTTP '+resposta.status+').');
+ return data;
+}
 async function cz206VisualizarAssinado(id){
  const janela=window.open('','_blank');
  try{
-  const {data,error}=await db.from('contratos_assinaturas').select('status,pdf_assinado_path').eq('orcamento_id',id).maybeSingle();
-  if(error)throw error;
-  if(data?.status!=='assinado'||!data.pdf_assinado_path)throw new Error('PDF assinado ainda não está disponível para este contrato.');
-  const path=String(data.pdf_assinado_path).replace(/^contratos-assinados\//,'');
-  const {data:link,error:linkError}=await db.storage.from('contratos-assinados').createSignedUrl(path,60);
-  if(linkError)throw linkError;
-  if(!link?.signedUrl)throw new Error('Não foi possível abrir o arquivo assinado.');
-  if(janela)janela.location.href=link.signedUrl;else window.open(link.signedUrl,'_blank','noopener');
- }catch(e){if(janela)janela.close();await czAlert('Não foi possível visualizar o PDF assinado: '+(e.message||String(e))+'\n\nVerifique as permissões de leitura do Supabase.','Contrato assinado')}
+  const data=await cz207AssinaturaApi('signed-pdf',{orcamento_id:id});
+  const link=new URL(data.url);
+  if(link.protocol!=='https:')throw new Error('O endereço do PDF não é seguro.');
+  if(janela)janela.location.replace(link.href);
+  else await czAlert('O navegador bloqueou a abertura do PDF. Permita pop-ups para o sistema CZ e tente novamente.','Visualizar PDF assinado');
+ }catch(e){if(janela)janela.close();await czAlert('Não foi possível visualizar o PDF assinado: '+(e.message||String(e)),'Contrato assinado')}
 }
 
 /* CZ V205 — link de assinatura via Edge Function, sem expor credenciais privilegiadas. */
