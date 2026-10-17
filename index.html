@@ -78,7 +78,7 @@
 </style>
 </head><body>
 <section id="login" class="login"><div class="loginbox"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><h3>Acesso ao sistema</h3><div class="field"><label>E-mail</label><input id="email" type="email"></div><div class="field"><label>Senha</label><input id="password" type="password"></div><button id="loginBtn" class="btn primary full" style="margin-top:18px">ENTRAR</button><button type="button" class="btn secondary full" style="margin-top:8px" onclick="recuperarSenha()">Esqueci minha senha</button><div id="loginMsg" class="msg"></div></div></section>
-<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><div class="muted" style="font-size:12px">Sistema de gestão CZ · V198</div></div><div><span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
+<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><div class="muted" style="font-size:12px">Sistema de gestão CZ · V206</div></div><div><span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
 <div id="clientModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="modalTitle">Novo cliente</h2><button class="btn secondary" onclick="closeClient()">Fechar</button></div>
   <input id="clientId" type="hidden"><div class="muted" id="clientOpenedAt" style="font-size:13px">Data de abertura: será definida ao salvar</div>
   <div class="row"><div class="field"><label>Nome / Razão social *</label><input id="clientName" autocomplete="name"></div><div class="field"><label>Telefone *</label><input id="clientPhone" type="tel" inputmode="tel" autocomplete="tel"></div></div>
@@ -4294,6 +4294,16 @@ async function renderContratosOficialCZ(){
  $('#pageTitle').textContent='Contratos';
  try{
   const os=await coOrcs();
+  const assinaturaPorOrcamento=new Map();
+  let avisoAssinaturas='';
+  try{
+   const ids=os.map(x=>x.id).filter(Boolean);
+   for(let i=0;i<ids.length;i+=100){
+    const {data,error}=await db.from('contratos_assinaturas').select('orcamento_id,status,pdf_assinado_path,assinado_em').in('orcamento_id',ids.slice(i,i+100));
+    if(error)throw error;
+    (data||[]).forEach(x=>assinaturaPorOrcamento.set(String(x.orcamento_id),x));
+   }
+  }catch(err){avisoAssinaturas='Não foi possível consultar as assinaturas no Supabase: '+(err.message||String(err));}
   let falhaFinanceiro='',mapaOrcamentos=new Map(os.map(p=>[String(p.id),p]));
   let movimentosContrato=[],parcelasContrato=[];
   try{
@@ -4303,8 +4313,9 @@ async function renderContratosOficialCZ(){
    parcelasContrato=cz172ParcelasFinanceiras(movimentosContrato).parcelas;
   }catch(err){falhaFinanceiro=err.message||String(err)}
   $('#content').innerHTML=`<div class="sectionhead"><div><h2>Contratos</h2><div class="muted">Modelo oficial CZ • contrato vinculado à proposta e ao cliente.</div></div><button class="btn secondary" onclick="abrirMapaReservasV140()">Reservas</button></div>
+  ${avisoAssinaturas?`<div class="msg" style="color:#ffb87b">${coEsc(avisoAssinaturas)}</div>`:''}
   ${falhaFinanceiro?`<div class="msg" style="color:#ff8b78">Não foi possível consultar os pagamentos: ${coEsc(falhaFinanceiro)}. Confira a conexão com o Caixa.</div>`:''}
-  <div class="tablewrap">${os.length?`<table><thead><tr><th>Proposta</th><th>Cliente</th><th>Evento</th><th>Data</th><th>Contrato</th><th>Pagamento</th><th>Ação</th></tr></thead><tbody>${os.map(p=>{const c=coGet(p.id)||{};const cancelado=c.status==='Cancelado'||String(p.status||'').toLowerCase()==='cancelado';const pagamento=cancelado?'<span class="muted">Cancelado</span>':falhaFinanceiro?'<span class="muted">Indisponível</span>':cz175StatusPagamentoEvento({origem_orcamento_id:p.id},mapaOrcamentos,parcelasContrato,movimentosContrato);return `<tr><td><b>${coEsc(p.numero||'—')}</b></td><td>${coEsc(p.cliente_nome||'')}</td><td>${coEsc(p.evento_nome||'')}</td><td>${finDate(p.data_evento)}</td><td>${coStatusBadge(cancelado?'Cancelado':c.status)}</td><td>${pagamento}</td><td><div style="display:flex;gap:6px;flex-wrap:wrap">${cancelado?'<span style="color:#ff8989;font-weight:800">CANCELADO</span>':`<button class="btn primary" onclick="abrirContratoOficialCZ('${p.id}')">${!c.status||c.status==='Não gerado'?'Preencher contrato':'Abrir contrato'}</button>${c.status&&c.status!=='Não gerado'?`<button class="btn secondary" onclick="visualizarPdfContratoCZ('${p.id}')">👁 Visualizar PDF</button><button class="btn secondary" onclick="enviarContratoOficialCZ('${p.id}')">WhatsApp / PDF</button><button class="btn primary" onclick="cz205EnviarLinkAssinatura('${p.id}')">✍ Link assinatura</button>`:''}<button type="button" class="btn danger" onclick="cz179CancelarContrato('${p.id}')">Cancelar</button>`}</div></td></tr>`}).join('')}</tbody></table>`:'<div class="empty">Nenhuma proposta encontrada.</div>'}</div>`;
+  <div class="tablewrap">${os.length?`<table><thead><tr><th>Proposta</th><th>Cliente</th><th>Evento</th><th>Data</th><th>Contrato</th><th>Pagamento</th><th>Ação</th></tr></thead><tbody>${os.map(p=>{const c=coGet(p.id)||{};const assinatura=assinaturaPorOrcamento.get(String(p.id));const assinado=assinatura?.status==='assinado';const cancelado=c.status==='Cancelado'||String(p.status||'').toLowerCase()==='cancelado';const pagamento=cancelado?'<span class="muted">Cancelado</span>':falhaFinanceiro?'<span class="muted">Indisponível</span>':cz175StatusPagamentoEvento({origem_orcamento_id:p.id},mapaOrcamentos,parcelasContrato,movimentosContrato);return `<tr><td><b>${coEsc(p.numero||'—')}</b></td><td>${coEsc(p.cliente_nome||'')}</td><td>${coEsc(p.evento_nome||'')}</td><td>${finDate(p.data_evento)}</td><td>${coStatusBadge(cancelado?'Cancelado':assinado?'Assinado':c.status)}</td><td>${pagamento}</td><td><div style="display:flex;gap:6px;flex-wrap:wrap">${cancelado?'<span style="color:#ff8989;font-weight:800">CANCELADO</span>':`<button class="btn primary" onclick="abrirContratoOficialCZ('${p.id}')">${!c.status||c.status==='Não gerado'?'Preencher contrato':'Abrir contrato'}</button>${c.status&&c.status!=='Não gerado'?`<button class="btn secondary" onclick="visualizarPdfContratoCZ('${p.id}')">👁 Visualizar PDF</button><button class="btn secondary" onclick="enviarContratoOficialCZ('${p.id}')">WhatsApp / PDF</button>${assinado?`<button class="btn secondary" onclick="cz206VisualizarAssinado('${p.id}')">📄 PDF assinado</button>`:`<button class="btn primary" onclick="cz205EnviarLinkAssinatura('${p.id}')">✍ Link assinatura</button>`}`:''}<button type="button" class="btn danger" onclick="cz179CancelarContrato('${p.id}')">Cancelar</button>`}</div></td></tr>`}).join('')}</tbody></table>`:'<div class="empty">Nenhuma proposta encontrada.</div>'}</div>`;
  }catch(e){$('#content').innerHTML=`<div class="msg">Erro: ${coEsc(e.message)}</div>`}
 }
 async function abrirContratoOficialCZ(id){
@@ -4437,6 +4448,23 @@ async function enviarContratoOficialCZ(id){
  if(await czConfirm('Você anexou e enviou o PDF ao cliente?','Confirmar envio','Sim, enviei')){coSet(id,{status:'Enviado',enviado_em:new Date().toISOString()});renderContratosOficialCZ()}
 }
 
+
+
+/* CZ V206 — consulta do PDF assinado com acesso autenticado.
+   O bucket é privado: requer política de leitura apropriada no Supabase. */
+async function cz206VisualizarAssinado(id){
+ const janela=window.open('','_blank');
+ try{
+  const {data,error}=await db.from('contratos_assinaturas').select('status,pdf_assinado_path').eq('orcamento_id',id).maybeSingle();
+  if(error)throw error;
+  if(data?.status!=='assinado'||!data.pdf_assinado_path)throw new Error('PDF assinado ainda não está disponível para este contrato.');
+  const path=String(data.pdf_assinado_path).replace(/^contratos-assinados\//,'');
+  const {data:link,error:linkError}=await db.storage.from('contratos-assinados').createSignedUrl(path,60);
+  if(linkError)throw linkError;
+  if(!link?.signedUrl)throw new Error('Não foi possível abrir o arquivo assinado.');
+  if(janela)janela.location.href=link.signedUrl;else window.open(link.signedUrl,'_blank','noopener');
+ }catch(e){if(janela)janela.close();await czAlert('Não foi possível visualizar o PDF assinado: '+(e.message||String(e))+'\n\nVerifique as permissões de leitura do Supabase.','Contrato assinado')}
+}
 
 /* CZ V205 — link de assinatura via Edge Function, sem expor credenciais privilegiadas. */
 async function cz205EnviarLinkAssinatura(id){
