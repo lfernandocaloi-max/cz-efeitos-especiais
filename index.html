@@ -2008,7 +2008,12 @@ var CZ_CAPA_CHA_W='data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAsICA
     if(!window.jspdf?.jsPDF)throw new Error('Não foi possível carregar o gerador de PDF.');
     const pdf=new window.jspdf.jsPDF({unit:'mm',format:'a4'});
     const W=210,H=297;
-    const modelo=['casamento','cha_revelacao','padrao'].includes(d?.modelo_proposta)?d.modelo_proposta:'padrao';
+    // V200: respeita o modelo persistido; recupera casamento em propostas
+    // antigas sem modelo quando o tipo de evento o identifica inequivocamente.
+    const modeloSalvo=String(d?.modelo_proposta||'').trim().toLowerCase();
+    const tipoEvento=String(d?.evento||d?.tipo_evento||'').toLowerCase();
+    const modelo=['casamento','cha_revelacao','padrao'].includes(modeloSalvo)
+      ? modeloSalvo : (/casamento|matrim[oô]nio|wedding/.test(tipoEvento)?'casamento':'padrao');
     const produtos=Array.isArray(d.produtos)?d.produtos:[];
     const equipamentos=Array.isArray(d.equipamentos)?d.equipamentos:[];
     // V167: aceita JPEG/PNG e normaliza imagens de modelos antigos.
