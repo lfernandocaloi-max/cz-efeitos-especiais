@@ -2338,7 +2338,7 @@ Obrigado!`;
     const eventosExistentes=new Set(eventosVinculados.filter(x=>x.status!=='pendente').map(x=>String(x.id)));
     const propostasExibidas=(data||[]).filter(x=>{const fechado=origensComEvento.has(String(x.id))||eventosExistentes.has(String(x.dados?.evento_operacional_id||''));return orcamentosFechadosModo?(fechado||String(x.status||'').toLowerCase()==='cancelado'):(!fechado&&String(x.status||'').toLowerCase()!=='cancelado')});
     box.innerHTML=propostasExibidas.length?`<div class="tablewrap"><table class="orcamentos-lista"><thead><tr><th>Cliente</th><th>Data</th><th>Evento</th><th>Valor</th><th>Status</th><th>Nº Proposta</th><th style="min-width:190px">Fechamento</th><th>Ações</th></tr></thead><tbody>${propostasExibidas.map(x=>`<tr><td>${esc(x.cliente_nome||'')}</td><td>${x.data_evento?new Date(x.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${esc(x.evento_nome||'')}</td><td>${money(x.valor_total)}</td><td>${esc(x.status||'')}</td><td><b>${esc(x.numero||'')}</b></td><td>${String(x.status||'').toLowerCase()==='cancelado'?'<span style="display:inline-flex;padding:8px 12px;border:1px solid #b85050;border-radius:999px;font-size:11px;font-weight:900;color:#ff8989">CANCELADO</span>':(origensComEvento.has(String(x.id))||eventosExistentes.has(String(x.dados?.evento_operacional_id||'')))?'<span style="display:inline-flex;padding:8px 12px;border:1px solid #2f9e63;border-radius:999px;font-size:11px;font-weight:900">FECHADO</span>':`<button type="button" class="btn primary btnConfirmarOrcamentoV156" data-id="${esc(x.id)}" style="font-weight:900;white-space:nowrap;padding:9px 12px">CONFIRMAR ORÇAMENTO</button>`}</td><td><div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap"><button type="button" class="btn secondary btnVisualizarProposta" data-id="${esc(x.id)}" title="Visualizar proposta" aria-label="Visualizar proposta" style="padding:5px 7px;min-height:auto">${iconeOlho()}</button><button type="button" class="btn secondary btnVerPdfProposta" data-id="${esc(x.id)}" title="Visualizar PDF da proposta" aria-label="Visualizar PDF da proposta" style="padding:6px 9px;min-height:auto;font-weight:800;white-space:nowrap">Ver PDF</button><button type="button" class="btn secondary btnEnviarProposta" data-id="${esc(x.id)}" title="Enviar proposta pelo WhatsApp" aria-label="Enviar proposta pelo WhatsApp" style="padding:5px 7px;min-height:auto">${iconeEnviarProposta()}</button><button type="button" class="btn secondary btnWhatsProposta" data-id="${esc(x.id)}" title="Enviar preenchimento pelo WhatsApp" aria-label="Enviar preenchimento pelo WhatsApp" style="padding:5px 7px;min-height:auto">${iconeWhats()}</button>${String(x.status||'').toLowerCase()!=='cancelado'&&(origensComEvento.has(String(x.id))||eventosExistentes.has(String(x.dados?.evento_operacional_id||'')))?`<button type="button" class="btn danger" onclick="cz180CancelarOrcamento('${esc(x.id)}')" style="padding:5px 9px;min-height:auto">Cancelar</button>`:''}<button type="button" class="btn danger btnExcluirProposta" data-id="${esc(x.id)}" title="Excluir proposta" aria-label="Excluir proposta" style="font-size:14px;padding:4px 8px;min-height:auto">×</button></div></td></tr>`).join('')}</tbody></table></div>`:'<div class="muted">Nenhuma proposta gerada ainda.</div>';
-    box.querySelectorAll('.btnConfirmarOrcamentoV156').forEach(btn=>{btn.onclick=()=>cz151ConfirmarOrcamento(btn.dataset.id)});
+    box.querySelectorAll('.btnConfirmarOrcamentoV156').forEach(btn=>{btn.onclick=async()=>{btn.disabled=true;const anterior=btn.textContent;btn.textContent='PROCESSANDO...';try{await cz151ConfirmarOrcamento(btn.dataset.id)}catch(e){console.error('CZ confirmar orçamento',e);await czAlert('Erro ao iniciar confirmação: '+(e?.message||String(e)),'Confirmar orçamento')}finally{if(btn.isConnected){btn.disabled=false;btn.textContent=anterior}}}});
     box.querySelectorAll('.btnVerPdfProposta').forEach(btn=>{btn.onclick=()=>{
       const p=propostasExibidas.find(x=>String(x.id)===String(btn.dataset.id));
       if(!p)return;
@@ -4274,7 +4274,7 @@ async function renderContratosOficialCZ(){
   }catch(err){falhaFinanceiro=err.message||String(err)}
   $('#content').innerHTML=`<div class="sectionhead"><div><h2>Contratos</h2><div class="muted">Modelo oficial CZ • contrato vinculado à proposta e ao cliente.</div></div><button class="btn secondary" onclick="abrirMapaReservasV140()">Reservas</button></div>
   ${falhaFinanceiro?`<div class="msg" style="color:#ff8b78">Não foi possível consultar os pagamentos: ${coEsc(falhaFinanceiro)}. Confira a conexão com o Caixa.</div>`:''}
-  <div class="tablewrap">${os.length?`<table><thead><tr><th>Proposta</th><th>Cliente</th><th>Evento</th><th>Data</th><th>Contrato</th><th>Pagamento</th><th>Ação</th></tr></thead><tbody>${os.map(p=>{const c=coGet(p.id)||{};const cancelado=c.status==='Cancelado'||String(p.status||'').toLowerCase()==='cancelado';const pagamento=cancelado?'<span class="muted">Cancelado</span>':falhaFinanceiro?'<span class="muted">Indisponível</span>':cz175StatusPagamentoEvento({origem_orcamento_id:p.id},mapaOrcamentos,parcelasContrato,movimentosContrato);return `<tr><td><b>${coEsc(p.numero||'—')}</b></td><td>${coEsc(p.cliente_nome||'')}</td><td>${coEsc(p.evento_nome||'')}</td><td>${finDate(p.data_evento)}</td><td>${coStatusBadge(cancelado?'Cancelado':c.status)}</td><td>${pagamento}</td><td><div style="display:flex;gap:6px;flex-wrap:wrap">${cancelado?'<span style="color:#ff8989;font-weight:800">CANCELADO</span>':`<button class="btn primary" onclick="abrirContratoOficialCZ('${p.id}')">${!c.status||c.status==='Não gerado'?'Preencher contrato':'Abrir contrato'}</button><button type="button" class="btn danger" onclick="cz179CancelarContrato('${p.id}')">Cancelar</button>`}</div></td></tr>`}).join('')}</tbody></table>`:'<div class="empty">Nenhuma proposta encontrada.</div>'}</div>`;
+  <div class="tablewrap">${os.length?`<table><thead><tr><th>Proposta</th><th>Cliente</th><th>Evento</th><th>Data</th><th>Contrato</th><th>Pagamento</th><th>Ação</th></tr></thead><tbody>${os.map(p=>{const c=coGet(p.id)||{};const cancelado=c.status==='Cancelado'||String(p.status||'').toLowerCase()==='cancelado';const pagamento=cancelado?'<span class="muted">Cancelado</span>':falhaFinanceiro?'<span class="muted">Indisponível</span>':cz175StatusPagamentoEvento({origem_orcamento_id:p.id},mapaOrcamentos,parcelasContrato,movimentosContrato);return `<tr><td><b>${coEsc(p.numero||'—')}</b></td><td>${coEsc(p.cliente_nome||'')}</td><td>${coEsc(p.evento_nome||'')}</td><td>${finDate(p.data_evento)}</td><td>${coStatusBadge(cancelado?'Cancelado':c.status)}</td><td>${pagamento}</td><td><div style="display:flex;gap:6px;flex-wrap:wrap">${cancelado?'<span style="color:#ff8989;font-weight:800">CANCELADO</span>':`<button class="btn primary" onclick="abrirContratoOficialCZ('${p.id}')">${!c.status||c.status==='Não gerado'?'Preencher contrato':'Abrir contrato'}</button>${c.status&&c.status!=='Não gerado'?`<button class="btn secondary" onclick="visualizarPdfContratoCZ('${p.id}')">👁 Visualizar PDF</button><button class="btn secondary" onclick="enviarContratoOficialCZ('${p.id}')">WhatsApp / PDF</button>`:''}<button type="button" class="btn danger" onclick="cz179CancelarContrato('${p.id}')">Cancelar</button>`}</div></td></tr>`}).join('')}</tbody></table>`:'<div class="empty">Nenhuma proposta encontrada.</div>'}</div>`;
  }catch(e){$('#content').innerHTML=`<div class="msg">Erro: ${coEsc(e.message)}</div>`}
 }
 async function abrirContratoOficialCZ(id){
@@ -4351,11 +4351,60 @@ async function imprimirContratoOficialCZ(id){
  const w=window.open('','_blank','width=950,height=800');if(!w)return czAlert('Libere pop-ups para visualizar o contrato.','Contrato');
  w.document.write(coContratoHTML(c,p)+`<script>window.onload=()=>setTimeout(()=>window.print(),250)<\/script>`);w.document.close();
 }
+// V202 — PDF real do contrato, para visualizar, baixar e compartilhar.
+async function cz202ArquivoContrato(id){
+ const p=(await coOrcs()).find(x=>String(x.id)===String(id)),c=coGet(id);
+ if(!p||!c||!c.nome||!c.servicos)throw new Error('Preencha e salve o contrato antes de gerar o PDF.');
+ if(!window.jspdf?.jsPDF)throw new Error('Biblioteca de PDF indisponível. Atualize a página.');
+ const pdf=new window.jspdf.jsPDF({unit:'mm',format:'a4'});
+ const doc=new DOMParser().parseFromString(coContratoHTML(c,p),'text/html');
+ const largura=174,margem=18;let y=20;
+ function linha(txt,titulo=false){
+  const conteudo=String(txt||'').replace(/\s+/g,' ').trim();if(!conteudo)return;
+  pdf.setFont('helvetica',titulo?'bold':'normal');pdf.setFontSize(titulo?12:10);
+  const partes=pdf.splitTextToSize(conteudo,largura);
+  const altura=titulo?6:4.8;
+  for(const parte of partes){if(y+altura>278){pdf.addPage();y=20}pdf.text(parte,margem,y);y+=altura}
+  y+=titulo?3:2;
+ }
+ for(const el of doc.body.querySelectorAll('h1,h2,p,li,.sig .line')){
+  if(el.closest('.sig')&&el.classList.contains('line')){linha(el.textContent);continue}
+  if(el.tagName==='H1'||el.tagName==='H2')linha(el.textContent,true);
+  else if(el.tagName==='LI')linha('• '+el.textContent);
+  else if(el.tagName==='P')linha(el.textContent);
+ }
+ const nome='Contrato_CZ_'+String(p.numero||id).replace(/[^a-zA-Z0-9_-]/g,'_')+'.pdf';
+ return {blob:pdf.output('blob'),nome,p,c};
+}
+function cz202BaixarArquivo(blob,nome){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=nome;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000)}
+async function visualizarPdfContratoCZ(id){
+ // Abre a janela imediatamente para não ser bloqueada após operações assíncronas.
+ const janela=window.open('','_blank');
+ try{const {blob}=await cz202ArquivoContrato(id);const url=URL.createObjectURL(blob);
+  if(janela){janela.location.href=url;setTimeout(()=>URL.revokeObjectURL(url),120000)}
+  else {cz202BaixarArquivo(blob,'Contrato_CZ.pdf');await czAlert('O navegador bloqueou a visualização. O PDF foi baixado.','Contrato')}
+ }catch(e){if(janela)janela.close();await czAlert(e.message||String(e),'Visualizar contrato')}
+}
 async function enviarContratoOficialCZ(id){
- const p=(await coOrcs()).find(x=>String(x.id)===String(id)),c=coGet(id);if(!p||!c)return;
- let tel=String(c.telefone||'').replace(/\D/g,'');if(tel.length===10||tel.length===11)tel='55'+tel;if(!tel)return czAlert('Telefone do contratante não preenchido.','WhatsApp');
- coSet(id,{status:'Enviado',enviado_em:new Date().toISOString()});
- window.open('https://wa.me/'+tel+'?text='+encodeURIComponent(`Olá ${c.nome}. O contrato referente à Proposta ${p.numero||''} da CZ Efeitos Especiais está pronto para conferência e assinatura.`),'_blank','noopener');
+ let arquivo;
+ try{arquivo=await cz202ArquivoContrato(id)}catch(e){return czAlert(e.message||String(e),'Contrato')}
+ const {blob,nome,c,p}=arquivo;
+ let tel=String(c.telefone||'').replace(/\D/g,'');if(tel.length===10||tel.length===11)tel='55'+tel;
+ if(!tel)return czAlert('Telefone do contratante não preenchido.','WhatsApp');
+ const mensagem=`Olá ${c.nome}. Segue o contrato referente à Proposta ${p.numero||''} da CZ Efeitos Especiais para conferência e assinatura.`;
+ const url='https://wa.me/'+tel+'?text='+encodeURIComponent(mensagem);
+ // Compartilhamento nativo pode anexar o arquivo em navegadores compatíveis.
+ const arquivoPdf=new File([blob],nome,{type:'application/pdf'});
+ if(navigator.share&&navigator.canShare&&navigator.canShare({files:[arquivoPdf]})){
+  try{await navigator.share({files:[arquivoPdf],title:'Contrato CZ Efeitos Especiais',text:mensagem});
+   if(await czConfirm('Você concluiu o envio do PDF ao cliente pelo WhatsApp?','Confirmar envio','Sim, enviei')){coSet(id,{status:'Enviado',enviado_em:new Date().toISOString()});renderContratosOficialCZ()}
+   return;
+  }catch(e){if(e?.name==='AbortError')return}
+ }
+ cz202BaixarArquivo(blob,nome);
+ window.open(url,'_blank','noopener');
+ await czAlert('O PDF do contrato foi baixado e o WhatsApp foi aberto. Anexe o arquivo PDF baixado na conversa e envie ao cliente.','Enviar contrato');
+ if(await czConfirm('Você anexou e enviou o PDF ao cliente?','Confirmar envio','Sim, enviei')){coSet(id,{status:'Enviado',enviado_em:new Date().toISOString()});renderContratosOficialCZ()}
 }
 
 
