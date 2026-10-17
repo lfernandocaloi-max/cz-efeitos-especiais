@@ -2227,6 +2227,28 @@ var CZ_CAPA_CHA_W='data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAsICA
     if(encontrados.length!==1)throw new Error(encontrados.length?'Há mais de um cliente correspondente. Confira o cadastro antes de enviar.':'Cliente não encontrado na base de clientes.');
     return encontrados[0];
   }
+  // V203: um único PDF imutável por ID do orçamento, usado na visualização e no WhatsApp.
+  async function cz203PdfDaProposta(p){
+    if(!p?.id||!p.dados||typeof p.dados!=='object')throw new Error('Orçamento sem identificação ou dados salvos.');
+    const caminho=p.dados.pdf_original_path;
+    if(caminho){
+      const {data,error}=await db.storage.from('propostas-pdf').download(caminho);
+      if(error||!data)throw new Error('O PDF original deste orçamento não está disponível: '+(error?.message||'arquivo ausente'));
+      return {blob:data,nomeArquivo:p.dados.pdf_original_nome||('proposta-'+p.numero+'.pdf'),caminho};
+    }
+    // Compatibilidade: propostas anteriores à V203 não possuem PDF original arquivado.
+    const original=gerarPdfProposta(p.dados,p.numero||'sem-numero',true);
+    return {...original,caminho:null};
+  }
+  async function cz203ArquivarPdfOriginal(p,blob,nomeArquivo){
+    const caminho=String(p.id)+'/original/'+nomeArquivo;
+    const {error}=await db.storage.from('propostas-pdf').upload(caminho,blob,{contentType:'application/pdf',upsert:false});
+    if(error)throw new Error('Não foi possível arquivar o PDF original: '+error.message);
+    const dados={...p.dados,pdf_original_path:caminho,pdf_original_nome:nomeArquivo};
+    const {error:erroUpdate}=await db.from('orcamentos').update({dados}).eq('id',p.id);
+    if(erroUpdate)throw new Error('PDF arquivado, mas não foi possível vincular ao orçamento: '+erroUpdate.message);
+    p.dados=dados;
+  }
   async function enviarPropostaWhats(p,btn){
     if(btn.disabled)return;
     const msg=$('#orcEnvioMsg');if(msg){msg.textContent='Preparando PDF e conferindo telefone do cliente...';msg.style.color='var(--muted)'}
@@ -2237,10 +2259,13 @@ var CZ_CAPA_CHA_W='data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAsICA
       if(!p.dados||typeof p.dados!=='object')throw new Error('Esta proposta não tem os dados salvos para gerar o PDF.');
       const cliente=await clienteDaProposta(p),telefone=telefonePropostaWhats(cliente.telefone);
       if(!/^\d{12,15}$/.test(telefone))throw new Error('Confira o telefone com DDD na base de clientes.');
-      const {blob,nomeArquivo}=gerarPdfProposta(p.dados,p.numero||'sem-numero',true);
-      const caminho=String(p.id)+'/'+crypto.randomUUID()+'/'+nomeArquivo;
-      const {error:erroUpload}=await db.storage.from('propostas-pdf').upload(caminho,blob,{contentType:'application/pdf',upsert:false});
-      if(erroUpload)throw new Error('Não foi possível salvar o PDF. Execute o SQL de envio de propostas. '+erroUpload.message);
+      const {blob,nomeArquivo,caminho:originalPath}=await cz203PdfDaProposta(p);
+      let caminho=originalPath;
+      if(!caminho){
+        caminho=String(p.id)+'/legado/'+crypto.randomUUID()+'/'+nomeArquivo;
+        const {error:erroUpload}=await db.storage.from('propostas-pdf').upload(caminho,blob,{contentType:'application/pdf',upsert:false});
+        if(erroUpload)throw new Error('Não foi possível salvar o PDF: '+erroUpload.message);
+      }
       const {data:arquivo,error:erroLink}=await db.storage.from('propostas-pdf').createSignedUrl(caminho,604800,{download:nomeArquivo});
       if(erroLink||!arquivo?.signedUrl)throw new Error('Não foi possível preparar o link do PDF: '+(erroLink?.message||'link indisponível'));
       const texto=`Olá ${cliente.nome||''}! Segue a proposta ${p.numero||''} da CZ Efeitos Especiais para ${p.evento_nome||p.dados.evento||'seu evento'}.\n\nPDF da proposta:\n${arquivo.signedUrl}\n\nO link fica disponível por 7 dias.`;
@@ -2339,7 +2364,7 @@ Obrigado!`;
     const propostasExibidas=(data||[]).filter(x=>{const fechado=origensComEvento.has(String(x.id))||eventosExistentes.has(String(x.dados?.evento_operacional_id||''));return orcamentosFechadosModo?(fechado||String(x.status||'').toLowerCase()==='cancelado'):(!fechado&&String(x.status||'').toLowerCase()!=='cancelado')});
     box.innerHTML=propostasExibidas.length?`<div class="tablewrap"><table class="orcamentos-lista"><thead><tr><th>Cliente</th><th>Data</th><th>Evento</th><th>Valor</th><th>Status</th><th>Nº Proposta</th><th style="min-width:190px">Fechamento</th><th>Ações</th></tr></thead><tbody>${propostasExibidas.map(x=>`<tr><td>${esc(x.cliente_nome||'')}</td><td>${x.data_evento?new Date(x.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${esc(x.evento_nome||'')}</td><td>${money(x.valor_total)}</td><td>${esc(x.status||'')}</td><td><b>${esc(x.numero||'')}</b></td><td>${String(x.status||'').toLowerCase()==='cancelado'?'<span style="display:inline-flex;padding:8px 12px;border:1px solid #b85050;border-radius:999px;font-size:11px;font-weight:900;color:#ff8989">CANCELADO</span>':(origensComEvento.has(String(x.id))||eventosExistentes.has(String(x.dados?.evento_operacional_id||'')))?'<span style="display:inline-flex;padding:8px 12px;border:1px solid #2f9e63;border-radius:999px;font-size:11px;font-weight:900">FECHADO</span>':`<button type="button" class="btn primary btnConfirmarOrcamentoV156" data-id="${esc(x.id)}" style="font-weight:900;white-space:nowrap;padding:9px 12px">CONFIRMAR ORÇAMENTO</button>`}</td><td><div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap"><button type="button" class="btn secondary btnVisualizarProposta" data-id="${esc(x.id)}" title="Visualizar proposta" aria-label="Visualizar proposta" style="padding:5px 7px;min-height:auto">${iconeOlho()}</button><button type="button" class="btn secondary btnVerPdfProposta" data-id="${esc(x.id)}" title="Visualizar PDF da proposta" aria-label="Visualizar PDF da proposta" style="padding:6px 9px;min-height:auto;font-weight:800;white-space:nowrap">Ver PDF</button><button type="button" class="btn secondary btnEnviarProposta" data-id="${esc(x.id)}" title="Enviar proposta pelo WhatsApp" aria-label="Enviar proposta pelo WhatsApp" style="padding:5px 7px;min-height:auto">${iconeEnviarProposta()}</button><button type="button" class="btn secondary btnWhatsProposta" data-id="${esc(x.id)}" title="Enviar preenchimento pelo WhatsApp" aria-label="Enviar preenchimento pelo WhatsApp" style="padding:5px 7px;min-height:auto">${iconeWhats()}</button>${String(x.status||'').toLowerCase()!=='cancelado'&&(origensComEvento.has(String(x.id))||eventosExistentes.has(String(x.dados?.evento_operacional_id||'')))?`<button type="button" class="btn danger" onclick="cz180CancelarOrcamento('${esc(x.id)}')" style="padding:5px 9px;min-height:auto">Cancelar</button>`:''}<button type="button" class="btn danger btnExcluirProposta" data-id="${esc(x.id)}" title="Excluir proposta" aria-label="Excluir proposta" style="font-size:14px;padding:4px 8px;min-height:auto">×</button></div></td></tr>`).join('')}</tbody></table></div>`:'<div class="muted">Nenhuma proposta gerada ainda.</div>';
     box.querySelectorAll('.btnConfirmarOrcamentoV156').forEach(btn=>{btn.onclick=async()=>{btn.disabled=true;const anterior=btn.textContent;btn.textContent='PROCESSANDO...';try{await cz151ConfirmarOrcamento(btn.dataset.id)}catch(e){console.error('CZ confirmar orçamento',e);await czAlert('Erro ao iniciar confirmação: '+(e?.message||String(e)),'Confirmar orçamento')}finally{if(btn.isConnected){btn.disabled=false;btn.textContent=anterior}}}});
-    box.querySelectorAll('.btnVerPdfProposta').forEach(btn=>{btn.onclick=()=>{
+    box.querySelectorAll('.btnVerPdfProposta').forEach(btn=>{btn.onclick=async()=>{
       const p=propostasExibidas.find(x=>String(x.id)===String(btn.dataset.id));
       if(!p)return;
       if(!p.dados||typeof p.dados!=='object'){czAlert('Esta proposta não possui dados completos para gerar o PDF.','Orçamento');return}
@@ -2349,7 +2374,7 @@ Obrigado!`;
       try{
         janela.document.title='Preparando PDF da proposta';
         janela.document.body.innerHTML='<p style="font:16px Arial;padding:24px">Preparando PDF da proposta...</p>';
-        const {blob}=gerarPdfProposta(p.dados,p.numero||'sem-numero',true);
+        const {blob}=await cz203PdfDaProposta(p);
         if(!(blob instanceof Blob)||!blob.size)throw new Error('O PDF não foi gerado corretamente.');
         const url=URL.createObjectURL(blob);
         janela.location.replace(url);
@@ -2379,8 +2404,13 @@ Obrigado!`;
       const modelo=await selecionarModeloProposta();
       if(!modelo){$('#orcMsg').textContent='Geração cancelada.';return;}
       const r=await salvarProposta('enviado',modelo);
-      gerarPdfProposta(r.d,r.numero);
-      await czAlert('Proposta '+r.numero+' salva em Orçamentos e PDF gerado.','Orçamento');await renderOrcamentos()
+      const {blob,nomeArquivo}=gerarPdfProposta(r.d,r.numero,true);
+      // Salva o arquivo exato antes de disponibilizar a proposta na lista.
+      await cz203ArquivarPdfOriginal(r.registro,blob,nomeArquivo);
+      const url=URL.createObjectURL(blob);
+      const link=document.createElement('a');link.href=url;link.download=nomeArquivo;document.body.appendChild(link);link.click();link.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),120000);
+      await czAlert('Proposta '+r.numero+' salva com PDF original vinculado ao orçamento.','Orçamento');await renderOrcamentos()
     }
     catch(e){$('#orcMsg').textContent='Erro ao gerar proposta: '+e.message}
     finally{btn.disabled=false}
