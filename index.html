@@ -4304,7 +4304,7 @@ async function renderContratosOficialCZ(){
   }catch(err){falhaFinanceiro=err.message||String(err)}
   $('#content').innerHTML=`<div class="sectionhead"><div><h2>Contratos</h2><div class="muted">Modelo oficial CZ • contrato vinculado à proposta e ao cliente.</div></div><button class="btn secondary" onclick="abrirMapaReservasV140()">Reservas</button></div>
   ${falhaFinanceiro?`<div class="msg" style="color:#ff8b78">Não foi possível consultar os pagamentos: ${coEsc(falhaFinanceiro)}. Confira a conexão com o Caixa.</div>`:''}
-  <div class="tablewrap">${os.length?`<table><thead><tr><th>Proposta</th><th>Cliente</th><th>Evento</th><th>Data</th><th>Contrato</th><th>Pagamento</th><th>Ação</th></tr></thead><tbody>${os.map(p=>{const c=coGet(p.id)||{};const cancelado=c.status==='Cancelado'||String(p.status||'').toLowerCase()==='cancelado';const pagamento=cancelado?'<span class="muted">Cancelado</span>':falhaFinanceiro?'<span class="muted">Indisponível</span>':cz175StatusPagamentoEvento({origem_orcamento_id:p.id},mapaOrcamentos,parcelasContrato,movimentosContrato);return `<tr><td><b>${coEsc(p.numero||'—')}</b></td><td>${coEsc(p.cliente_nome||'')}</td><td>${coEsc(p.evento_nome||'')}</td><td>${finDate(p.data_evento)}</td><td>${coStatusBadge(cancelado?'Cancelado':c.status)}</td><td>${pagamento}</td><td><div style="display:flex;gap:6px;flex-wrap:wrap">${cancelado?'<span style="color:#ff8989;font-weight:800">CANCELADO</span>':`<button class="btn primary" onclick="abrirContratoOficialCZ('${p.id}')">${!c.status||c.status==='Não gerado'?'Preencher contrato':'Abrir contrato'}</button>${c.status&&c.status!=='Não gerado'?`<button class="btn secondary" onclick="visualizarPdfContratoCZ('${p.id}')">👁 Visualizar PDF</button><button class="btn secondary" onclick="enviarContratoOficialCZ('${p.id}')">WhatsApp / PDF</button>`:''}<button type="button" class="btn danger" onclick="cz179CancelarContrato('${p.id}')">Cancelar</button>`}</div></td></tr>`}).join('')}</tbody></table>`:'<div class="empty">Nenhuma proposta encontrada.</div>'}</div>`;
+  <div class="tablewrap">${os.length?`<table><thead><tr><th>Proposta</th><th>Cliente</th><th>Evento</th><th>Data</th><th>Contrato</th><th>Pagamento</th><th>Ação</th></tr></thead><tbody>${os.map(p=>{const c=coGet(p.id)||{};const cancelado=c.status==='Cancelado'||String(p.status||'').toLowerCase()==='cancelado';const pagamento=cancelado?'<span class="muted">Cancelado</span>':falhaFinanceiro?'<span class="muted">Indisponível</span>':cz175StatusPagamentoEvento({origem_orcamento_id:p.id},mapaOrcamentos,parcelasContrato,movimentosContrato);return `<tr><td><b>${coEsc(p.numero||'—')}</b></td><td>${coEsc(p.cliente_nome||'')}</td><td>${coEsc(p.evento_nome||'')}</td><td>${finDate(p.data_evento)}</td><td>${coStatusBadge(cancelado?'Cancelado':c.status)}</td><td>${pagamento}</td><td><div style="display:flex;gap:6px;flex-wrap:wrap">${cancelado?'<span style="color:#ff8989;font-weight:800">CANCELADO</span>':`<button class="btn primary" onclick="abrirContratoOficialCZ('${p.id}')">${!c.status||c.status==='Não gerado'?'Preencher contrato':'Abrir contrato'}</button>${c.status&&c.status!=='Não gerado'?`<button class="btn secondary" onclick="visualizarPdfContratoCZ('${p.id}')">👁 Visualizar PDF</button><button class="btn secondary" onclick="enviarContratoOficialCZ('${p.id}')">WhatsApp / PDF</button><button class="btn primary" onclick="cz205EnviarLinkAssinatura('${p.id}')">✍ Link assinatura</button>`:''}<button type="button" class="btn danger" onclick="cz179CancelarContrato('${p.id}')">Cancelar</button>`}</div></td></tr>`}).join('')}</tbody></table>`:'<div class="empty">Nenhuma proposta encontrada.</div>'}</div>`;
  }catch(e){$('#content').innerHTML=`<div class="msg">Erro: ${coEsc(e.message)}</div>`}
 }
 async function abrirContratoOficialCZ(id){
@@ -4437,6 +4437,38 @@ async function enviarContratoOficialCZ(id){
  if(await czConfirm('Você anexou e enviou o PDF ao cliente?','Confirmar envio','Sim, enviei')){coSet(id,{status:'Enviado',enviado_em:new Date().toISOString()});renderContratosOficialCZ()}
 }
 
+
+/* CZ V205 — link de assinatura via Edge Function, sem expor credenciais privilegiadas. */
+async function cz205EnviarLinkAssinatura(id){
+ const botao=document.querySelector(`button[onclick="cz205EnviarLinkAssinatura('${id}')"]`);
+ if(botao?.disabled)return;
+ const anterior=botao?.textContent;
+ if(botao){botao.disabled=true;botao.textContent='Preparando link...'}
+ try{
+  const {data:{session},error:authError}=await db.auth.getSession();
+  if(authError||!session?.access_token)throw new Error('Entre novamente no sistema CZ para enviar o contrato.');
+  const {blob,p,c}=await cz202ArquivoContrato(id);
+  if(blob.size>10*1024*1024)throw new Error('O PDF ultrapassa o limite de 10 MB.');
+  const bytes=new Uint8Array(await blob.arrayBuffer());
+  let base64='';for(let i=0;i<bytes.length;i+=0x8000)base64+=String.fromCharCode(...bytes.subarray(i,i+0x8000));
+  const resp=await fetch(SUPABASE_URL+'/functions/v1/contrato-assinatura',{
+   method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token,'apikey':SUPABASE_KEY},
+   body:JSON.stringify({action:'create',orcamento_id:id,pdf_base64:btoa(base64)})
+  });
+  const data=await resp.json().catch(()=>({}));
+  if(!resp.ok||!data.url)throw new Error(data.error||('Não foi possível gerar o link (HTTP '+resp.status+').'));
+  const link=new URL(data.url);
+  if(link.protocol!=='https:')throw new Error('O servidor retornou um link inseguro.');
+  let tel=String(c.telefone||'').replace(/\D/g,'');if(tel.length===10||tel.length===11)tel='55'+tel;
+  const msg=`Olá ${c.nome||'!'}, segue o contrato da CZ Efeitos Especiais referente à proposta ${p.numero||''}. Leia o documento completo e, estando de acordo, assine pelo link: ${link.href}`;
+  coSet(id,{status:'Enviado',enviado_em:new Date().toISOString()});
+  await czAlert('Link de assinatura criado. Vamos abrir o WhatsApp para você enviar ao cliente.\n\nO contrato só será marcado como ASSINADO após a assinatura ser confirmada pelo servidor.','Assinatura eletrônica');
+  if(tel)window.open('https://wa.me/'+tel+'?text='+encodeURIComponent(msg),'_blank','noopener');
+  else {await navigator.clipboard.writeText(msg).catch(()=>{});await czAlert('Telefone não cadastrado. Copie e envie este link ao cliente:\n'+link.href,'Link de assinatura')}
+  await renderContratosOficialCZ();
+ }catch(e){await czAlert(e.message||String(e),'Assinatura eletrônica')}
+ finally{if(botao?.isConnected){botao.disabled=false;botao.textContent=anterior}}
+}
 
 /* ===== V139 — CONFIRMAÇÃO DO CONTRATO E FLUXO AUTOMÁTICO ===== */
 async function confirmarContratoFluxoV139(id){
