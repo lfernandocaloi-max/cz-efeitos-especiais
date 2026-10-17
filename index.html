@@ -4317,10 +4317,10 @@ async function renderContratosOficialCZ(){
    movimentosContrato=caixaCache||[];
    parcelasContrato=cz172ParcelasFinanceiras(movimentosContrato).parcelas;
   }catch(err){falhaFinanceiro=err.message||String(err)}
-  $('#content').innerHTML=`<div class="sectionhead"><div><h2>Contratos</h2><div class="muted">Modelo oficial CZ • contrato vinculado à proposta e ao cliente.</div></div><button class="btn secondary" onclick="abrirMapaReservasV140()">Reservas</button></div>
+  $('#content').innerHTML=`<div class="sectionhead"><div><h2>Contratos</h2><div class="muted">Modelo oficial CZ • contrato vinculado à proposta e ao cliente.</div></div><div style="display:flex;gap:8px;flex-wrap:wrap">${cz208PodeAssinar()?`<button class="btn secondary" onclick="cz208CadastrarAssinatura()">🖊 Cadastrar assinatura CZ</button>`:''}<button class="btn secondary" onclick="abrirMapaReservasV140()">Reservas</button></div></div>
   ${avisoAssinaturas?`<div class="msg" style="color:#ffb87b">${coEsc(avisoAssinaturas)}</div>`:''}
   ${falhaFinanceiro?`<div class="msg" style="color:#ff8b78">Não foi possível consultar os pagamentos: ${coEsc(falhaFinanceiro)}. Confira a conexão com o Caixa.</div>`:''}
-  <div class="tablewrap">${os.length?`<table><thead><tr><th>Proposta</th><th>Cliente</th><th>Evento</th><th>Data</th><th>Contrato</th><th>Pagamento</th><th>Ação</th></tr></thead><tbody>${os.map(p=>{const c=coGet(p.id)||{};const assinatura=assinaturaPorOrcamento.get(String(p.id));const assinado=assinatura?.status==='assinado';const cancelado=c.status==='Cancelado'||String(p.status||'').toLowerCase()==='cancelado';const pagamento=cancelado?'<span class="muted">Cancelado</span>':falhaFinanceiro?'<span class="muted">Indisponível</span>':cz175StatusPagamentoEvento({origem_orcamento_id:p.id},mapaOrcamentos,parcelasContrato,movimentosContrato);return `<tr><td><b>${coEsc(p.numero||'—')}</b></td><td>${coEsc(p.cliente_nome||'')}</td><td>${coEsc(p.evento_nome||'')}</td><td>${finDate(p.data_evento)}</td><td>${coStatusBadge(cancelado?'Cancelado':assinado?'Assinado':c.status)}</td><td>${pagamento}</td><td><div style="display:flex;gap:6px;flex-wrap:wrap">${cancelado?'<span style="color:#ff8989;font-weight:800">CANCELADO</span>':`<button class="btn primary" onclick="abrirContratoOficialCZ('${p.id}')">${!c.status||c.status==='Não gerado'?'Preencher contrato':'Abrir contrato'}</button>${c.status&&c.status!=='Não gerado'?`<button class="btn secondary" onclick="visualizarPdfContratoCZ('${p.id}')">👁 Visualizar PDF</button><button class="btn secondary" onclick="enviarContratoOficialCZ('${p.id}')">WhatsApp / PDF</button>${assinado?`<button class="btn secondary" onclick="cz206VisualizarAssinado('${p.id}')">📄 PDF assinado</button>`:`<button class="btn primary" onclick="cz205EnviarLinkAssinatura('${p.id}')">✍ Link assinatura</button>`}`:''}<button type="button" class="btn danger" onclick="cz179CancelarContrato('${p.id}')">Cancelar</button>`}</div></td></tr>`}).join('')}</tbody></table>`:'<div class="empty">Nenhuma proposta encontrada.</div>'}</div>`;
+  <div class="tablewrap">${os.length?`<table><thead><tr><th>Proposta</th><th>Cliente</th><th>Evento</th><th>Data</th><th>Contrato</th><th>Pagamento</th><th>Ação</th></tr></thead><tbody>${os.map(p=>{const c=coGet(p.id)||{};const assinatura=assinaturaPorOrcamento.get(String(p.id));const assinado=assinatura?.status==='assinado'||assinatura?.status==='finalizado';const finalizado=assinatura?.status==='finalizado';const cancelado=c.status==='Cancelado'||String(p.status||'').toLowerCase()==='cancelado';const pagamento=cancelado?'<span class="muted">Cancelado</span>':falhaFinanceiro?'<span class="muted">Indisponível</span>':cz175StatusPagamentoEvento({origem_orcamento_id:p.id},mapaOrcamentos,parcelasContrato,movimentosContrato);return `<tr><td><b>${coEsc(p.numero||'—')}</b></td><td>${coEsc(p.cliente_nome||'')}</td><td>${coEsc(p.evento_nome||'')}</td><td>${finDate(p.data_evento)}</td><td>${coStatusBadge(cancelado?'Cancelado':finalizado?'Assinado por ambas as partes':assinado?'Assinado pelo cliente':c.status)}</td><td>${pagamento}</td><td><div style="display:flex;gap:6px;flex-wrap:wrap">${cancelado?'<span style="color:#ff8989;font-weight:800">CANCELADO</span>':`<button class="btn primary" onclick="abrirContratoOficialCZ('${p.id}')">${!c.status||c.status==='Não gerado'?'Preencher contrato':'Abrir contrato'}</button>${c.status&&c.status!=='Não gerado'?`<button class="btn secondary" onclick="visualizarPdfContratoCZ('${p.id}')">👁 Visualizar PDF</button><button class="btn secondary" onclick="enviarContratoOficialCZ('${p.id}')">WhatsApp / PDF</button>${assinado?`<button class="btn secondary" onclick="cz206VisualizarAssinado('${p.id}')">📄 ${finalizado?'PDF final':'PDF assinado'}</button>${finalizado?`<button class="btn primary" onclick="cz208EnviarContratoFinal('${p.id}')">📲 ENVIAR CONTRATO AO CLIENTE</button>`:cz208PodeAssinar()?`<button class="btn primary" onclick="cz208AssinarPelaCZ('${p.id}',this)">✍ ASSINAR PELA CZ</button>`:''}`:`<button class="btn primary" onclick="cz205EnviarLinkAssinatura('${p.id}')">✍ Link assinatura</button>`}`:''}<button type="button" class="btn danger" onclick="cz179CancelarContrato('${p.id}')">Cancelar</button>`}</div></td></tr>`}).join('')}</tbody></table>`:'<div class="empty">Nenhuma proposta encontrada.</div>'}</div>`;
  }catch(e){$('#content').innerHTML=`<div class="msg">Erro: ${coEsc(e.message)}</div>`}
 }
 async function abrirContratoOficialCZ(id){
@@ -4478,6 +4478,58 @@ async function cz206VisualizarAssinado(id){
   if(janela)janela.location.replace(link.href);
   else await czAlert('O navegador bloqueou a abertura do PDF. Permita pop-ups para o sistema CZ e tente novamente.','Visualizar PDF assinado');
  }catch(e){if(janela)janela.close();await czAlert('Não foi possível visualizar o PDF assinado: '+(e.message||String(e)),'Contrato assinado')}
+}
+
+
+/* CZ V208 — assinatura única protegida, autorizada pelo servidor. */
+function cz208PodeAssinar(){
+ const email=String(currentAuthUser?.email||'').trim().toLowerCase();
+ return email==='lfernando.caloi@gmail.com'||email==='nazati01@gmail.com';
+}
+async function cz208CadastrarAssinatura(){
+ if(!cz208PodeAssinar())return czAlert('Esta conta não pode cadastrar a assinatura da CZ.','Acesso restrito');
+ const ov=document.createElement('div');ov.className='modal';ov.id='cz208Cadastro';
+ ov.innerHTML=`<div class="modalbox"><div class="sectionhead"><h2>Assinatura fixa da CZ</h2><button class="btn secondary" id="cz208Fechar">Fechar</button></div><p class="muted">Cadastre uma imagem PNG transparente da assinatura autorizada. Ela ficará guardada no armazenamento privado e será aplicada quando Master ou Nayara clicar em ASSINAR PELA CZ.</p><div class="field"><label>Imagem da assinatura (PNG, até 1 MB)</label><input id="cz208Imagem" type="file" accept="image/png"></div><img id="cz208Preview" style="max-width:100%;max-height:160px;display:none;background:white;margin-top:12px;border-radius:8px"><div class="actions"><button class="btn primary" id="cz208Salvar">Salvar assinatura</button></div><div id="cz208Mensagem" class="msg"></div></div>`;
+ document.body.appendChild(ov);
+ const fechar=()=>ov.remove();ov.querySelector('#cz208Fechar').onclick=fechar;
+ const inp=ov.querySelector('#cz208Imagem');inp.onchange=()=>{const f=inp.files?.[0];const img=ov.querySelector('#cz208Preview');if(f){img.src=URL.createObjectURL(f);img.style.display='block'}};
+ ov.querySelector('#cz208Salvar').onclick=async()=>{
+  const f=inp.files?.[0];const msg=ov.querySelector('#cz208Mensagem');const btn=ov.querySelector('#cz208Salvar');
+  if(!f||f.type!=='image/png'||f.size>1024*1024||f.size<100){msg.textContent='Escolha um arquivo PNG válido de até 1 MB.';return}
+  btn.disabled=true;msg.textContent='Salvando assinatura no Supabase...';
+  try{
+   const png=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result));r.onerror=()=>reject(new Error('Falha ao ler PNG'));r.readAsDataURL(f)});
+   await cz207AssinaturaApi('save-cz-signature',{assinatura_png:png});
+   fechar();await czAlert('Assinatura da CZ cadastrada com sucesso.','CZ Efeitos Especiais');
+  }catch(e){msg.textContent=e.message||String(e)}finally{btn.disabled=false}
+ };
+}
+async function cz208AssinarPelaCZ(id,botao){
+ if(!cz208PodeAssinar())return czAlert('Apenas Master e Nayara podem assinar pela CZ.','Acesso restrito');
+ if(botao?.disabled)return;
+ const anterior=botao?.textContent;if(botao){botao.disabled=true;botao.textContent='Assinando...'}
+ try{
+  const r=await cz207AssinaturaApi('sign-cz',{orcamento_id:id});
+  if(!r.ok)throw new Error('O servidor não confirmou a assinatura.');
+  await renderContratosOficialCZ();
+  await czAlert('Contrato assinado pela CZ e PDF final salvo no Supabase.','Assinatura concluída');
+ }catch(e){await czAlert('Não foi possível assinar: '+(e.message||String(e)),'Assinatura CZ')}
+ finally{if(botao?.isConnected){botao.disabled=false;botao.textContent=anterior}}
+}
+async function cz208EnviarContratoFinal(id){
+ const janela=window.open('','_blank');
+ try{
+  const {url}=await cz207AssinaturaApi('final-link',{orcamento_id:id});
+  if(!url||new URL(url).protocol!=='https:')throw new Error('Link seguro não disponível.');
+  const p=(await coOrcs()).find(x=>String(x.id)===String(id));if(!p)throw new Error('Proposta não encontrada.');
+  const c=coGet(id)||{};
+  let tel=String(c.telefone||p.cliente_telefone||'').replace(/\D/g,'');
+  if(tel.length===10||tel.length===11)tel='55'+tel;
+  const mensagem=`Olá ${c.nome||p.cliente_nome||''}! O contrato da CZ Efeitos Especiais referente à proposta ${p.numero||''} foi assinado pelas duas partes. Acesse seu PDF final neste link seguro: ${url}`;
+  if(janela){janela.location.replace(tel?'https://wa.me/'+tel+'?text='+encodeURIComponent(mensagem):'about:blank');if(!tel)janela.close()}
+  if(!tel){await navigator.clipboard?.writeText(mensagem).catch(()=>{});await czAlert('Telefone não encontrado. Copie a mensagem e o link para enviar ao cliente:\n\n'+mensagem,'Enviar contrato')}
+  else await czAlert('WhatsApp aberto com o link seguro do contrato final. Confira a conversa e clique em enviar.','Enviar contrato');
+ }catch(e){if(janela)janela.close();await czAlert('Falha ao preparar envio: '+(e.message||String(e)),'Contrato final')}
 }
 
 /* CZ V205 — link de assinatura via Edge Function, sem expor credenciais privilegiadas. */
