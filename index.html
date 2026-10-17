@@ -75,10 +75,11 @@
 @media(max-width:620px){.contract-installment{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:900px){.orc-travel-grid{grid-template-columns:repeat(2,minmax(120px,180px))}.orc-team-row{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.orc-travel-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.nav .cz212-group{background:#17222d;color:#f6f7f9;font-weight:800;margin-top:8px;border-left:3px solid #ff641f}.nav .cz212-sub{padding-left:14px;border-left:1px solid #394757;margin-left:12px}.nav .cz212-sub[hidden]{display:none}.nav .cz212-sub button{font-size:13px;padding:9px 8px;margin:1px 0;white-space:normal}.nav .cz212-group:hover{background:#263341}
 </style>
 </head><body>
 <section id="login" class="login"><div class="loginbox"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><h3>Acesso ao sistema</h3><div class="field"><label>E-mail</label><input id="email" type="email"></div><div class="field"><label>Senha</label><input id="password" type="password"></div><button id="loginBtn" class="btn primary full" style="margin-top:18px">ENTRAR</button><button type="button" class="btn secondary full" style="margin-top:8px" onclick="recuperarSenha()">Esqueci minha senha</button><div id="loginMsg" class="msg"></div></div></section>
-<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><div class="muted" style="font-size:12px">Sistema de gestão CZ · V207</div></div><div><span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
+<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><div class="muted" style="font-size:12px">Sistema de gestão CZ · V212</div></div><div><span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
 <div id="clientModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="modalTitle">Novo cliente</h2><button class="btn secondary" onclick="closeClient()">Fechar</button></div>
   <input id="clientId" type="hidden"><div class="muted" id="clientOpenedAt" style="font-size:13px">Data de abertura: será definida ao salvar</div>
   <div class="row"><div class="field"><label>Nome / Razão social *</label><input id="clientName" autocomplete="name"></div><div class="field"><label>Telefone *</label><input id="clientPhone" type="tel" inputmode="tel" autocomplete="tel"></div></div>
@@ -142,10 +143,32 @@ function czConfirm(mensagem,titulo='Confirmação',confirmar='Confirmar'){return
 function czPrompt(mensagem,valor='',titulo='Preenchimento'){return czDialog({titulo,mensagem,tipo:'prompt',valor,confirmar:'Continuar',cancelar:'Cancelar'})}
 window.alert=(m)=>{czAlert(m)};
 const modules=['Dashboard','Clientes','Orçamentos','Contratos','Eventos','Retorno de evento','Estoque','Ativos / Equipamentos','Colaboradores','Manutenção','Financeiro / DRE','Agenda','Relatórios','Configurações','Lista de compra','Veículos','Caixa','PDV','Sair pro Evento','Oficina','Inventário / Contagem'];
-const ordemMenu=[...modules.keys()].filter(i=>i!==16);
-ordemMenu.splice(11,0,16);
-$('#nav').innerHTML=ordemMenu.map(i=>`<button data-i="${i}" class="${i===0?'active':''}">${modules[i]}</button>`).join('');
-$('#nav').onclick=e=>{const b=e.target.closest('button');if(!b)return;document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');$('.side').classList.remove('mobile-open');renderModule(+b.dataset.i)};
+// V212 — grupos recolhíveis sem alterar os índices dos módulos.
+const cz212Menu=[
+ {i:0},{i:1},{i:2},{i:3},{i:4},{i:5},
+ {g:'Estoque',items:[{i:7,label:'Ativos e Equipamentos'},{i:6,label:'Estoque Consumível'},{i:20},{i:14}]},
+ {g:'Configurações',items:[{i:8},{i:15},{i:13,label:'Usuários / Permissões'}]},
+ {g:'Manutenção',items:[{i:19,label:'Oficina'},{i:9,label:'Ordens de manutenção'}]},
+ {g:'Financeiro',items:[{i:16},{i:10,label:'DRE / Financeiro'},{action:'novaDespesa',label:'Nova despesa'},{i:17}]},
+ {i:11},{i:12},{i:18,label:'Sair pro Evento'}
+];
+// A página Eventos continua no menu principal; Sair pro Evento também permanece acessível.
+const cz212MenuAbertos=new Set();
+function cz212MontarMenu(){
+ $('#nav').innerHTML=cz212Menu.map(x=>{
+  if(x.i!==undefined)return `<button type="button" data-i="${x.i}" class="${x.i===0?'active':''}">${x.label||modules[x.i]}</button>`;
+  const aberto=cz212MenuAbertos.has(x.g);
+  return `<button type="button" class="cz212-group" data-grupo="${x.g}" aria-expanded="${aberto}">${x.g} <span style="float:right">${aberto?'▾':'▸'}</span></button><div class="cz212-sub" data-sub="${x.g}" ${aberto?'':'hidden'}>${x.items.map(item=>`<button type="button" ${item.i!==undefined?`data-i="${item.i}"`:`data-action="${item.action}"`}>${item.label||modules[item.i]}</button>`).join('')}</div>`;
+ }).join('');
+}
+cz212MontarMenu();
+$('#nav').onclick=e=>{
+ const b=e.target.closest('button');if(!b)return;
+ if(b.dataset.grupo){const g=b.dataset.grupo;cz212MenuAbertos.has(g)?cz212MenuAbertos.delete(g):cz212MenuAbertos.add(g);cz212MontarMenu();return}
+ if(b.dataset.action==='novaDespesa'){document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');$('.side').classList.remove('mobile-open');novaDespesa();return}
+ if(b.dataset.i===undefined)return;
+ document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');$('.side').classList.remove('mobile-open');renderModule(Number(b.dataset.i));
+};
 $('#menuBtn').onclick=()=>$('.side').classList.toggle('mobile-open');
 // CZ V191 — recuperação de senha na tela de login (sem alterar a página Usuários).
 const cz191LoginOriginal=$('.loginbox').innerHTML;
@@ -4188,7 +4211,7 @@ function coProdutos(p){
  return [];
 }
 function coStatusBadge(st){
- const c=st==='Assinado'||st==='Confirmado'?'#45b879':st==='Enviado'?'#d7a73b':st==='Gerado'?'#4f8fd1':'#7b8794';
+ const c=st==='Assinado por ambas as partes'||st==='Assinado'||st==='Confirmado'?'#45b879':st==='Enviado'?'#d7a73b':st==='Gerado'?'#4f8fd1':'#7b8794';
  return `<span style="border:1px solid ${c};background:${c}22;padding:4px 9px;border-radius:999px;font-size:12px">${coEsc(st||'Não gerado')}</span>`;
 }
 // V179 — Cancelamento conjunto de contrato e proposta, preservando o histórico.
@@ -4289,6 +4312,29 @@ async function cz180CancelarOrcamento(id){
  };
 }
 async function cz179CancelarContrato(id){return cz180CancelarOrcamento(id)}
+// V212 — contador compacto: total de parcelas / parcelas integralmente pagas.
+function cz212PagamentoContrato(p,movimentos){
+ const id=String(p.id),total=Number(p.valor_total||0);
+ if(!(total>0))return '<span class="muted">Sem valor definido</span>';
+ const recebido=(movimentos||[]).filter(x=>x.tipo==='entrada'&&caixaConfirmado(x)&&String(x.orcamento_id||'')===id).reduce((v,x)=>v+Math.max(0,Number(x.valor||0)),0);
+ if(total-recebido<=.009)return '<span style="color:#57d88c;font-weight:900">✓ Quitado</span>';
+ const d=p.dados||{},fech=d.fechamento_financeiro||{},pg=d.pagamento||{};
+ let valores=Array.isArray(fech.partes)?fech.partes.filter(x=>Number(x.cent)>0).map(x=>Number(x.cent)/100):[];
+ if(!valores.length){
+  if(pg.modo==='contratual'){
+   if(Number(pg.entrada_valor)>0)valores.push(Number(pg.entrada_valor));
+   valores.push(...(Array.isArray(pg.parcelas_detalhes)?pg.parcelas_detalhes:[]).map(x=>Number(x.valor||0)).filter(x=>x>0));
+  }else if(Number(pg.parcelas)>1){const n=Math.floor(Number(pg.parcelas));valores=Array.from({length:n},()=>total/n)}
+ }
+ if(!valores.length){
+  const originais=(movimentos||[]).filter(x=>x.tipo==='entrada'&&String(x.orcamento_id||'')===id&&String(x.origem_id||'').startsWith('orc-confirmado:'));
+  valores=originais.map(x=>Number(x.valor||0)).filter(x=>x>0);
+ }
+ if(!valores.length)valores=[total];
+ let saldoPago=recebido,quitadas=0;
+ for(const valor of valores){if(saldoPago+0.009>=valor){quitadas++;saldoPago-=valor}else break}
+ return `<span style="color:#ffcb76;font-weight:800" title="${quitadas} de ${valores.length} parcelas pagas; saldo ${money(Math.max(0,total-recebido))}">🟡 ${valores.length}/${quitadas} Parc.</span>`;
+}
 // V176 — situação de pagamento dos contratos, igual à tela Eventos.
 async function renderContratosOficialCZ(){
  $('#pageTitle').textContent='Contratos';
@@ -4320,7 +4366,7 @@ async function renderContratosOficialCZ(){
   $('#content').innerHTML=`<div class="sectionhead"><div><h2>Contratos</h2><div class="muted">Modelo oficial CZ • contrato vinculado à proposta e ao cliente.</div></div><div style="display:flex;gap:8px;flex-wrap:wrap">${cz208PodeAssinar()?`<button class="btn secondary" onclick="cz208CadastrarAssinatura()">🖊 Cadastrar assinatura CZ</button>`:''}<button class="btn secondary" onclick="abrirMapaReservasV140()">Reservas</button></div></div>
   ${avisoAssinaturas?`<div class="msg" style="color:#ffb87b">${coEsc(avisoAssinaturas)}</div>`:''}
   ${falhaFinanceiro?`<div class="msg" style="color:#ff8b78">Não foi possível consultar os pagamentos: ${coEsc(falhaFinanceiro)}. Confira a conexão com o Caixa.</div>`:''}
-  <div class="tablewrap">${os.length?`<table><thead><tr><th>Proposta</th><th>Cliente</th><th>Evento</th><th>Data</th><th>Contrato</th><th>Pagamento</th><th>Ação</th></tr></thead><tbody>${os.map(p=>{const c=coGet(p.id)||{};const assinatura=assinaturaPorOrcamento.get(String(p.id));const assinado=assinatura?.status==='assinado'||assinatura?.status==='finalizado';const finalizado=assinatura?.status==='finalizado';const cancelado=c.status==='Cancelado'||String(p.status||'').toLowerCase()==='cancelado';const pagamento=cancelado?'<span class="muted">Cancelado</span>':falhaFinanceiro?'<span class="muted">Indisponível</span>':cz175StatusPagamentoEvento({origem_orcamento_id:p.id},mapaOrcamentos,parcelasContrato,movimentosContrato);return `<tr><td><b>${coEsc(p.numero||'—')}</b></td><td>${coEsc(p.cliente_nome||'')}</td><td>${coEsc(p.evento_nome||'')}</td><td>${finDate(p.data_evento)}</td><td>${coStatusBadge(cancelado?'Cancelado':finalizado?'Assinado por ambas as partes':assinado?'Assinado pelo cliente':c.status)}</td><td>${pagamento}</td><td><div style="display:flex;gap:6px;flex-wrap:wrap">${cancelado?'<span style="color:#ff8989;font-weight:800">CANCELADO</span>':`<button class="btn primary" onclick="abrirContratoOficialCZ('${p.id}')">${!c.status||c.status==='Não gerado'?'Preencher contrato':'Editar'}</button>${c.status&&c.status!=='Não gerado'?`<button class="btn secondary" onclick="visualizarPdfContratoCZ('${p.id}')">👁 Modelo</button>${assinado?`<button class="btn secondary" onclick="cz206VisualizarAssinado('${p.id}')">📄 ${finalizado?'Contrato':'PDF assinado'}</button>${finalizado?`<button class="btn primary" onclick="cz208EnviarContratoFinal('${p.id}')">📲 ENVIAR CONTRATO</button>`:cz208PodeAssinar()?`<button class="btn primary" onclick="cz208AssinarPelaCZ('${p.id}',this)">✍ ASSINAR PELA CZ</button>`:''}`:`<button class="btn primary" onclick="cz205EnviarLinkAssinatura('${p.id}')">✍ Link assinatura</button>`}`:''}<button type="button" class="btn danger" onclick="cz179CancelarContrato('${p.id}')">Cancelar</button>`}</div></td></tr>`}).join('')}</tbody></table>`:'<div class="empty">Nenhuma proposta encontrada.</div>'}</div>`;
+  <div class="tablewrap">${os.length?`<table><thead><tr><th>Proposta</th><th>Cliente</th><th>Evento</th><th>Data</th><th>Contrato</th><th>Pagamento</th><th>Ação</th></tr></thead><tbody>${os.map(p=>{const c=coGet(p.id)||{};const assinatura=assinaturaPorOrcamento.get(String(p.id));const assinado=assinatura?.status==='assinado'||assinatura?.status==='finalizado';const finalizado=assinatura?.status==='finalizado';const cancelado=c.status==='Cancelado'||String(p.status||'').toLowerCase()==='cancelado';const pagamento=cancelado?'<span class="muted">Cancelado</span>':falhaFinanceiro?'<span class="muted">Indisponível</span>':cz212PagamentoContrato(p,movimentosContrato);return `<tr><td><b>${coEsc(p.numero||'—')}</b></td><td>${coEsc(p.cliente_nome||'')}</td><td>${coEsc(p.evento_nome||'')}</td><td>${finDate(p.data_evento)}</td><td>${coStatusBadge(cancelado?'Cancelado':finalizado?'Assinado por ambas as partes':assinado?'Assinado pelo cliente':c.status)}</td><td>${pagamento}</td><td><div style="display:flex;gap:6px;flex-wrap:wrap">${cancelado?'<span style="color:#ff8989;font-weight:800">CANCELADO</span>':`<button class="btn primary" onclick="abrirContratoOficialCZ('${p.id}')">${!c.status||c.status==='Não gerado'?'Preencher contrato':'Editar'}</button>${c.status&&c.status!=='Não gerado'?`<button class="btn secondary" onclick="visualizarPdfContratoCZ('${p.id}')">👁 Modelo</button>${assinado?`<button class="btn secondary" onclick="cz206VisualizarAssinado('${p.id}')">📄 ${finalizado?'Contrato':'PDF assinado'}</button>${finalizado?`<button class="btn primary" onclick="cz208EnviarContratoFinal('${p.id}')">📲 ENVIAR CONTRATO</button>`:cz208PodeAssinar()?`<button class="btn primary" onclick="cz208AssinarPelaCZ('${p.id}',this)">✍ ASSINAR PELA CZ</button>`:''}`:`<button class="btn primary" onclick="cz205EnviarLinkAssinatura('${p.id}')">✍ Link assinatura</button>`}`:''}<button type="button" class="btn danger" onclick="cz179CancelarContrato('${p.id}')">Cancelar</button>`}</div></td></tr>`}).join('')}</tbody></table>`:'<div class="empty">Nenhuma proposta encontrada.</div>'}</div>`;
  }catch(e){$('#content').innerHTML=`<div class="msg">Erro: ${coEsc(e.message)}</div>`}
 }
 async function abrirContratoOficialCZ(id){
@@ -4350,7 +4396,7 @@ async function abrirContratoOficialCZ(id){
  <div class="row"><div class="field"><label>Local *</label><input id="coLocal" value="${coEsc(c.local??d.local_evento??'')}"></div><div class="field"><label>Cidade</label><input id="coCidade" value="${coEsc(c.cidade??d.cidade_evento??cli.cidade??'')}"></div></div></div>
  <div class="card"><h3 style="margin-top:0">SERVIÇOS CONTRATADOS</h3><textarea id="coServicos" style="min-height:145px">${coEsc(c.servicos??(prod.length?prod.map(x=>`${x.qtd} - ${x.nome}${x.cor?` | COR: ${x.cor}`:''}`).join('\n'):'') )}</textarea><div class="muted">Pode conferir ou complementar antes de gerar o contrato.</div></div>
  <div class="card"><h3 style="margin-top:0">PAGAMENTO</h3><div class="row"><div class="field"><label>Valor total</label><input id="coValor" value="${coEsc(c.valor??money(p.valor_total))}"></div><div class="field"><label>Condição de pagamento</label><textarea id="coPagamento" rows="3" style="min-height:85px">${coEsc(coPagamentoExibicao(c,p))}</textarea></div></div><div class="field"><label>Data do contrato</label><input id="coDataContrato" type="date" value="${coEsc(c.data_contrato??new Date().toISOString().slice(0,10))}"></div></div>
- <div class="actions"><button class="btn primary" onclick="salvarContratoOficialCZ('${id}',false)">Salvar preenchimento</button><button class="btn secondary" onclick="salvarContratoOficialCZ('${id}',true)">Visualizar / PDF</button>${c.status&&!['Não gerado','Confirmado','Assinado'].includes(c.status)?`<button class="btn primary" onclick="confirmarContratoFluxoV139('${id}')">Confirmar contrato</button>`:''}${['Confirmado','Assinado'].includes(c.status)?`<span style="padding:7px 10px;border-radius:999px;border:1px solid #45b879;background:#45b87922">✓ Contrato confirmado</span>`:''}</div>`;
+ <div class="actions"><button class="btn primary" onclick="salvarContratoOficialCZ('${id}',false)">SALVAR CONTRATO</button>${['Confirmado','Assinado'].includes(c.status)?`<span style="padding:7px 10px;border-radius:999px;border:1px solid #45b879;background:#45b87922">✓ Contrato confirmado</span>`:''}</div><div id="cz212ContratoPreview"></div>`;
 }
 // V209 — transforma os dados estruturados do orçamento em condições legíveis no contrato.
 // Prioriza as parcelas efetivamente confirmadas no fechamento, quando disponíveis.
@@ -4383,8 +4429,21 @@ function coPagamentoExibicao(c,p){
 }
 async function salvarContratoOficialCZ(id,visualizar){
  const req=['coNome','coTel','coCpf','coEnd','coData','coLocal'],falt=req.filter(x=>!$('#'+x).value.trim());if(falt.length)return czAlert('Preencha os campos obrigatórios do contratante e do evento.','Cadastro incompleto');
- const v={status:'Gerado',nome:$('#coNome').value.trim(),telefone:$('#coTel').value.trim(),cpf:$('#coCpf').value.trim(),rg:$('#coRg').value.trim(),endereco:$('#coEnd').value.trim(),data_evento:$('#coData').value,horario:$('#coHora').value,local:$('#coLocal').value.trim(),cidade:$('#coCidade').value.trim(),servicos:$('#coServicos').value.trim(),valor:$('#coValor').value.trim(),pagamento:$('#coPagamento').value.trim(),data_contrato:$('#coDataContrato').value,gerado_em:new Date().toISOString()};
- coSet(id,v);if(visualizar)return imprimirContratoOficialCZ(id);await czAlert('Preenchimento do contrato salvo.','Contrato');abrirContratoOficialCZ(id);
+ const v={status:['Confirmado','Assinado'].includes(coGet(id)?.status)?coGet(id).status:'Gerado',nome:$('#coNome').value.trim(),telefone:$('#coTel').value.trim(),cpf:$('#coCpf').value.trim(),rg:$('#coRg').value.trim(),endereco:$('#coEnd').value.trim(),data_evento:$('#coData').value,horario:$('#coHora').value,local:$('#coLocal').value.trim(),cidade:$('#coCidade').value.trim(),servicos:$('#coServicos').value.trim(),valor:$('#coValor').value.trim(),pagamento:$('#coPagamento').value.trim(),data_contrato:$('#coDataContrato').value,gerado_em:new Date().toISOString()};
+ coSet(id,v);await cz212MostrarPreviewContrato(id);
+}
+// V212 — prévia na própria página, seguida do link de assinatura.
+let cz212PreviewUrl='';
+async function cz212MostrarPreviewContrato(id){
+ const area=document.querySelector('#cz212ContratoPreview');if(!area)return;
+ area.innerHTML='<div class="card" style="margin-top:16px">Preparando visualização do PDF...</div>';
+ try{
+  const {blob}=await cz202ArquivoContrato(id);
+  if(cz212PreviewUrl)URL.revokeObjectURL(cz212PreviewUrl);
+  cz212PreviewUrl=URL.createObjectURL(blob);
+  area.innerHTML=`<div class="card" style="margin-top:16px"><h3>✓ Contrato salvo — Visualizar PDF</h3><iframe title="Prévia do contrato" src="${cz212PreviewUrl}" style="width:100%;height:540px;border:1px solid #394657;border-radius:9px;background:white"></iframe><div class="actions" style="justify-content:flex-start;flex-wrap:wrap"><button class="btn secondary" onclick="visualizarPdfContratoCZ('${id}')">Abrir PDF</button><button class="btn primary" onclick="cz205EnviarLinkAssinatura('${id}')">ENVIAR LINK DE ASSINATURA</button></div></div>`;
+  area.scrollIntoView({behavior:'smooth',block:'start'});
+ }catch(e){area.innerHTML=`<div class="msg">Contrato salvo, mas não foi possível gerar a prévia: ${coEsc(e.message||String(e))}</div>`}
 }
 function coContratoHTML(c,p){
  const serv=(c.servicos||'').split(/\n+/).filter(Boolean).map(x=>`<li>${coEsc(x)}</li>`).join('');
@@ -4772,7 +4831,7 @@ async function sair142Abrir(eventoId){
   <div class="card"><h3 style="margin-top:0">Conferência</h3>${grupos.map(([n,a])=>sair142Grupo(n,a,b)).join('')}
    <div style="margin-top:14px"><b>Total: ${conf}/${esperado} — ${pct}%</b><div style="height:10px;background:#26313b;border-radius:10px;margin-top:6px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${pct===100?'#45b879':'#d7a73b'}"></div></div></div>
   </div>
-  <div class="actions"><button class="btn secondary" onclick="sair142Imprimir('${eventoId}')">Imprimir bipagem</button><button class="btn primary" onclick="sair142DarSaida('${eventoId}')">${pct===100?'Dar saída':'Dar saída com pendência'}</button></div>`;
+  <div class="actions"><button class="btn secondary" onclick="sair142Imprimir('${eventoId}')">Imprimir bipagem</button><button class="btn primary" onclick="sair142DarSaida('${eventoId}',window.open('','_blank','width=900,height=800'))">${pct===100?'Dar saída':'Dar saída com pendência'}</button></div>`;
   setTimeout(()=>$('#sair142Cod')?.focus(),80);
  }catch(err){$('#content').innerHTML=`<div class="msg">Erro: ${coEsc(err.message)}</div>`}
 }
@@ -4789,24 +4848,25 @@ async function sair142Bipar(id){
  const st=sair142State(id),b=new Set(st.bipados||[]);b.add(String(item.codigo_barras||item.codigo||item.id));
  sair142Set(id,{responsavel:resp,bipados:[...b],historico:[...(st.historico||[]),{acao:'Conferência',codigo:cod,data:new Date().toISOString(),responsavel:resp}]});sair142Abrir(id);
 }
-async function sair142DarSaida(id){
- const resp=String($('#sair142Resp')?.value||'').trim();if(!resp)return czAlert('Informe o responsável pela conferência.','Saída');
+async function sair142DarSaida(id,janelaRelatorio=null){
+ const resp=String($('#sair142Resp')?.value||'').trim();if(!resp){janelaRelatorio?.close();return czAlert('Informe o responsável pela conferência.','Saída')}
  const {data:m}=await db.from('evento_materiais').select('*').eq('evento_id',id),st=sair142State(id),b=new Set(st.bipados||[]);
  const falt=(m||[]).filter(x=>!b.has(String(x.codigo_barras||x.codigo||x.id)));
  let motivo='';
  if(falt.length){
    motivo=await czPrompt(`A conferência está incompleta.\n\nFaltam ${falt.length} item(ns). Informe obrigatoriamente o motivo para liberar a saída:`, '', 'Saída com pendência');
-   if(!String(motivo||'').trim())return czAlert('O motivo é obrigatório para sair com pendência.','Saída');
+   if(!String(motivo||'').trim()){janelaRelatorio?.close();return czAlert('O motivo é obrigatório para sair com pendência.','Saída')}
  }
  const status=falt.length?'em_evento_divergencia':'aguardando_retorno';
- const {error}=await db.from('eventos_operacionais').update({status,atualizado_em:new Date().toISOString()}).eq('id',id);if(error)return czAlert(error.message,'Saída');
+ const {error}=await db.from('eventos_operacionais').update({status,atualizado_em:new Date().toISOString()}).eq('id',id);if(error){janelaRelatorio?.close();return czAlert(error.message,'Saída')}
  sair142Set(id,{responsavel:resp,motivo_pendencia:motivo||'',saida_em:new Date().toISOString(),itens_enviados:[...b],historico:[...(st.historico||[]),{acao:falt.length?'Saída com divergência':'Saída',data:new Date().toISOString(),responsavel:resp,motivo:motivo||''}]});
- await czAlert(falt.length?'Saída liberada com divergência registrada. Somente os materiais realmente bipados serão esperados no retorno.':'Saída liberada. Evento enviado para Aguardando Retorno.','Saída');
+ await sair142Imprimir(id,janelaRelatorio);
+ await czAlert(falt.length?'Saída liberada com divergência registrada. Somente os materiais realmente bipados serão esperados no retorno.':'Saída liberada. Relatório de bipagem aberto para impressão.','Saída');
  if(typeof renderModule==='function')renderModule(18);
 }
-async function sair142Imprimir(id){
+async function sair142Imprimir(id,janelaRelatorio=null){
  const {data:e}=await db.from('eventos_operacionais').select('*').eq('id',id).single(),st=sair142State(id);
- const w=window.open('','_blank','width=900,height=800');if(!w)return;
+ const w=janelaRelatorio||window.open('','_blank','width=900,height=800');if(!w)return czAlert('O navegador bloqueou a impressão. Use o botão Imprimir bipagem.','Relatório');
  w.document.write(`<html><head><title>Bipagem</title><style>body{font-family:Arial;padding:30px}h1{font-size:20px}li{margin:7px}</style></head><body><h1>RELATÓRIO DE CONFERÊNCIA / SAÍDA</h1><p><b>Evento:</b> ${coEsc(e?.nome_evento||'')}</p><p><b>Cliente:</b> ${coEsc(e?.cliente_nome||'')}</p><p><b>Responsável:</b> ${coEsc(st.responsavel||'')}</p><p><b>Data/hora:</b> ${new Date().toLocaleString('pt-BR')}</p><h3>Materiais bipados</h3><ul>${(st.bipados||[]).map(x=>`<li>${coEsc(x)}</li>`).join('')}</ul>${st.motivo_pendencia?`<p><b>Divergência:</b> ${coEsc(st.motivo_pendencia)}</p>`:''}<script>window.onload=()=>window.print()<\/script></body></html>`);w.document.close();
 }
 
@@ -4953,20 +5013,21 @@ async function prep145Salvar(id){
 async function prep192AdicionarMaterial(eventoId,origem){
  const ativo=origem==='montagem';
  const tabela=ativo?'ativos':'produtos';
- const {data,error}=await db.from(tabela).select(ativo?'id,nome,quantidade,status,codigo_interno':'id,nome,estoque_atual,codigo_barras').order('nome');
+ const {data,error}=await db.from(tabela).select(ativo?'id,nome,quantidade,status,codigo_interno':'id,nome,estoque_atual,codigo_barras,consumivel').order('nome');
  if(error)return czAlert(error.message,'Selecionar material');
- const itens=(data||[]).filter(x=>!ativo||(!['manutencao','em_manutencao','perdido','indisponivel'].includes(String(x.status||'').toLowerCase())&&Number(x.quantidade||0)>0));
+ const itens=(data||[]).filter(x=>ativo?(!['manutencao','em_manutencao','perdido','indisponivel'].includes(String(x.status||'').toLowerCase())&&Number(x.quantidade||0)>0):x.consumivel!==false);
  if(!itens.length)return czAlert('Nenhum item disponível para seleção.','Materiais');
  const {data:atuais,error:em}=await db.from('evento_materiais').select('id,item_id,origem,tipo,quantidade_necessaria').eq('evento_id',eventoId);
  if(em)return czAlert(em.message,'Materiais');
  const ja=(atuais||[]).filter(x=>x.tipo===(ativo?'ativo':'produto'));
  const ov=document.createElement('div');ov.style.cssText='position:fixed;inset:0;z-index:200090;background:#000c;display:flex;align-items:center;justify-content:center;padding:16px';
  const box=document.createElement('div');box.style.cssText='background:#17202b;color:white;border:1px solid #44556a;border-radius:14px;padding:20px;width:min(690px,100%);max-height:90vh;overflow:auto';
- box.innerHTML=`<h3>${ativo?'Adicionar material de montagem':'Adicionar produto extra'}</h3><div class="row"><div class="field" style="flex:3"><label>${ativo?'Ativo / Equipamento':'Produto'}</label><select id="prep192Item"><option value="">Selecione</option>${itens.map(x=>`<option value="${esc(x.id)}">${esc(x.nome)}</option>`).join('')}</select></div><div class="field" style="flex:1"><label>Quantidade</label><input id="prep192Qtd" type="number" min="1" step="1" value="1"></div></div><div id="prep192Erro" class="msg"></div><div class="actions"><button type="button" class="btn secondary" id="prep192Cancelar">Cancelar</button><button type="button" class="btn primary" id="prep192Salvar">Adicionar</button></div>`;
+ box.innerHTML=`<h3>${ativo?'Selecionar ativos / equipamentos':'Selecionar produtos de uso e consumo'}</h3><div class="field"><label>Pesquisar por nome ou código</label><input id="prep192Busca" placeholder="Digite para filtrar a tabela"></div><div class="tablewrap" style="max-height:310px;overflow:auto;margin-top:12px"><table><thead><tr><th>Selecionar</th><th>Descrição</th><th>Código</th><th>Disponível</th></tr></thead><tbody id="prep192Tabela">${itens.map(x=>`<tr data-busca="${esc((x.nome+' '+(ativo?x.codigo_interno||'':x.codigo_barras||'')).toLowerCase())}"><td><input type="radio" name="prep192Escolha" value="${esc(x.id)}"></td><td>${esc(x.nome)}</td><td>${esc(ativo?x.codigo_interno||'—':x.codigo_barras||'—')}</td><td>${Number(ativo?x.quantidade:x.estoque_atual)||0}</td></tr>`).join('')}</tbody></table></div><div class="field" style="max-width:150px"><label>Quantidade</label><input id="prep192Qtd" type="number" min="1" step="1" value="1"></div><div id="prep192Erro" class="msg"></div><div class="actions"><button type="button" class="btn secondary" id="prep192Cancelar">Cancelar</button><button type="button" class="btn primary" id="prep192Salvar">Adicionar selecionado</button></div>`;
  ov.appendChild(box);document.body.appendChild(ov);
  box.querySelector('#prep192Cancelar').onclick=()=>ov.remove();
+ box.querySelector('#prep192Busca').oninput=e=>{const q=e.target.value.trim().toLowerCase();box.querySelectorAll('#prep192Tabela tr').forEach(tr=>tr.hidden=!tr.dataset.busca.includes(q))};
  box.querySelector('#prep192Salvar').onclick=async()=>{
-  const item=itens.find(x=>String(x.id)===box.querySelector('#prep192Item').value),q=Number(box.querySelector('#prep192Qtd').value),msg=box.querySelector('#prep192Erro');
+  const item=itens.find(x=>String(x.id)===box.querySelector('input[name="prep192Escolha"]:checked')?.value),q=Number(box.querySelector('#prep192Qtd').value),msg=box.querySelector('#prep192Erro');
   if(!item)return msg.textContent='Selecione um item.';
   if(!Number.isInteger(q)||q<1)return msg.textContent='Informe uma quantidade inteira maior que zero.';
   if(ja.some(x=>String(x.item_id)===String(item.id)))return msg.textContent='Este item já está no evento (orçamento ou preparação).';
@@ -5237,20 +5298,7 @@ function cz150AplicarEventos(){
    });
  });
 }
-/* After contract confirmation, the official next stage is Financeiro.
-   Existing V139 continues creating the event and finance base; this wrapper only redirects the user to the next stage. */
-if(typeof confirmarContratoFluxoV139==='function' && !window.__cz150ConfirmWrap){
- window.__cz150ConfirmWrap=true;
- const _cz150Confirmar=confirmarContratoFluxoV139;
- confirmarContratoFluxoV139=async function(id){
-   await _cz150Confirmar(id);
-   const c=cz150ContratoLocal(id);
-   if(c.status==='Confirmado'){
-     await czAlert('Contrato confirmado. O orçamento avançou para FINANCEIRO e o evento foi liberado para preparação.','Ciclo CZ');
-     try{renderFinanceiro()}catch(e){try{renderModule(10)}catch(_){}}
-   }
- };
-}
+/* V212 — não redirecionar a tela Contratos ao Financeiro. */
 function cz150Aplicar(){
  cz150AplicarOrcamentos();cz150AplicarEventos();
  // hide known legacy standalone operational entries when duplicated by the new cycle
