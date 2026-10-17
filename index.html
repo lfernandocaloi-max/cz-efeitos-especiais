@@ -78,7 +78,7 @@
 </style>
 </head><body>
 <section id="login" class="login"><div class="loginbox"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><h3>Acesso ao sistema</h3><div class="field"><label>E-mail</label><input id="email" type="email"></div><div class="field"><label>Senha</label><input id="password" type="password"></div><button id="loginBtn" class="btn primary full" style="margin-top:18px">ENTRAR</button><button type="button" class="btn secondary full" style="margin-top:8px" onclick="recuperarSenha()">Esqueci minha senha</button><div id="loginMsg" class="msg"></div></div></section>
-<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><div class="muted" style="font-size:12px">Sistema de gestão CZ · V98</div></div><div><span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
+<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><div class="muted" style="font-size:12px">Sistema de gestão CZ · V198</div></div><div><span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
 <div id="clientModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="modalTitle">Novo cliente</h2><button class="btn secondary" onclick="closeClient()">Fechar</button></div>
   <input id="clientId" type="hidden"><div class="muted" id="clientOpenedAt" style="font-size:13px">Data de abertura: será definida ao salvar</div>
   <div class="row"><div class="field"><label>Nome / Razão social *</label><input id="clientName" autocomplete="name"></div><div class="field"><label>Telefone *</label><input id="clientPhone" type="tel" inputmode="tel" autocomplete="tel"></div></div>
@@ -2045,7 +2045,16 @@ var CZ_CAPA_CHA_W='data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAsICA
     };
     const marcaDagua=()=>{
       const img=modelo==='cha_revelacao'?CZ_CAPA_CHA_W:modelo==='padrao'?CZ_CAPA_PADRAO_W:CZ_ORCAMENTO_MARCA_DAGUA;
-      imagemA4(img,'marca d’água');
+      if(modelo==='casamento'){
+        // Reduz a intensidade da marca-d'água sem afetar outros modelos.
+        const imagem=imagemBinaria(img);
+        if(imagem){
+          pdf.saveGraphicsState();
+          pdf.setGState(new pdf.GState({opacity:0.24}));
+          pdf.addImage(imagem.bytes,imagem.formato,0,0,W,H);
+          pdf.restoreGraphicsState();
+        }else imagemA4(img,'marca d’água');
+      }else imagemA4(img,'marca d’água');
     };
     const ouro=[178,125,47],preto=[28,28,28],cinza=[115,115,115];
     const linhaTitulo=(n,titulo,y)=>{
@@ -2097,6 +2106,30 @@ var CZ_CAPA_CHA_W='data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAsICA
     y=linhaTitulo('1','Dados do Evento',y);
     const dataFmt=d.data_evento?new Date(d.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—';
     y=campo('Data do evento',dataFmt,y); y=campo('Local',d.local_evento||'—',y); y=campo('Cidade',d.cidade_evento||'—',y); y=campo('Horário',d.horario||'—',y); y=campo('Evento',d.evento||'—',y);
+    if(modelo==='casamento'){
+      // V198 — somente a apresentação do PDF de casamento.
+      y+=7;
+      pdf.setTextColor(...preto);pdf.setFont('times','italic');pdf.setFontSize(16);
+      pdf.text('PRODUTOS CONTRATADOS',105,y,{align:'center'});
+      pdf.setDrawColor(...ouro);pdf.setLineWidth(.35);pdf.line(15,y+3,195,y+3);y+=12;
+      const linhas=[...produtos.map(x=>({nome:x.nome,qtd:x.quantidade})),...equipamentos.map(x=>({nome:x.nome,qtd:x.quantidade}))];
+      pdf.setFillColor(246,239,227);pdf.rect(15,y-5,180,8,'F');
+      pdf.setTextColor(...preto);pdf.setFont('helvetica','bold');pdf.setFontSize(9);
+      pdf.text('QTD',20,y);pdf.text('DESCRIÇÃO DO PRODUTO',39,y);y+=8;
+      const maxLinhas=Math.min(linhas.length,10);
+      pdf.setFont('helvetica','normal');
+      for(let i=0;i<Math.max(maxLinhas,5);i++){
+        const x=linhas[i];
+        if(x){pdf.text(String(x.qtd??''),20,y);pdf.text(pdf.splitTextToSize(String(x.nome||''),150)[0]||'',39,y);}
+        pdf.setDrawColor(210,210,210);pdf.line(15,y+3,195,y+3);y+=8;
+      }
+      if(linhas.length>10){pdf.setFontSize(8);pdf.setTextColor(...cinza);pdf.text('+'+(linhas.length-10)+' itens adicionais conforme proposta.',19,y);y+=7;}
+      y+=5;y=linhaTitulo('3','Observações',y);
+      pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.setTextColor(80,80,80);
+      const obs=String(d.observacoes||d.observacao||'').trim().replace(/\s+/g,' ');
+      if(obs){pdf.text(pdf.splitTextToSize(obs,175)[0]||'',18,y);y+=18;}
+      else{pdf.setDrawColor(210,210,210);pdf.line(18,y,193,y);y+=18;}
+    }else{
     y+=7;y=linhaTitulo('2','Produtos e Equipamentos',y);
     const linhas=[...produtos.map(x=>({nome:x.nome,qtd:x.quantidade})),...equipamentos.map(x=>({nome:x.nome,qtd:x.quantidade}))];
     pdf.setFillColor(246,239,227);pdf.rect(15,y-5,180,8,'F');pdf.setTextColor(...preto);pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.text('Descrição',105,y,{align:'center'});y+=8;
@@ -2111,6 +2144,7 @@ var CZ_CAPA_CHA_W='data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAsICA
     pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.setTextColor(80,80,80);
     const obs=String(d.observacoes||d.observacao||'').trim();
     if(obs){const partes=pdf.splitTextToSize(obs,175).slice(0,4);pdf.text(partes,18,y);y+=Math.max(18,partes.length*6);}else{for(let i=0;i<3;i++){pdf.setDrawColor(210,210,210);pdf.line(18,y,193,y);y+=9;}}
+    }
     // Total sem tarja escura e condições de pagamento logo abaixo.
     if(y>237){pdf.addPage();marcaDagua();y=26;}
     const totalY=Math.max(y+8,247);
