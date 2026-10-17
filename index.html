@@ -4106,7 +4106,8 @@ function coGet(id){
 function coSet(id,p){const a=coLoad(),k=String(id);a[k]={...(a[k]||{}),...p,orcamento_id:id};coSave(a);return a[k]}
 function coBrDate(v){if(!v)return '____/____/________';try{return new Date(v+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'})}catch(_){return v}}
 function coEsc(v){return esc(v==null?'':String(v))}
-async function coOrcs(){const {data,error}=await db.from('orcamentos').select('*').order('criado_em',{ascending:false}).limit(300);if(error)throw error;return data||[]}
+function cz199OrcamentoConfirmado(p){return !!p?.dados?.fechamento_financeiro?.data}
+async function coOrcs(){const {data,error}=await db.from('orcamentos').select('*').order('criado_em',{ascending:false}).limit(300);if(error)throw error;return (data||[]).filter(cz199OrcamentoConfirmado)}
 function coNorm(v){return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim().toLowerCase()}
 function coDigits(v){return String(v||'').replace(/\D/g,'')}
 // V188 — vínculo do cliente guardado em dados.cliente_id no orçamento.
@@ -4272,7 +4273,7 @@ async function renderContratosOficialCZ(){
  }catch(e){$('#content').innerHTML=`<div class="msg">Erro: ${coEsc(e.message)}</div>`}
 }
 async function abrirContratoOficialCZ(id){
- const p=(await coOrcs()).find(x=>String(x.id)===String(id));if(!p)return;
+ const p=(await coOrcs()).find(x=>String(x.id)===String(id));if(!p)return czAlert('Confirme o orçamento antes de abrir o contrato.','Contrato não liberado');
  if(String(p.status||'').toLowerCase()==='cancelado'||coGet(id)?.status==='Cancelado'){
   await czAlert('Este contrato e orçamento estão cancelados. O preenchimento está bloqueado.','Contrato cancelado');
   return renderContratosOficialCZ();
