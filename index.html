@@ -79,7 +79,7 @@
 </style>
 </head><body>
 <section id="login" class="login"><div class="loginbox"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><h3>Acesso ao sistema</h3><div class="field"><label>E-mail</label><input id="email" type="email"></div><div class="field"><label>Senha</label><input id="password" type="password"></div><button id="loginBtn" class="btn primary full" style="margin-top:18px">ENTRAR</button><button type="button" class="btn secondary full" style="margin-top:8px" onclick="recuperarSenha()">Esqueci minha senha</button><div id="loginMsg" class="msg"></div></div></section>
-<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><div class="muted" style="font-size:12px">Sistema de gestão CZ · V212</div></div><div><span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
+<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><div class="muted" style="font-size:12px">Sistema de gestão CZ · V213</div></div><div><span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
 <div id="clientModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="modalTitle">Novo cliente</h2><button class="btn secondary" onclick="closeClient()">Fechar</button></div>
   <input id="clientId" type="hidden"><div class="muted" id="clientOpenedAt" style="font-size:13px">Data de abertura: será definida ao salvar</div>
   <div class="row"><div class="field"><label>Nome / Razão social *</label><input id="clientName" autocomplete="name"></div><div class="field"><label>Telefone *</label><input id="clientPhone" type="tel" inputmode="tel" autocomplete="tel"></div></div>
@@ -145,18 +145,18 @@ window.alert=(m)=>{czAlert(m)};
 const modules=['Dashboard','Clientes','Orçamentos','Contratos','Eventos','Retorno de evento','Estoque','Ativos / Equipamentos','Colaboradores','Manutenção','Financeiro / DRE','Agenda','Relatórios','Configurações','Lista de compra','Veículos','Caixa','PDV','Sair pro Evento','Oficina','Inventário / Contagem'];
 // V212 — grupos recolhíveis sem alterar os índices dos módulos.
 const cz212Menu=[
- {i:0},{i:1},{i:2},{i:3},{i:4},{i:5},
+ {i:2},{i:3},{i:1},{i:11},{i:4},{i:18,label:'Sair pro Evento'},
+ {i:5},{i:12},{i:0},
  {g:'Estoque',items:[{i:7,label:'Ativos e Equipamentos'},{i:6,label:'Estoque Consumível'},{i:20},{i:14}]},
  {g:'Configurações',items:[{i:8},{i:15},{i:13,label:'Usuários / Permissões'}]},
  {g:'Manutenção',items:[{i:19,label:'Oficina'},{i:9,label:'Ordens de manutenção'}]},
- {g:'Financeiro',items:[{i:16},{i:10,label:'DRE / Financeiro'},{action:'novaDespesa',label:'Nova despesa'},{i:17}]},
- {i:11},{i:12},{i:18,label:'Sair pro Evento'}
+ {g:'Financeiro',items:[{i:16},{i:10,label:'DRE / Financeiro'},{action:'novaDespesa',label:'Nova despesa'},{i:17}]}
 ];
 // A página Eventos continua no menu principal; Sair pro Evento também permanece acessível.
 const cz212MenuAbertos=new Set();
 function cz212MontarMenu(){
  $('#nav').innerHTML=cz212Menu.map(x=>{
-  if(x.i!==undefined)return `<button type="button" data-i="${x.i}" class="${x.i===0?'active':''}">${x.label||modules[x.i]}</button>`;
+  if(x.i!==undefined)return `<button type="button" data-i="${x.i}" class="${x.i===2?'active':''}">${x.label||modules[x.i]}</button>`;
   const aberto=cz212MenuAbertos.has(x.g);
   return `<button type="button" class="cz212-group" data-grupo="${x.g}" aria-expanded="${aberto}">${x.g} <span style="float:right">${aberto?'▾':'▸'}</span></button><div class="cz212-sub" data-sub="${x.g}" ${aberto?'':'hidden'}>${x.items.map(item=>`<button type="button" ${item.i!==undefined?`data-i="${item.i}"`:`data-action="${item.action}"`}>${item.label||modules[item.i]}</button>`).join('')}</div>`;
  }).join('');
@@ -1213,6 +1213,19 @@ async function renderDashboard(){
     </div>`;
     const financeiro=document.querySelector('#dashFinanceiro');
     if(financeiro)financeiro.before(central.firstElementChild);
+    // V213 — agenda compacta no Painel de Controle, sem substituir a agenda completa.
+    try{
+      const hoje=new Date();hoje.setHours(0,0,0,0);
+      const agendamentos=(agendaComps()||[]).filter(a=>a.data&&new Date(a.data+'T12:00:00')>=hoje)
+        .sort((a,b)=>String(a.data+' '+(a.horario||'')).localeCompare(String(b.data+' '+(b.horario||'')))).slice(0,5);
+      const cardAgenda=document.createElement('div');
+      cardAgenda.className='card';
+      cardAgenda.style.cssText='margin:0 0 18px;padding:12px 15px;max-width:680px';
+      cardAgenda.innerHTML=`<div class="sectionhead" style="margin-bottom:8px"><div><h3 style="margin:0;font-size:16px">📅 Agenda — próximos compromissos</h3><div class="muted" style="font-size:12px">Visualização reduzida</div></div><button class="btn secondary" type="button" onclick="renderModule(11)">Abrir agenda</button></div>
+        ${agendamentos.length?agendamentos.map(a=>`<div style="display:flex;gap:10px;align-items:center;padding:7px 0;border-top:1px solid #303947;font-size:13px"><b style="min-width:72px">${esc(new Date(a.data+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}))}</b><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.descricao||a.tipo||'Compromisso')}</span><span class="muted">${esc(a.horario||'')}</span></div>`).join(''):'<div class="muted" style="font-size:13px;padding:8px 0">Nenhum compromisso futuro cadastrado.</div>'}`;
+      if(financeiro)financeiro.before(cardAgenda);
+    }catch(agendaErr){console.warn('Agenda compacta:',agendaErr)}
+
   }catch(err){console.warn('Central Operacional:',err)}
 
   await carregarCaixa();const desp=finDespesas(),fr=cz178ResumoFinanceiro(desp);
