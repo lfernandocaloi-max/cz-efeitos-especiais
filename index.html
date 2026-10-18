@@ -79,7 +79,7 @@
 </style>
 </head><body>
 <section id="login" class="login"><div class="loginbox"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><h3>Acesso ao sistema</h3><div class="field"><label>E-mail</label><input id="email" type="email"></div><div class="field"><label>Senha</label><input id="password" type="password"></div><button id="loginBtn" class="btn primary full" style="margin-top:18px">ENTRAR</button><button type="button" class="btn secondary full" style="margin-top:8px" onclick="recuperarSenha()">Esqueci minha senha</button><div id="loginMsg" class="msg"></div></div></section>
-<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><div class="muted" style="font-size:12px">Sistema de gestão CZ · V215</div></div><div><span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
+<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><div class="muted" style="font-size:12px">Sistema de gestão CZ · V221</div></div><div><span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
 <div id="clientModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="modalTitle">Novo cliente</h2><button class="btn secondary" onclick="closeClient()">Fechar</button></div>
   <input id="clientId" type="hidden"><div class="muted" id="clientOpenedAt" style="font-size:13px">Data de abertura: será definida ao salvar</div>
   <div class="row"><div class="field"><label>Nome / Razão social *</label><input id="clientName" autocomplete="name"></div><div class="field"><label>Telefone *</label><input id="clientPhone" type="tel" inputmode="tel" autocomplete="tel"></div></div>
@@ -304,7 +304,7 @@ async function recuperarSenha(){
   if(msg)msg.textContent='Não foi possível solicitar o link: '+(e.message||e)+'. Confira no Supabase Auth > URL Configuration se este endereço está em Redirect URLs.';
  }finally{if(btn)btn.disabled=false}
 }
-async function renderModule(i){$('#pageTitle').textContent=modules[i];if(i===0)return renderDashboard();if(i===1)return renderClients();if(i===2)return renderOrcamentos();if(i===3)return renderContratosOficialCZ();if(i===4)return renderEventos();if(i===5)return renderRetornoEventos();if(i===6)return renderProducts();if(i===7)return renderAssets();if(i===8)return renderColaboradores();if(i===9)return renderManutencao();if(i===10)return renderFinanceiro();if(i===11)return renderAgenda();if(i===12)return renderRelatorios();if(i===13)return renderUsuariosPermissoes();if(i===14)return renderShoppingList();if(i===15)return renderVehicles();if(i===16)return renderCaixa();if(i===17)return renderPDV();if(i===18)return renderSairEventoV135();if(i===19)return renderOficinaV135();if(i===20)return renderInventarioV135();$('#content').innerHTML=`<div class="sectionhead"><h2>${modules[i]}</h2></div><div class="placeholder">Módulo já previsto no banco de dados. A tela operacional será ativada nas próximas versões sem precisar recriar sua estrutura.</div>`}
+async function renderModule(i){$('#pageTitle').textContent=modules[i];if(i===0)return renderDashboard();if(i===1)return renderClients();if(i===2)return renderOrcamentos();if(i===3)return renderContratosOficialCZ();if(i===4)return renderEventos();if(i===5)return renderRetornoEventos();if(i===6)return renderProducts();if(i===7)return renderAssets();if(i===8)return renderColaboradores();if(i===9)return renderManutencao();if(i===10)return renderFinanceiro();if(i===11)return renderAgenda();if(i===12)return renderRelatorios();if(i===13)return renderUsuariosPermissoes();if(i===14)return renderShoppingList();if(i===15)return renderVehicles();if(i===16)return renderCaixa();if(i===17)return renderPDV();if(i===18)return renderSairEventoV221();if(i===19)return renderOficinaV135();if(i===20)return renderInventarioV135();$('#content').innerHTML=`<div class="sectionhead"><h2>${modules[i]}</h2></div><div class="placeholder">Módulo já previsto no banco de dados. A tela operacional será ativada nas próximas versões sem precisar recriar sua estrutura.</div>`}
 let agendaMesRef=null,agendaConsulta=0;
 var AGENDA_COMP_KEY='cz_agenda_compromissos_v1'; // V194: evita conflito de redeclaracao
 function agendaISO(data){return `${data.getFullYear()}-${String(data.getMonth()+1).padStart(2,'0')}-${String(data.getDate()).padStart(2,'0')}`}
@@ -4012,7 +4012,8 @@ async function renderSairEventoV135(){
   <div class="tablewrap">${evs.length?`<table><thead><tr><th>Data</th><th>Cliente</th><th>Evento</th><th>Conferência</th><th>Status</th><th>Ação</th></tr></thead><tbody>${await Promise.all(evs.map(async e=>{const {data:m}=await db.from('evento_materiais').select('id').eq('evento_id',e.id),o=cz135Evento(e.id),tot=(m||[]).length,b=(o.saida_bipada||[]).length,p=cz135Pct(b,tot);return `<tr><td>${finDate(e.data_evento)}</td><td>${esc(e.cliente_nome||'')}</td><td>${esc(e.nome_evento||'')}</td><td><b>${b}/${tot}</b> • ${p}%</td><td>${p===100?'🟢 Conferido':b?'🟡 Em conferência':'⚪ Aguardando'}</td><td><button class="btn primary" onclick="abrirSaidaV135('${e.id}')">Bipar / Conferir</button></td></tr>`})).then(x=>x.join(''))}</tbody></table>`:'<div class="empty">Nenhum evento aguardando saída.</div>'}</div>`;
  }catch(e){$('#content').innerHTML=`<div class="msg">Erro ao carregar saída: ${esc(e.message)}</div>`}
 }
-async function abrirSaidaV135(id){
+async function abrirSaidaV135(id){return sair142Abrir(id);}
+async function abrirSaidaV135_ANTIGA(id){
  const [{data:e,error:ee},{data:m,error:me}]=await Promise.all([db.from('eventos_operacionais').select('*').eq('id',id).single(),db.from('evento_materiais').select('*').eq('evento_id',id).order('criado_em')]);
  if(ee||me)return czAlert((ee||me).message,'Erro');
  const o=cz135Evento(id),b=new Set(o.saida_bipada||[]),tot=(m||[]).length,p=cz135Pct(b.size,tot);
@@ -4784,6 +4785,46 @@ if(_renderEventosV141){
 }
 
 
+/* ===== V221 — MENU DE SAÍDA UNIFICADO / CÓDIGOS DO CADASTRO ===== */
+async function renderSairEventoV221(){
+ $('#pageTitle').textContent='Sair pro Evento';
+ try{
+  const evs=(await cz135Eventos()).filter(e=>!['finalizado','aguardando_retorno'].includes(e.status));
+  const linhas=await Promise.all(evs.map(async e=>{
+   const r=await db.from('evento_materiais').select('id,quantidade_necessaria').eq('evento_id',e.id);
+   if(r.error)throw r.error;
+   const m=r.data||[],st=sair142State(e.id),c=sair220Contagens(m,st);
+   const previsto=m.reduce((v,x)=>v+sair220Qtd(x),0),feito=sair220Total(m,c);
+   const pct=previsto?Math.round(feito/previsto*100):0;
+   return `<tr><td>${finDate(e.data_evento)}</td><td>${coEsc(e.cliente_nome||'')}</td><td>${coEsc(e.nome_evento||'')}</td><td><b>${feito}/${previsto}</b> • ${pct}%</td><td>${pct===100?'🟢 Conferido':feito?'🟡 Em conferência':'⚪ Aguardando'}</td><td><button type="button" class="btn primary" onclick="sair142Abrir('${e.id}')">Bipar / Conferir</button></td></tr>`;
+  }));
+  $('#content').innerHTML=`<div class="sectionhead"><div><h2>🚚 Sair pro Evento</h2><div class="muted">Conferência automática de cada unidade. Códigos de produtos e rastreios dos ativos.</div></div></div><div class="tablewrap">${linhas.length?`<table><thead><tr><th>Data</th><th>Cliente</th><th>Evento</th><th>Conferência</th><th>Status</th><th>Ação</th></tr></thead><tbody>${linhas.join('')}</tbody></table>`:'<div class="empty">Nenhum evento aguardando saída.</div>'}</div>`;
+ }catch(e){$('#content').innerHTML=`<div class="msg">Erro ao carregar saída: ${coEsc(e.message)}</div>`}
+}
+// Resolve o código efetivamente cadastrado: produto.codigo_barras ou rastreios
+// individuais guardados em ativos.observacoes. O evento pode ter código antigo/vazio.
+async function sair221Materiais(eventoId){
+ const r=await db.from('evento_materiais').select('*').eq('evento_id',eventoId);
+ if(r.error)throw r.error;
+ const mats=r.data||[];
+ const pids=[...new Set(mats.filter(x=>!sair220Ativo(x)&&x.item_id).map(x=>x.item_id))];
+ const aids=[...new Set(mats.filter(x=>sair220Ativo(x)&&x.item_id).map(x=>x.item_id))];
+ const [pr,ar]=await Promise.all([
+  pids.length?db.from('produtos').select('id,codigo_barras').in('id',pids):Promise.resolve({data:[],error:null}),
+  aids.length?db.from('ativos').select('id,codigo_interno,observacoes').in('id',aids):Promise.resolve({data:[],error:null})
+ ]);
+ if(pr.error)throw pr.error;if(ar.error)throw ar.error;
+ const pm=new Map((pr.data||[]).map(x=>[String(x.id),x]));
+ const am=new Map((ar.data||[]).map(x=>[String(x.id),x]));
+ return mats.map(x=>{
+  const ativo=sair220Ativo(x),cad=ativo?am.get(String(x.item_id)):pm.get(String(x.item_id));
+  const rastreios=ativo&&cad?unidadesAtivo(cad).map(v=>String(v).trim()).filter(Boolean):[];
+  const codProduto=!ativo?String(cad?.codigo_barras||x.codigo_barras||x.codigo||'').trim():'';
+  // Rastreios individuais têm precedência sobre o código geral do cadastro.
+  const codigos=ativo?rastreios:(codProduto?[codProduto]:[]);
+  return {...x,_codigos:codigos,_codigoExibicao:codigos.join(' · ')||(!ativo?String(x.codigo||'').trim():'Cadastre rastreios individuais')};
+ });
+}
 /* ===== V220 — SAIR PRO EVENTO: BIPAGEM AUTOMÁTICA E CONFERÊNCIA POR QUANTIDADE ===== */
 const SAIR142_KEY='cz_v142_saida_eventos';
 function sair142Load(){try{return JSON.parse(localStorage.getItem(SAIR142_KEY)||'{}')}catch(_){return {}}}
@@ -4804,12 +4845,12 @@ let sair220Timer=null,sair220Ocupado=false;
 async function sair142Abrir(eventoId){
  $('#pageTitle').textContent='Sair pro Evento';
  try{
-  const [{data:e,error},{data:m,error:em}]=await Promise.all([db.from('eventos_operacionais').select('*').eq('id',eventoId).single(),db.from('evento_materiais').select('*').eq('evento_id',eventoId)]);
+  const [{data:e,error},{data:m,error:em}]=await Promise.all([db.from('eventos_operacionais').select('*').eq('id',eventoId).single(),sair221Materiais(eventoId).then(data=>({data,error:null}))]);
   if(error)throw error;if(em)throw em;
   const mats=m||[],st=sair142State(eventoId),c=sair220Contagens(mats,st);
   const grupos=[
    ['Produtos contratados',mats.filter(x=>String(x.origem||'').toLowerCase()==='orcamento'&&!sair220Ativo(x))],
-   ['Produtos extras',mats.filter(x=>String(x.origem||'').toLowerCase()==='extra')],
+   ['Produtos extras',mats.filter(x=>String(x.origem||'').toLowerCase()==='extra'&&!sair220Ativo(x))],
    ['Materiais de montagem / ativos',mats.filter(x=>sair220Ativo(x))]
   ];
   const esperado=mats.reduce((sum,x)=>sum+sair220Qtd(x),0),conf=sair220Total(mats,c),pct=esperado?Math.round(conf/esperado*100):100;
@@ -4826,7 +4867,7 @@ async function sair142Abrir(eventoId){
 }
 function sair142Grupo(nome,arr,c){
  const exp=arr.reduce((sum,x)=>sum+sair220Qtd(x),0),ok=sair220Total(arr,c);
- return `<div style="margin:12px 0;padding:10px;border:1px solid #303b45;border-radius:10px"><b>${coEsc(nome)}</b><span style="float:right">${ok}/${exp} ${ok===exp?'✓':'⚠'}</span><div class="tablewrap" style="margin-top:9px"><table><thead><tr><th>Produto</th><th>Código / Rastreio</th><th>Qtd. prevista</th><th>Conferido</th><th>Status</th></tr></thead><tbody>${arr.map(x=>{const q=sair220Qtd(x),n=Math.min(q,Number(c[x.id]||0)),cod=sair220Cod(x);return `<tr><td>${coEsc(x.nome_item||x.descricao||x.produto_nome||x.ativo_nome||'Material')}</td><td><b>${coEsc(cod||'Sem código')}</b></td><td>${q}</td><td><b>${n}/${q}</b></td><td>${n>=q?'✅ Conferido':n?'🟡 Parcial':'⬜ Pendente'}</td></tr>`}).join('')}</tbody></table></div></div>`;
+ return `<div style="margin:12px 0;padding:10px;border:1px solid #303b45;border-radius:10px"><b>${coEsc(nome)}</b><span style="float:right">${ok}/${exp} ${ok===exp?'✓':'⚠'}</span><div class="tablewrap" style="margin-top:9px"><table><thead><tr><th>Produto</th><th>Código / Rastreio</th><th>Qtd. prevista</th><th>Conferido</th><th>Status</th></tr></thead><tbody>${arr.map(x=>{const q=sair220Qtd(x),n=Math.min(q,Number(c[x.id]||0)),cod=x._codigoExibicao||sair220Cod(x);return `<tr><td>${coEsc(x.nome_item||x.descricao||x.produto_nome||x.ativo_nome||'Material')}</td><td><b>${coEsc(cod||'Sem código')}</b></td><td>${q}</td><td><b>${n}/${q}</b></td><td>${n>=q?'✅ Conferido':n?'🟡 Parcial':'⬜ Pendente'}</td></tr>`}).join('')}</tbody></table></div></div>`;
 }
 async function sair142Bipar(id){
  if(sair220Ocupado)return;
@@ -4835,16 +4876,17 @@ async function sair142Bipar(id){
  const aviso=$('#sair220Aviso');
  try{
   if(!resp)throw new Error('Informe o responsável pela conferência antes de bipar.');
-  const {data:m,error}=await db.from('evento_materiais').select('*').eq('evento_id',id);if(error)throw error;
-  const mats=m||[],st=sair142State(id),c=sair220Contagens(mats,st);
-  const candidatos=mats.filter(x=>sair220Cod(x)===cod);
+  const mats=await sair221Materiais(id),st=sair142State(id),c=sair220Contagens(mats,st);
+  const codigo=normalizarCodigoEvento(cod);
+  const candidatos=mats.filter(x=>(x._codigos||[]).some(v=>normalizarCodigoEvento(v)===codigo));
   if(!candidatos.length)throw new Error('Código não encontrado nos materiais deste evento.');
   const item=candidatos.find(x=>Number(c[x.id]||0)<sair220Qtd(x));
   if(!item)throw new Error('Este código já está totalmente conferido.');
-  if(sair220Ativo(item)&&Number(c[item.id]||0)>0)throw new Error('Este rastreio de ativo já foi conferido. Cada equipamento precisa de seu código individual.');
+  const rastreiosLidos=st.rastreiosLidos||[];
+  if(sair220Ativo(item)&&rastreiosLidos.includes(codigo))throw new Error('Este rastreio de ativo já foi conferido.');
   c[item.id]=Number(c[item.id]||0)+1;
   const b=[...new Set([...(st.bipados||[]),String(item.codigo_barras||item.codigo||item.id)])];
-  sair142Set(id,{responsavel:resp,contagens:c,bipados:b,historico:[...(st.historico||[]),{acao:'Conferência',codigo:cod,material_id:item.id,data:new Date().toISOString(),responsavel:resp}]});
+  sair142Set(id,{responsavel:resp,contagens:c,bipados:b,rastreiosLidos:sair220Ativo(item)?[...(st.rastreiosLidos||[]),codigo]:(st.rastreiosLidos||[]),historico:[...(st.historico||[]),{acao:'Conferência',codigo:cod,material_id:item.id,data:new Date().toISOString(),responsavel:resp}]});
   // Atualiza os números na tabela e mantém o campo pronto para a próxima leitura.
   await sair142Abrir(id);
   const ok=$('#sair220Aviso');if(ok){ok.style.color='#75dba4';ok.textContent='✓ '+(item.nome_item||'Material')+' — '+c[item.id]+'/'+sair220Qtd(item)}
@@ -4873,7 +4915,7 @@ async function sair142DarSaida(id,janelaRelatorio=null){
 async function sair142Imprimir(id,janelaRelatorio=null){
  const [{data:e},{data:m}]=await Promise.all([db.from('eventos_operacionais').select('*').eq('id',id).single(),db.from('evento_materiais').select('*').eq('evento_id',id)]),st=sair142State(id),c=sair220Contagens(m||[],st);
  const w=janelaRelatorio||window.open('','_blank','width=900,height=800');if(!w)return czAlert('O navegador bloqueou a impressão. Use o botão Imprimir bipagem.','Relatório');
- w.document.write(`<html><head><title>Bipagem</title><style>body{font-family:Arial;padding:30px}h1{font-size:20px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:8px;text-align:left}</style></head><body><h1>RELATÓRIO DE CONFERÊNCIA / SAÍDA</h1><p><b>Evento:</b> ${coEsc(e?.nome_evento||'')}</p><p><b>Cliente:</b> ${coEsc(e?.cliente_nome||'')}</p><p><b>Responsável:</b> ${coEsc(st.responsavel||'')}</p><p><b>Data/hora:</b> ${new Date().toLocaleString('pt-BR')}</p><table><thead><tr><th>Produto</th><th>Código</th><th>Previsto</th><th>Conferido</th></tr></thead><tbody>${(m||[]).map(x=>`<tr><td>${coEsc(x.nome_item||'Material')}</td><td>${coEsc(sair220Cod(x))}</td><td>${sair220Qtd(x)}</td><td>${Number(c[x.id]||0)}</td></tr>`).join('')}</tbody></table>${st.motivo_pendencia?`<p><b>Divergência:</b> ${coEsc(st.motivo_pendencia)}</p>`:''}<script>window.onload=()=>window.print()<\/script></body></html>`);w.document.close();
+ w.document.write(`<html><head><title>Bipagem</title><style>body{font-family:Arial;padding:30px}h1{font-size:20px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:8px;text-align:left}</style></head><body><h1>RELATÓRIO DE CONFERÊNCIA / SAÍDA</h1><p><b>Evento:</b> ${coEsc(e?.nome_evento||'')}</p><p><b>Cliente:</b> ${coEsc(e?.cliente_nome||'')}</p><p><b>Responsável:</b> ${coEsc(st.responsavel||'')}</p><p><b>Data/hora:</b> ${new Date().toLocaleString('pt-BR')}</p><table><thead><tr><th>Produto</th><th>Código</th><th>Previsto</th><th>Conferido</th></tr></thead><tbody>${(m||[]).map(x=>`<tr><td>${coEsc(x.nome_item||'Material')}</td><td>${coEsc(x._codigoExibicao||sair220Cod(x))}</td><td>${sair220Qtd(x)}</td><td>${Number(c[x.id]||0)}</td></tr>`).join('')}</tbody></table>${st.motivo_pendencia?`<p><b>Divergência:</b> ${coEsc(st.motivo_pendencia)}</p>`:''}<script>window.onload=()=>window.print()<\/script></body></html>`);w.document.close();
 }
 
 /* ===== V143 — LIMPEZA OPERACIONAL / UM ÚNICO CAMINHO =====
