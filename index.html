@@ -4962,11 +4962,11 @@ async function prep141Abrir(eventoId){
   </div>
 
   <div class="card"><div class="sectionhead"><div><h3 style="margin:0">3. Produto Extra</h3><div class="muted">Selecione produtos e informe a quantidade.</div></div><button class="btn secondary" onclick="prep192AdicionarMaterial('${eventoId}','extra')">+ Adicionar produto extra</button></div>
-   ${grupos.extra.length?`<div class="tablewrap"><table><thead><tr><th>Produto</th><th>Quantidade</th><th>Ação</th></tr></thead><tbody>${grupos.extra.map(x=>`<tr><td>${coEsc(x.nome_item)}</td><td>${Number(x.quantidade_necessaria||0)}</td><td><button class="btn secondary" onclick="prep192RemoverMaterial('${x.id}','${eventoId}','extra')">Remover</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Nenhum produto extra adicionado.</div>'}
+   ${grupos.extra.length?`<div class="tablewrap"><table><thead><tr><th>Produto</th><th>Quantidade</th><th>Código</th><th>Ação</th></tr></thead><tbody>${grupos.extra.map(x=>`<tr><td>${coEsc(x.nome_item)}</td><td>${Number(x.quantidade_necessaria||0)}</td><td>${coEsc(x.codigo||"—")}</td><td><button class="btn secondary" onclick="prep192RemoverMaterial('${x.id}','${eventoId}','extra')">Remover</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Nenhum produto extra adicionado.</div>'}
   </div>
 
   <div class="card"><div class="sectionhead"><div><h3 style="margin:0">4. Materiais de Montagem</h3><div class="muted">Ativos do orçamento aparecem automaticamente. Adicione outros ativos, se necessário.</div></div><button class="btn secondary" onclick="prep192AdicionarMaterial('${eventoId}','montagem')">+ Adicionar material de montagem</button></div>
-   ${grupos.montagem.length?`<div class="tablewrap"><table><thead><tr><th>Ativo / Equipamento</th><th>Quantidade</th><th>Ação</th></tr></thead><tbody>${grupos.montagem.map(x=>`<tr><td>${coEsc(x.nome_item)}</td><td>${Number(x.quantidade_necessaria||0)}</td><td>${x.origem==='orcamento'?'<span class="muted">Do orçamento</span>':`<button class="btn secondary" onclick="prep192RemoverMaterial('${x.id}','${eventoId}','montagem')">Remover</button>`}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Nenhum ativo de montagem selecionado.</div>'}
+   ${grupos.montagem.length?`<div class="tablewrap"><table><thead><tr><th>Produto</th><th>Quantidade</th><th>Código</th><th>Ação</th></tr></thead><tbody>${grupos.montagem.map(x=>`<tr><td>${coEsc(x.nome_item)}</td><td>${Number(x.quantidade_necessaria||0)}</td><td>${coEsc(x.codigo||"—")}</td><td>${x.origem==='orcamento'?'<span class="muted">Do orçamento</span>':`<button class="btn secondary" onclick="prep192RemoverMaterial('${x.id}','${eventoId}','montagem')">Remover</button>`}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Nenhum ativo de montagem selecionado.</div>'}
   </div>
 
   <div class="card"><div class="sectionhead"><div><h3 style="margin:0">5. Projeto de execução</h3><div class="muted">Desenho técnico, montagem, técnico responsável e materiais de montagem.</div></div><button class="btn primary" onclick="editarProjetoEvento('${eventoId}')">Editar projeto de execução</button></div>
@@ -4984,33 +4984,79 @@ async function prep145Salvar(id){
  if(error){if(msg)msg.textContent='Erro ao salvar: '+error.message;return}
  await czAlert('Preparação salva.','Evento');prep141Abrir(id);
 }
+/* V216 — seleção múltipla, quantidade por linha, repetição permitida e código visível. */
 async function prep192AdicionarMaterial(eventoId,origem){
  const ativo=origem==='montagem';
  const tabela=ativo?'ativos':'produtos';
- const {data,error}=await db.from(tabela).select(ativo?'id,nome,quantidade,status,codigo_interno':'id,nome,estoque_atual,codigo_barras,consumivel').order('nome');
+ const campos=ativo?'id,nome,quantidade,status,codigo_interno':'id,nome,estoque_atual,codigo_barras,consumivel';
+ const {data,error}=await db.from(tabela).select(campos).order('nome');
  if(error)return czAlert(error.message,'Selecionar material');
- const itens=(data||[]).filter(x=>ativo?(!['manutencao','em_manutencao','perdido','indisponivel'].includes(String(x.status||'').toLowerCase())&&Number(x.quantidade||0)>0):x.consumivel!==false);
+ const itens=(data||[]).filter(x=>ativo
+   ? (!['manutencao','em_manutencao','perdido','indisponivel'].includes(String(x.status||'').toLowerCase())&&Number(x.quantidade||0)>0)
+   : x.consumivel!==false);
  if(!itens.length)return czAlert('Nenhum item disponível para seleção.','Materiais');
- const {data:atuais,error:em}=await db.from('evento_materiais').select('id,item_id,origem,tipo,quantidade_necessaria').eq('evento_id',eventoId);
+ const {data:atuais,error:em}=await db.from('evento_materiais').select('item_id,tipo,quantidade_necessaria').eq('evento_id',eventoId);
  if(em)return czAlert(em.message,'Materiais');
- const ja=(atuais||[]).filter(x=>x.tipo===(ativo?'ativo':'produto'));
- const ov=document.createElement('div');ov.style.cssText='position:fixed;inset:0;z-index:200090;background:#000c;display:flex;align-items:center;justify-content:center;padding:16px';
- const box=document.createElement('div');box.style.cssText='background:#17202b;color:white;border:1px solid #44556a;border-radius:14px;padding:20px;width:min(690px,100%);max-height:90vh;overflow:auto';
- box.innerHTML=`<h3>${ativo?'Selecionar ativos / equipamentos':'Selecionar produtos de uso e consumo'}</h3><div class="field"><label>Pesquisar por nome ou código</label><input id="prep192Busca" placeholder="Digite para filtrar a tabela"></div><div class="tablewrap" style="max-height:310px;overflow:auto;margin-top:12px"><table><thead><tr><th>Selecionar</th><th>Descrição</th><th>Código</th><th>Disponível</th></tr></thead><tbody id="prep192Tabela">${itens.map(x=>`<tr data-busca="${esc((x.nome+' '+(ativo?x.codigo_interno||'':x.codigo_barras||'')).toLowerCase())}"><td><input type="radio" name="prep192Escolha" value="${esc(x.id)}"></td><td>${esc(x.nome)}</td><td>${esc(ativo?x.codigo_interno||'—':x.codigo_barras||'—')}</td><td>${Number(ativo?x.quantidade:x.estoque_atual)||0}</td></tr>`).join('')}</tbody></table></div><div class="field" style="max-width:150px"><label>Quantidade</label><input id="prep192Qtd" type="number" min="1" step="1" value="1"></div><div id="prep192Erro" class="msg"></div><div class="actions"><button type="button" class="btn secondary" id="prep192Cancelar">Cancelar</button><button type="button" class="btn primary" id="prep192Salvar">Adicionar selecionado</button></div>`;
+ const usados=new Map();
+ for(const m of (atuais||[])){
+   if(m.tipo!==(ativo?'ativo':'produto'))continue;
+   const id=String(m.item_id);
+   usados.set(id,(usados.get(id)||0)+Number(m.quantidade_necessaria||0));
+ }
+ const ov=document.createElement('div');
+ ov.style.cssText='position:fixed;inset:0;z-index:200090;background:#000c;display:flex;align-items:center;justify-content:center;padding:16px';
+ const box=document.createElement('div');
+ box.style.cssText='background:#17202b;color:white;border:1px solid #44556a;border-radius:14px;padding:20px;width:min(960px,100%);max-height:90vh;overflow:auto';
+ const rows=itens.map(x=>{
+   const codigo=ativo?(x.codigo_interno||''):(x.codigo_barras||'');
+   const disponivel=Math.max(0,Number(ativo?x.quantidade:x.estoque_atual)||0);
+   const busca=(String(x.nome||'')+' '+String(codigo)).toLowerCase();
+   return `<tr data-busca="${esc(busca)}" data-id="${esc(String(x.id))}">
+     <td style="text-align:center"><input type="checkbox" class="prep216Sel" aria-label="Selecionar ${esc(x.nome)}" style="width:25px;height:25px;min-width:25px;cursor:pointer;accent-color:#16a34a"></td>
+     <td>${esc(x.nome)}</td>
+     <td>${disponivel}</td>
+     <td><input class="prep216Qtd" aria-label="Quantidade de ${esc(x.nome)}" type="number" min="1" step="1" inputmode="numeric" placeholder="Qtd." value="" style="width:94px;min-width:78px;padding:9px"></td>
+     <td>${esc(codigo||'—')}</td></tr>`;
+ }).join('');
+ box.innerHTML=`<h3 style="margin-top:0">${ativo?'4. Materiais de Montagem — Ativos / Equipamentos':'3. Produto Extra — Uso e Consumo'}</h3>
+  <p class="muted">Selecione vários itens, preencha a quantidade na mesma linha e confira o estoque disponível. O mesmo produto pode ser adicionado novamente em outra operação.</p>
+  <div class="field"><label>Pesquisar por produto ou código</label><input id="prep216Busca" placeholder="Digite para pesquisar"></div>
+  <div class="tablewrap" style="max-height:360px;overflow:auto;margin-top:12px"><table><thead><tr><th>Sel.</th><th>Produto</th><th>Disponível</th><th>Qtd.</th><th>Código</th></tr></thead><tbody id="prep216Tabela">${rows}</tbody></table></div>
+  <div id="prep216Erro" class="msg" role="status"></div>
+  <div class="actions"><button type="button" class="btn secondary" id="prep216Cancelar">Cancelar</button><button type="button" class="btn primary" id="prep216Salvar">Adicionar selecionados</button></div>`;
  ov.appendChild(box);document.body.appendChild(ov);
- box.querySelector('#prep192Cancelar').onclick=()=>ov.remove();
- box.querySelector('#prep192Busca').oninput=e=>{const q=e.target.value.trim().toLowerCase();box.querySelectorAll('#prep192Tabela tr').forEach(tr=>tr.hidden=!tr.dataset.busca.includes(q))};
- box.querySelector('#prep192Salvar').onclick=async()=>{
-  const item=itens.find(x=>String(x.id)===box.querySelector('input[name="prep192Escolha"]:checked')?.value),q=Number(box.querySelector('#prep192Qtd').value),msg=box.querySelector('#prep192Erro');
-  if(!item)return msg.textContent='Selecione um item.';
-  if(!Number.isInteger(q)||q<1)return msg.textContent='Informe uma quantidade inteira maior que zero.';
-  if(ja.some(x=>String(x.item_id)===String(item.id)))return msg.textContent='Este item já está no evento (orçamento ou preparação).';
-  const limite=Number(ativo?item.quantidade:item.estoque_atual);
-  if(q>limite)return msg.textContent='Quantidade maior que a disponível no cadastro ('+limite+').';
-  const btn=box.querySelector('#prep192Salvar');btn.disabled=true;msg.textContent='Salvando...';
-  const {error}=await db.from('evento_materiais').insert({evento_id:eventoId,tipo:ativo?'ativo':'produto',item_id:item.id,nome_item:item.nome,codigo:ativo?(item.codigo_interno||null):(item.codigo_barras||null),quantidade_necessaria:q,quantidade_bipada:0,origem});
-  if(error){btn.disabled=false;return msg.textContent=error.message}
-  ov.remove();await prep141Abrir(eventoId);
+ box.querySelector('#prep216Cancelar').onclick=()=>ov.remove();
+ box.querySelector('#prep216Busca').oninput=e=>{
+   const q=e.target.value.trim().toLowerCase();
+   box.querySelectorAll('#prep216Tabela tr').forEach(tr=>tr.hidden=!tr.dataset.busca.includes(q));
+ };
+ box.querySelectorAll('#prep216Tabela tr').forEach(tr=>{
+   const input=tr.querySelector('.prep216Qtd');
+   input.addEventListener('input',()=>{if(input.value.trim())tr.querySelector('.prep216Sel').checked=true});
+ });
+ box.querySelector('#prep216Salvar').onclick=async()=>{
+   const msg=box.querySelector('#prep216Erro');msg.textContent='';
+   const selecionados=[...box.querySelectorAll('#prep216Tabela tr')].filter(tr=>tr.querySelector('.prep216Sel').checked);
+   if(!selecionados.length){msg.textContent='Selecione pelo menos um produto.';return}
+   const registros=[];
+   for(const tr of selecionados){
+     const item=itens.find(x=>String(x.id)===tr.dataset.id);
+     if(!item)continue;
+     const qtdTexto=tr.querySelector('.prep216Qtd').value.trim();
+     const qtd=Number(qtdTexto);
+     if(!qtdTexto||!Number.isInteger(qtd)||qtd<1){msg.textContent='Informe uma quantidade inteira maior que zero para '+item.nome+'.';return}
+     const disponivel=Number(ativo?item.quantidade:item.estoque_atual)||0;
+     const jaNoEvento=usados.get(String(item.id))||0;
+     if(qtd+jaNoEvento>disponivel){
+       msg.textContent=item.nome+': disponível '+disponivel+', já separado para este evento '+jaNoEvento+'. Quantidade adicional máxima: '+Math.max(0,disponivel-jaNoEvento)+'.';return;
+     }
+     registros.push({evento_id:eventoId,tipo:ativo?'ativo':'produto',item_id:item.id,nome_item:item.nome,codigo:ativo?(item.codigo_interno||null):(item.codigo_barras||null),quantidade_necessaria:qtd,quantidade_bipada:0,origem});
+   }
+   if(!registros.length){msg.textContent='Nenhum item válido selecionado.';return}
+   const btn=box.querySelector('#prep216Salvar');btn.disabled=true;msg.textContent='Salvando...';
+   const {error}=await db.from('evento_materiais').insert(registros);
+   if(error){btn.disabled=false;msg.textContent='Não foi possível adicionar: '+error.message;return}
+   ov.remove();await prep141Abrir(eventoId);
  };
 }
 async function prep192RemoverMaterial(id,eventoId,origem){
