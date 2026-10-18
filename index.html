@@ -4842,32 +4842,110 @@ function sair220Contagens(mats,st){
 }
 function sair220Total(mats,c){return mats.reduce((sum,x)=>sum+Math.min(sair220Qtd(x),Number(c[x.id]||0)),0)}
 let sair220Timer=null,sair220Ocupado=false;
+/* ===== V223 — MODAL DE BIPAGEM POR ITEM E LINHAS VERDES ===== */
+let sair222Selecionado={};
+function sair222Origem(x){return ['extra','extras'].includes(String(x.origem||'').toLowerCase())?'Extra':'Contratado'}
+function sair222Nome(x){return String(x.nome_item||x.descricao||x.produto_nome||x.ativo_nome||'Material')}
+function sair223FecharModal(){clearTimeout(sair220Timer);document.getElementById('sair223Modal')?.remove();}
+function sair222Selecionar(eventoId,materialId){
+ const mats=window.sair222MateriaisTela||[],x=mats.find(v=>String(v.id)===String(materialId));
+ if(!x)return;
+ sair222Selecionado[String(eventoId)]=String(materialId);
+ const st=sair142State(eventoId),c=sair220Contagens(mats,st);
+ if(Number(c[x.id]||0)>=sair220Qtd(x))return; // Conferência concluída: linha verde, sem reabrir.
+ sair223AbrirModal(eventoId);
+}
+function sair223AbrirModal(eventoId){
+ sair223FecharModal();
+ const ov=document.createElement('div');ov.id='sair223Modal';ov.className='sair223Overlay';
+ ov.innerHTML=`<div class="sair223Dialog" role="dialog" aria-modal="true" aria-label="Conferência de material"><button type="button" class="sair223Fechar" aria-label="Fechar conferência" onclick="sair223FecharModal()">×</button><div id="sair223Painel"></div><div class="field" style="margin-top:15px"><label style="font-size:14px;font-weight:800">BIPAR CÓDIGO DE BARRAS</label><input id="sair142Cod" autocomplete="off" inputmode="none" placeholder="Aguardando leitura..." style="width:100%;min-height:62px;font-size:21px;font-weight:700;border:2px solid #ff641f;padding:13px;box-sizing:border-box"><div id="sair220Aviso" class="msg" role="status" aria-live="polite"></div></div></div>`;
+ document.body.appendChild(ov);
+ ov.addEventListener('click',ev=>{if(ev.target===ov)sair223FecharModal()});
+ const input=ov.querySelector('#sair142Cod');
+ input.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key==='Tab'){ev.preventDefault();clearTimeout(sair220Timer);sair142Bipar(eventoId)}});
+ input.addEventListener('input',()=>{clearTimeout(sair220Timer);if(input.value.trim())sair220Timer=setTimeout(()=>sair142Bipar(eventoId),450)});
+ sair223AtualizarModal(eventoId);
+ input.focus();
+}
+function sair223AtualizarModal(eventoId){
+ const mats=window.sair222MateriaisTela||[],id=String(sair222Selecionado[String(eventoId)]||'');
+ const x=mats.find(v=>String(v.id)===id),painel=document.getElementById('sair223Painel');
+ if(!painel||!x)return;
+ const c=sair220Contagens(mats,sair142State(eventoId)),q=sair220Qtd(x),n=Math.min(q,Number(c[x.id]||0)),f=Math.max(0,q-n);
+ if(f===0){sair223FecharModal();return}
+ painel.innerHTML=`<div style="color:#ff884d;font-size:12px;font-weight:900;letter-spacing:.8px">CONFERÊNCIA DE MATERIAL</div><h2 style="margin:10px 0 6px;font-size:24px">${coEsc(sair222Nome(x))}</h2><div class="muted" style="font-size:13px">${sair220Ativo(x)?'Ativo':'Consumo'} • ${sair222Origem(x)} • ${coEsc(x._codigoExibicao||sair220Cod(x)||'Sem código')}</div><div class="sair223Numeros"><div><small>PARA BIPAR</small><strong>${q}</strong></div><div><small>BIPADO</small><strong style="color:#67dca2">${n}</strong></div><div><small>FALTAM</small><strong style="color:#ffbd72">${f}</strong></div></div><div style="font-size:13px;color:#b8c4d0;margin-top:12px">A cada leitura válida, a quantidade será atualizada automaticamente.</div>`;
+}
+function sair223AbrirConclusao(eventoId){
+ sair223FecharModal();document.getElementById('sair223Conclusao')?.remove();
+ const ov=document.createElement('div');ov.id='sair223Conclusao';ov.className='sair223Overlay';
+ ov.innerHTML=`<div class="sair223Dialog" role="dialog" aria-modal="true" aria-label="Concluir bipagem" style="max-width:420px"><h3 style="margin:0 0 8px">Concluir bipagem</h3><p class="muted" style="margin:0 0 18px">Imprimir relatório de conferência?</p><div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap"><button type="button" class="btn secondary" id="sair223Imprimir">Imprimir</button><button type="button" class="btn primary" id="sair223Confirmar">Confirmar bipagem</button></div></div>`;
+ document.body.appendChild(ov);
+ ov.addEventListener('click',ev=>{if(ev.target===ov)ov.remove()});
+ ov.querySelector('#sair223Imprimir').onclick=()=>sair142Imprimir(eventoId);
+ ov.querySelector('#sair223Confirmar').onclick=async()=>{
+  const btn=ov.querySelector('#sair223Confirmar');btn.disabled=true;
+  try{await sair142DarSaida(eventoId)}finally{btn.disabled=false;if(document.getElementById('sair223Conclusao')===ov)ov.remove()}
+ };
+}
+// V225 — filtros compactos e independentes da lista de saída (nome e código).
+function sair225FiltrarLista(){
+ const norm=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
+ const nome=norm(document.getElementById('sair225FiltroNome')?.value);
+ const codigo=norm(document.getElementById('sair225FiltroCodigo')?.value);
+ const linhas=Array.from(document.querySelectorAll('#sair222Tabela tbody tr'));
+ let visiveis=0;
+ linhas.forEach(tr=>{
+  const produto=norm(tr.cells[1]?.textContent);
+  const cod=norm(tr.cells[4]?.textContent);
+  const mostrar=(!nome||produto.includes(nome))&&(!codigo||cod.includes(codigo));
+  tr.hidden=!mostrar;
+  tr.style.display=mostrar?'':'none';
+  if(mostrar)visiveis++;
+ });
+ const resumo=document.getElementById('sair225ResumoFiltro');
+ if(resumo)resumo.textContent=`${visiveis} de ${linhas.length} itens`;
+}
 async function sair142Abrir(eventoId){
  $('#pageTitle').textContent='Sair pro Evento';
  try{
-  const [{data:e,error},{data:m,error:em}]=await Promise.all([db.from('eventos_operacionais').select('*').eq('id',eventoId).single(),sair221Materiais(eventoId).then(data=>({data,error:null}))]);
-  if(error)throw error;if(em)throw em;
+  const [{data:e,error},m]=await Promise.all([db.from('eventos_operacionais').select('*').eq('id',eventoId).single(),sair221Materiais(eventoId)]);
+  if(error)throw error;
   const mats=m||[],st=sair142State(eventoId),c=sair220Contagens(mats,st);
-  const grupos=[
-   ['Produtos contratados',mats.filter(x=>String(x.origem||'').toLowerCase()==='orcamento'&&!sair220Ativo(x))],
-   ['Produtos extras',mats.filter(x=>String(x.origem||'').toLowerCase()==='extra'&&!sair220Ativo(x))],
-   ['Materiais de montagem / ativos',mats.filter(x=>sair220Ativo(x))]
-  ];
+  window.sair222MateriaisTela=mats;
   const esperado=mats.reduce((sum,x)=>sum+sair220Qtd(x),0),conf=sair220Total(mats,c),pct=esperado?Math.round(conf/esperado*100):100;
-  $('#content').innerHTML=`<div class="sectionhead"><div><h2>${coEsc(e.nome_evento||'Evento')}</h2><div class="muted">${coEsc(e.cliente_nome||'')} • ${finDate(e.data_evento)} • ${coEsc(e.cidade_evento||'')}</div></div><button class="btn secondary" onclick="renderModule(18)">Voltar</button></div>
-  <div class="card"><div class="field" style="max-width:290px;margin-bottom:18px"><label>Responsável pela conferência *</label><input id="sair142Resp" value="${coEsc(st.responsavel||'')}" placeholder="Digite o colaborador"></div><div class="field"><label style="font-weight:800;font-size:16px">LEITURA AUTOMÁTICA DO CÓDIGO DE BARRAS</label><input id="sair142Cod" autofocus placeholder="BIPE O MATERIAL AQUI" autocomplete="off" style="width:100%;min-height:66px;font-size:23px;font-weight:700;border:2px solid #f97316;padding:14px 18px;box-sizing:border-box"><div class="muted" style="margin-top:7px">Ao bipar, a unidade entra automaticamente na conferência. Não precisa clicar em confirmar.</div><div id="sair220Aviso" class="msg" role="status" aria-live="polite"></div></div></div>
-  <div class="card"><h3 style="margin-top:0">Conferência dos materiais</h3>${grupos.map(([nome,arr])=>sair142Grupo(nome,arr,c)).join('')}
-  <div style="margin-top:14px"><b>Total conferido: ${conf}/${esperado} — ${pct}%</b><div style="height:10px;background:#26313b;border-radius:10px;margin-top:6px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${pct===100?'#45b879':'#d7a73b'}"></div></div></div></div>
-  <div class="actions"><button class="btn secondary" onclick="sair142Imprimir('${eventoId}')">Imprimir bipagem</button><button class="btn primary" onclick="sair142DarSaida('${eventoId}',window.open('','_blank','width=900,height=800'))">${pct===100?'Dar saída':'Dar saída com pendência'}</button></div>`;
-  const input=$('#sair142Cod');
-  input.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key==='Tab'){ev.preventDefault();clearTimeout(sair220Timer);sair142Bipar(eventoId)}});
-  input.addEventListener('input',()=>{clearTimeout(sair220Timer);if(input.value.trim())sair220Timer=setTimeout(()=>sair142Bipar(eventoId),450)});
-  setTimeout(()=>input.focus(),80);
+  $('#content').innerHTML=`<div class="sectionhead"><div><h2>🚚 Conferência de saída — ${coEsc(e.nome_evento||'Evento')}</h2><div class="muted">${coEsc(e.cliente_nome||'')} • ${finDate(e.data_evento)} • ${coEsc(e.cidade_evento||'')}</div></div><button class="btn secondary" onclick="sair223FecharModal();renderModule(18)">Voltar</button></div>
+  <style>
+  .sair223Overlay{position:fixed;inset:0;z-index:210000;background:#000b;display:flex;align-items:center;justify-content:center;padding:18px}
+  .sair223Dialog{position:relative;width:min(540px,100%);max-height:90vh;overflow:auto;border:1px solid #40566b;border-radius:16px;background:#151f2a;box-shadow:0 25px 80px #000b;padding:24px;color:#fff}
+  .sair223Fechar{position:absolute;right:12px;top:10px;border:0;background:transparent;color:#aab8c5;font-size:27px;cursor:pointer;padding:4px 9px}
+  .sair223Numeros{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-top:20px}
+  .sair223Numeros>div{background:#0d1822;border:1px solid #324556;border-radius:10px;padding:12px 6px;text-align:center}
+  .sair223Numeros small{display:block;color:#a8b6c5;font-size:11px;font-weight:800}
+  .sair223Numeros strong{display:block;font-size:32px;margin-top:6px}
+  .sair223Linha{cursor:pointer}.sair223Linha td{vertical-align:middle;white-space:normal;font-size:16px;padding:15px 12px}
+  #sair222Tabela th{font-size:14px;padding:14px 12px}
+  #sair222Tabela td:nth-child(2) b{font-size:17px}
+  #sair222Tabela td:nth-child(6){font-weight:800;min-width:135px}
+  .sair224StatusPendente{color:#b9c7d4}
+  .sair224StatusPronto{color:#92ffc0;font-weight:900}
+  .sair223Linha:not(.sair223Concluida):hover{background:#20313f!important}
+  .sair223Linha input{width:22px;height:22px;accent-color:#ff641f;cursor:pointer}
+  .sair223Concluida{background:#16452f!important;color:#d6ffe5!important}
+  .sair223Concluida td,.sair223Concluida td b{color:#d6ffe5!important}
+  .sair223Concluida input{accent-color:#41c47a;cursor:default}
+  @media(max-width:600px){.sair223Numeros strong{font-size:25px}.sair223Numeros small{font-size:10px}}
+  </style>
+  <div class="card"><div class="field" style="max-width:360px;margin:0 0 14px"><label>Responsável pela conferência *</label><input id="sair142Resp" value="${coEsc(st.responsavel||'')}" placeholder="Digite o colaborador" onchange="sair142Set('${eventoId}',{responsavel:this.value.trim()})"></div><div class="muted" style="margin-bottom:10px">Selecione o quadrado do material para abrir a conferência. Os itens totalmente bipados ficam verdes.</div>
+  <div style="display:flex;align-items:end;gap:9px;flex-wrap:wrap;margin:0 0 10px">
+   <div class="field" style="margin:0;width:190px;max-width:calc(50% - 5px)"><label for="sair225FiltroNome" style="font-size:12px;margin-bottom:4px">Filtrar pelo nome</label><input id="sair225FiltroNome" type="search" placeholder="Nome do produto" autocomplete="off" oninput="sair225FiltrarLista()" style="min-height:34px;padding:7px 9px;font-size:13px"></div>
+   <div class="field" style="margin:0;width:170px;max-width:calc(50% - 5px)"><label for="sair225FiltroCodigo" style="font-size:12px;margin-bottom:4px">Filtrar pelo código</label><input id="sair225FiltroCodigo" type="search" placeholder="Código / rastreio" autocomplete="off" oninput="sair225FiltrarLista()" style="min-height:34px;padding:7px 9px;font-size:13px"></div>
+   <span id="sair225ResumoFiltro" class="muted" style="font-size:12px;padding-bottom:8px">${mats.length} de ${mats.length} itens</span>
+  </div>
+  <div class="tablewrap"><table id="sair222Tabela"><thead><tr><th>Sel.</th><th>Produto</th><th>Tipo</th><th>Origem</th><th>Código</th><th>Conferência</th></tr></thead><tbody>${mats.map(x=>{const q=sair220Qtd(x),n=Math.min(q,Number(c[x.id]||0)),f=Math.max(0,q-n),pronto=f===0;return `<tr class="sair223Linha ${pronto?'sair223Concluida':''}" data-material="${coEsc(String(x.id))}" onclick="sair222Selecionar('${eventoId}','${x.id}')"><td><input type="checkbox" aria-label="Selecionar ${coEsc(sair222Nome(x))}" ${pronto?'checked disabled':''} onclick="event.stopPropagation();sair222Selecionar('${eventoId}','${x.id}')"></td><td><b>${coEsc(sair222Nome(x))}</b></td><td>${sair220Ativo(x)?'Ativo':'Consumo'}</td><td>${sair222Origem(x)}</td><td><b>${coEsc(x._codigoExibicao||sair220Cod(x)||'Sem código')}</b></td><td><span class="${pronto?'sair224StatusPronto':'sair224StatusPendente'}">${pronto?'✓ Conferido':n+'/'+q+' • Faltam '+f}</span></td></tr>`}).join('')}</tbody></table></div>
+  <div style="margin-top:14px"><b style="font-size:17px">Itens conferidos: ${mats.filter(x=>Number(c[x.id]||0)>=sair220Qtd(x)).length} de ${mats.length} • Unidades bipadas: ${conf}/${esperado} — ${pct}%</b><div style="height:10px;background:#26313b;border-radius:10px;margin-top:6px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${pct===100?'#45b879':'#d7a73b'}"></div></div></div></div>
+  <div class="actions"><button class="btn primary" onclick="sair223AbrirConclusao('${eventoId}')">Concluir bipagem</button></div>`;
+  sair223AtualizarModal(eventoId);
  }catch(err){$('#content').innerHTML=`<div class="msg">Erro: ${coEsc(err.message)}</div>`}
-}
-function sair142Grupo(nome,arr,c){
- const exp=arr.reduce((sum,x)=>sum+sair220Qtd(x),0),ok=sair220Total(arr,c);
- return `<div style="margin:12px 0;padding:10px;border:1px solid #303b45;border-radius:10px"><b>${coEsc(nome)}</b><span style="float:right">${ok}/${exp} ${ok===exp?'✓':'⚠'}</span><div class="tablewrap" style="margin-top:9px"><table><thead><tr><th>Produto</th><th>Código / Rastreio</th><th>Qtd. prevista</th><th>Conferido</th><th>Status</th></tr></thead><tbody>${arr.map(x=>{const q=sair220Qtd(x),n=Math.min(q,Number(c[x.id]||0)),cod=x._codigoExibicao||sair220Cod(x);return `<tr><td>${coEsc(x.nome_item||x.descricao||x.produto_nome||x.ativo_nome||'Material')}</td><td><b>${coEsc(cod||'Sem código')}</b></td><td>${q}</td><td><b>${n}/${q}</b></td><td>${n>=q?'✅ Conferido':n?'🟡 Parcial':'⬜ Pendente'}</td></tr>`}).join('')}</tbody></table></div></div>`;
 }
 async function sair142Bipar(id){
  if(sair220Ocupado)return;
@@ -4876,20 +4954,23 @@ async function sair142Bipar(id){
  const aviso=$('#sair220Aviso');
  try{
   if(!resp)throw new Error('Informe o responsável pela conferência antes de bipar.');
+  const selecionado=String(sair222Selecionado[String(id)]||'');
+  if(!selecionado)throw new Error('Selecione o material na lista antes de bipar.');
   const mats=await sair221Materiais(id),st=sair142State(id),c=sair220Contagens(mats,st);
+  const item=mats.find(x=>String(x.id)===selecionado);
+  if(!item)throw new Error('O material selecionado não está mais na lista deste evento.');
   const codigo=normalizarCodigoEvento(cod);
-  const candidatos=mats.filter(x=>(x._codigos||[]).some(v=>normalizarCodigoEvento(v)===codigo));
-  if(!candidatos.length)throw new Error('Código não encontrado nos materiais deste evento.');
-  const item=candidatos.find(x=>Number(c[x.id]||0)<sair220Qtd(x));
-  if(!item)throw new Error('Este código já está totalmente conferido.');
-  const rastreiosLidos=st.rastreiosLidos||[];
-  if(sair220Ativo(item)&&rastreiosLidos.includes(codigo))throw new Error('Este rastreio de ativo já foi conferido.');
+  if(!(item._codigos||[]).some(v=>normalizarCodigoEvento(v)===codigo)){
+   const outro=mats.find(x=>(x._codigos||[]).some(v=>normalizarCodigoEvento(v)===codigo));
+   throw new Error(outro?'O código pertence a outro material: '+sair222Nome(outro)+'. Selecione a linha correta.':'Código não encontrado no cadastro do material selecionado.');
+  }
+  if(Number(c[item.id]||0)>=sair220Qtd(item))throw new Error('Este material já está totalmente conferido.');
+  if(sair220Ativo(item)&&(st.rastreiosLidos||[]).includes(codigo))throw new Error('Este rastreio de ativo já foi conferido.');
   c[item.id]=Number(c[item.id]||0)+1;
   const b=[...new Set([...(st.bipados||[]),String(item.codigo_barras||item.codigo||item.id)])];
   sair142Set(id,{responsavel:resp,contagens:c,bipados:b,rastreiosLidos:sair220Ativo(item)?[...(st.rastreiosLidos||[]),codigo]:(st.rastreiosLidos||[]),historico:[...(st.historico||[]),{acao:'Conferência',codigo:cod,material_id:item.id,data:new Date().toISOString(),responsavel:resp}]});
-  // Atualiza os números na tabela e mantém o campo pronto para a próxima leitura.
   await sair142Abrir(id);
-  const ok=$('#sair220Aviso');if(ok){ok.style.color='#75dba4';ok.textContent='✓ '+(item.nome_item||'Material')+' — '+c[item.id]+'/'+sair220Qtd(item)}
+  const ok=$('#sair220Aviso');if(ok){ok.style.color='#75dba4';ok.textContent='✓ '+sair222Nome(item)+' — '+c[item.id]+'/'+sair220Qtd(item)}
  }catch(err){if(aviso){aviso.style.color='#ffb0b0';aviso.textContent=err.message}else if(typeof czAlert==='function')await czAlert(err.message,'Conferência')}
  finally{const novo=$('#sair142Cod')||input;if(novo){novo.value='';novo.focus()}sair220Ocupado=false}
 }
@@ -4908,12 +4989,11 @@ async function sair142DarSaida(id,janelaRelatorio=null){
  const {error}=await db.from('eventos_operacionais').update({status,atualizado_em:new Date().toISOString()}).eq('id',id);if(error){janelaRelatorio?.close();return czAlert(error.message,'Saída')}
  const enviados=mats.flatMap(x=>Array.from({length:Math.min(sair220Qtd(x),Number(c[x.id]||0))},()=>String(x.codigo_barras||x.codigo||x.id)));
  sair142Set(id,{responsavel:resp,contagens:c,motivo_pendencia:motivo||'',saida_em:new Date().toISOString(),itens_enviados:enviados,historico:[...(st.historico||[]),{acao:falt.length?'Saída com divergência':'Saída',data:new Date().toISOString(),responsavel:resp,motivo:motivo||''}]});
- await sair142Imprimir(id,janelaRelatorio);
- await czAlert(falt.length?'Saída liberada com divergência registrada. Somente os materiais realmente bipados serão esperados no retorno.':'Saída liberada. Relatório de bipagem aberto para impressão.','Saída');
+ await czAlert(falt.length?'Bipagem confirmada com divergência registrada. Somente os materiais realmente bipados serão esperados no retorno.':'Bipagem confirmada e saída liberada.','Saída');
  if(typeof renderModule==='function')renderModule(18);
 }
 async function sair142Imprimir(id,janelaRelatorio=null){
- const [{data:e},{data:m}]=await Promise.all([db.from('eventos_operacionais').select('*').eq('id',id).single(),db.from('evento_materiais').select('*').eq('evento_id',id)]),st=sair142State(id),c=sair220Contagens(m||[],st);
+ const [{data:e},m]=await Promise.all([db.from('eventos_operacionais').select('*').eq('id',id).single(),sair221Materiais(id)]),st=sair142State(id),c=sair220Contagens(m||[],st);
  const w=janelaRelatorio||window.open('','_blank','width=900,height=800');if(!w)return czAlert('O navegador bloqueou a impressão. Use o botão Imprimir bipagem.','Relatório');
  w.document.write(`<html><head><title>Bipagem</title><style>body{font-family:Arial;padding:30px}h1{font-size:20px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:8px;text-align:left}</style></head><body><h1>RELATÓRIO DE CONFERÊNCIA / SAÍDA</h1><p><b>Evento:</b> ${coEsc(e?.nome_evento||'')}</p><p><b>Cliente:</b> ${coEsc(e?.cliente_nome||'')}</p><p><b>Responsável:</b> ${coEsc(st.responsavel||'')}</p><p><b>Data/hora:</b> ${new Date().toLocaleString('pt-BR')}</p><table><thead><tr><th>Produto</th><th>Código</th><th>Previsto</th><th>Conferido</th></tr></thead><tbody>${(m||[]).map(x=>`<tr><td>${coEsc(x.nome_item||'Material')}</td><td>${coEsc(x._codigoExibicao||sair220Cod(x))}</td><td>${sair220Qtd(x)}</td><td>${Number(c[x.id]||0)}</td></tr>`).join('')}</tbody></table>${st.motivo_pendencia?`<p><b>Divergência:</b> ${coEsc(st.motivo_pendencia)}</p>`:''}<script>window.onload=()=>window.print()<\/script></body></html>`);w.document.close();
 }
