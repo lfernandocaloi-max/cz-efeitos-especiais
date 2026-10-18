@@ -4946,7 +4946,7 @@ async function prep141Abrir(eventoId){
     db.from('evento_materiais').select('*').eq('evento_id',eventoId).order('criado_em')
   ]);
   if(error)throw error;if(em)throw em;
-  const mats=m||[];
+  const mats=m||[];const info217=prep217Local(eventoId);const docs217=cz135Evento(eventoId).docs||{};
   // Usa a estrutura REAL já existente no sistema: origem = orcamento / extra / montagem.
   const grupos={
    contratado:mats.filter(x=>String(x.origem||'').toLowerCase()==='orcamento'),
@@ -4962,7 +4962,7 @@ async function prep141Abrir(eventoId){
   </div>
 
   <div class="card"><div class="sectionhead"><div><h3 style="margin:0">3. Produto Extra</h3><div class="muted">Selecione produtos e informe a quantidade.</div></div><button class="btn secondary" onclick="prep192AdicionarMaterial('${eventoId}','extra')">+ Adicionar produto extra</button></div>
-   ${grupos.extra.length?`<div class="tablewrap"><table><thead><tr><th>Produto</th><th>Quantidade</th><th>Código</th><th>Ação</th></tr></thead><tbody>${grupos.extra.map(x=>`<tr><td>${coEsc(x.nome_item)}</td><td>${Number(x.quantidade_necessaria||0)}</td><td>${coEsc(x.codigo||"—")}</td><td><button class="btn secondary" onclick="prep192RemoverMaterial('${x.id}','${eventoId}','extra')">Remover</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Nenhum produto extra adicionado.</div>'}
+   ${grupos.extra.length?`<div class="tablewrap"><table><thead><tr><th>Produto</th><th>Quantidade</th><th>Código</th><th>Qtd. utilizada</th><th>Ação</th></tr></thead><tbody>${grupos.extra.map(x=>`<tr><td>${coEsc(x.nome_item)}</td><td>${Number(x.quantidade_necessaria||0)}</td><td>${coEsc(x.codigo||"—")}</td><td><input data-prep217-extra="${x.id}" type="number" min="0" step="1" placeholder="Qtd." value="${coEsc(info217.extra?.[x.id]||'')}" style="width:95px" aria-label="Quantidade utilizada de ${coEsc(x.nome_item)}"></td><td><button class="btn secondary" onclick="prep192RemoverMaterial('${x.id}','${eventoId}','extra')">Remover</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Nenhum produto extra adicionado.</div>'}
   </div>
 
   <div class="card"><div class="sectionhead"><div><h3 style="margin:0">4. Materiais de Montagem</h3><div class="muted">Ativos do orçamento aparecem automaticamente. Adicione outros ativos, se necessário.</div></div><button class="btn secondary" onclick="prep192AdicionarMaterial('${eventoId}','montagem')">+ Adicionar material de montagem</button></div>
@@ -4975,20 +4975,45 @@ async function prep141Abrir(eventoId){
 
   <div class="card"><h3 style="margin-top:0">6. Anotação técnica</h3><textarea id="prep145Anotacao" rows="6" placeholder="Orientações para montagem e operação">${coEsc(e.anotacao_tecnica||'')}</textarea></div>
 
-  <div class="actions"><button class="btn primary" onclick="prep145Salvar('${eventoId}')">Salvar preparação</button><button class="btn secondary" onclick="abrirMapaReservasV140()">Ver reservas</button></div><div id="prep145Msg" class="msg"></div>`;
+  <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">7. Documentação</h3><div class="tablewrap"><table><thead><tr><th>Documento</th><th>Status</th></tr></thead><tbody><tr><td>Alvará de Queima de Fogos</td><td>${coEsc(docs217.alvara||'Pendente')}</td></tr><tr><td>Croqui Polícia Civil</td><td>${coEsc(docs217.croqui||'Pendente')}</td></tr></tbody></table></div><p class="muted">A situação da documentação é mantida pelo módulo de documentação do evento.</p></div><div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">8. Ocorrências de campo</h3><textarea id="prep217Ocorrencias" rows="4" placeholder="Registre ocorrências, observações e acontecimentos durante o evento">${coEsc(info217.ocorrencias||'')}</textarea></div><div class="actions"><button class="btn primary" onclick="prep145Salvar('${eventoId}')">Salvar preparação</button><button class="btn secondary" onclick="prep217Imprimir('${eventoId}')">🖨 Imprimir projeto de execução</button><button class="btn secondary" onclick="abrirMapaReservasV140()">Ver reservas</button></div><div id="prep145Msg" class="msg"></div>`;
  }catch(err){$('#content').innerHTML=`<div class="msg">Erro: ${coEsc(err.message)}</div>`}
 }
 async function prep145Salvar(id){
  const msg=$('#prep145Msg');if(msg)msg.textContent='Salvando...';
+ prep217Guardar(id);
  const {error}=await db.from('eventos_operacionais').update({anotacao_tecnica:$('#prep145Anotacao')?.value.trim()||null,atualizado_em:new Date().toISOString()}).eq('id',id);
  if(error){if(msg)msg.textContent='Erro ao salvar: '+error.message;return}
  await czAlert('Preparação salva.','Evento');prep141Abrir(id);
+}
+/* V217 — informações operacionais adicionais mantidas neste navegador (sem alteração SQL). */
+function prep217Local(id){try{return JSON.parse(localStorage.getItem('cz217_preparacao_'+id)||'{}')}catch(_){return {}}}
+function prep217Guardar(id){
+ const extra={};document.querySelectorAll('[data-prep217-extra]').forEach(inp=>{extra[inp.dataset.prep217Extra]=inp.value.trim()});
+ const dados={ocorrencias:document.getElementById('prep217Ocorrencias')?.value||'',extra};
+ localStorage.setItem('cz217_preparacao_'+id,JSON.stringify(dados));
+}
+function prep217Escapar(v){return esc(String(v??'—'))}
+async function prep217Imprimir(id){
+ if(document.getElementById('prep217Ocorrencias'))prep217Guardar(id);
+ // Open synchronously to avoid popup blockers after awaited database requests.
+ const w=window.open('','_blank');if(!w)return czAlert('Permita janelas pop-up para imprimir o projeto.','Impressão');
+ w.document.write('<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>Preparando projeto</title><body>Carregando informações...</body></html>');w.document.close();
+ try{
+  const [er,mr]=await Promise.all([db.from('eventos_operacionais').select('*').eq('id',id).single(),db.from('evento_materiais').select('*').eq('evento_id',id).order('criado_em')]);
+  if(er.error||mr.error)throw (er.error||mr.error);
+  const e=er.data,m=mr.data||[],o=cz135Evento(id),local=prep217Local(id);
+  const dado=(titulo,valor)=>`<div class="dado"><b>${prep217Escapar(titulo)}</b><span>${prep217Escapar(valor||'—')}</span></div>`;
+  const data=v=>v?finDate(v):'—';
+  const linha=x=>`<tr><td>${prep217Escapar(x.nome_item)}</td><td>${prep217Escapar(x.origem==='extra'?'Extra':x.origem==='montagem'?'Montagem':x.tipo==='ativo'?'Ativo contratado':'Contratado')}</td><td>${Number(x.quantidade_necessaria||0)}</td><td>${prep217Escapar(x.codigo)}</td><td>${x.origem==='extra'?prep217Escapar(local.extra?.[x.id]||'—'):'—'}</td></tr>`;
+  const html=`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Projeto de execução — ${prep217Escapar(e.nome_evento)}</title><style>@page{size:A4;margin:13mm}*{box-sizing:border-box}body{font:11px Arial,sans-serif;color:#1d2939}h1{font-size:18px;margin:0 0 4px}h2{font-size:13px;margin:20px 0 8px;padding:7px;background:#e9edf2;border-left:4px solid #344054;break-after:avoid}.sub{color:#667085;margin-bottom:15px}.dados{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}.dado{border:1px solid #d0d5dd;border-radius:4px;padding:7px;break-inside:avoid}.dado b{display:block;font-size:9px;color:#475467;margin-bottom:3px}.dado span{font-size:11px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #bfc7d1;padding:7px;text-align:left;vertical-align:top;overflow-wrap:anywhere}th{background:#eef1f5}svg{width:100%;height:auto;max-height:380px;border:1px solid #d0d5dd;break-inside:avoid}.texto{white-space:pre-wrap;border:1px solid #d0d5dd;padding:10px;min-height:42px;break-inside:avoid}.rodape{font-size:9px;color:#667085;margin-top:22px}@media print{button{display:none}}</style></head><body><h1>CZ EFEITOS ESPECIAIS</h1><div class="sub">PROJETO DE EXECUÇÃO E RELATÓRIO TÉCNICO DO EVENTO</div><h2>1. Dados do evento</h2><div class="dados">${dado('Cliente',e.cliente_nome)}${dado('Responsável pelo evento',e.responsavel_evento)}${dado('Projeto / Evento',e.nome_evento)}${dado('Data do evento',data(e.data_evento))}${dado('Local do evento',e.local_evento)}${dado('Cidade do evento',e.cidade_evento)}${dado('Horário inicial',e.horario_evento)}${dado('Telefone do responsável',e.telefone_responsavel)}</div><h2>2. Dados técnicos</h2><div class="dados">${dado('Início da montagem',data(e.data_inicio_montagem))}${dado('Término da montagem',data(e.data_termino_montagem))}${dado('Horário de montagem',e.horario_montagem)}${dado('Técnico responsável',e.tecnico_responsavel)}</div><h2>3. Materiais do evento</h2><table><thead><tr><th>Produto / Equipamento</th><th>Grupo</th><th>Quantidade</th><th>Código / Rastreio</th><th>Qtd. utilizada extra</th></tr></thead><tbody>${m.map(linha).join('')||'<tr><td colspan="5">Nenhum material registrado</td></tr>'}</tbody></table><h2>4. Projeto de execução</h2><svg viewBox="0 0 900 500" xmlns="http://www.w3.org/2000/svg">${projetoExecucaoMarkup(e.projeto_execucao)}</svg><h2>5. Anotação técnica</h2><div class="texto">${prep217Escapar(e.anotacao_tecnica)}</div><h2>6. Documentação</h2><table><thead><tr><th>Documento</th><th>Situação</th></tr></thead><tbody><tr><td>Alvará de Queima de Fogos</td><td>${prep217Escapar(o.docs?.alvara||'Pendente')}</td></tr><tr><td>Croqui Polícia Civil</td><td>${prep217Escapar(o.docs?.croqui||'Pendente')}</td></tr></tbody></table><h2>7. Ocorrências de campo</h2><div class="texto">${prep217Escapar(local.ocorrencias)}</div><div class="rodape">Gerado em ${prep217Escapar(new Date().toLocaleString('pt-BR'))} — CZ Efeitos Especiais</div><script>window.onload=()=>{window.focus();window.print()}<\/script></body></html>`;
+  w.document.open();w.document.write(html);w.document.close();
+ }catch(err){w.document.body.textContent='Não foi possível gerar o relatório: '+err.message}
 }
 /* V216 — seleção múltipla, quantidade por linha, repetição permitida e código visível. */
 async function prep192AdicionarMaterial(eventoId,origem){
  const ativo=origem==='montagem';
  const tabela=ativo?'ativos':'produtos';
- const campos=ativo?'id,nome,quantidade,status,codigo_interno':'id,nome,estoque_atual,codigo_barras,consumivel';
+ const campos=ativo?'id,nome,quantidade,status,codigo_interno,observacoes':'id,nome,estoque_atual,codigo_barras,consumivel';
  const {data,error}=await db.from(tabela).select(campos).order('nome');
  if(error)return czAlert(error.message,'Selecionar material');
  const itens=(data||[]).filter(x=>ativo
@@ -5008,7 +5033,7 @@ async function prep192AdicionarMaterial(eventoId,origem){
  const box=document.createElement('div');
  box.style.cssText='background:#17202b;color:white;border:1px solid #44556a;border-radius:14px;padding:20px;width:min(960px,100%);max-height:90vh;overflow:auto';
  const rows=itens.map(x=>{
-   const codigo=ativo?(x.codigo_interno||''):(x.codigo_barras||'');
+   const codigo=ativo?(unidadesAtivo(x).join(' · ')||'SEM RASTREIO'):(x.codigo_barras||'');
    const disponivel=Math.max(0,Number(ativo?x.quantidade:x.estoque_atual)||0);
    const busca=(String(x.nome||'')+' '+String(codigo)).toLowerCase();
    return `<tr data-busca="${esc(busca)}" data-id="${esc(String(x.id))}">
@@ -5047,10 +5072,11 @@ async function prep192AdicionarMaterial(eventoId,origem){
      if(!qtdTexto||!Number.isInteger(qtd)||qtd<1){msg.textContent='Informe uma quantidade inteira maior que zero para '+item.nome+'.';return}
      const disponivel=Number(ativo?item.quantidade:item.estoque_atual)||0;
      const jaNoEvento=usados.get(String(item.id))||0;
+     if(ativo && unidadesAtivo(item).length<qtd+jaNoEvento){msg.textContent=item.nome+': não há códigos de rastreio individuais suficientes para esta quantidade. Cadastre os rastreios no ativo antes de adicionar.';return}
      if(qtd+jaNoEvento>disponivel){
        msg.textContent=item.nome+': disponível '+disponivel+', já separado para este evento '+jaNoEvento+'. Quantidade adicional máxima: '+Math.max(0,disponivel-jaNoEvento)+'.';return;
      }
-     registros.push({evento_id:eventoId,tipo:ativo?'ativo':'produto',item_id:item.id,nome_item:item.nome,codigo:ativo?(item.codigo_interno||null):(item.codigo_barras||null),quantidade_necessaria:qtd,quantidade_bipada:0,origem});
+     registros.push({evento_id:eventoId,tipo:ativo?'ativo':'produto',item_id:item.id,nome_item:item.nome,codigo:ativo?(unidadesAtivo(item).slice(jaNoEvento,jaNoEvento+qtd).join(' · ')||null):(item.codigo_barras||null),quantidade_necessaria:qtd,quantidade_bipada:0,origem});
    }
    if(!registros.length){msg.textContent='Nenhum item válido selecionado.';return}
    const btn=box.querySelector('#prep216Salvar');btn.disabled=true;msg.textContent='Salvando...';
