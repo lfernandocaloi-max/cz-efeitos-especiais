@@ -77,7 +77,23 @@
 @media(max-width:560px){.orc-travel-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .nav .cz212-group{background:#17222d;color:#f6f7f9;font-weight:800;margin-top:8px;border-left:3px solid #ff641f}.nav .cz212-sub{padding-left:14px;border-left:1px solid #394757;margin-left:12px}.nav .cz212-sub[hidden]{display:none}.nav .cz212-sub button{font-size:13px;padding:9px 8px;margin:1px 0;white-space:normal}.nav .cz212-group:hover{background:#263341}
 </style>
-</head><body>
+<style>
+/* CZ V231: orçamento legível e cabeçalhos compactos */
+.cz231Resumo{background:var(--card,#171e29)!important;color:#fff!important}
+.cz231Titulo{display:table!important;width:auto!important;background:#e96513!important;color:white!important;border-radius:7px!important;padding:7px 12px!important;font-size:17px!important;margin:0!important}
+#content input[type="date"],#content input[type="time"]{color:#fff!important;color-scheme:dark!important;border-color:#a9b9c9!important}
+#content .field>label{color:#fff!important;font-size:14px!important;font-weight:700!important}
+#content .cz231Resumo label{color:#fff!important}
+.cz231MonitorTable{width:100%;table-layout:auto;border-collapse:collapse}
+.cz231MonitorTable th,.cz231MonitorTable td{text-align:center!important;padding:8px 4px!important;vertical-align:middle;font-size:13px;white-space:nowrap}
+.cz231MonitorTable th{font-size:14px;font-weight:800}
+.cz231MonitorTable .cz231Cliente{white-space:normal;min-width:100px}
+.cz231MonitorTable .cz231Data{min-width:82px}
+.cz231MonitorTable .cz231Icon{border:0;background:transparent;padding:1px 2px;cursor:pointer;font-size:21px;line-height:1}
+.cz231MonitorTable .cz231Btn{padding:5px 7px;font-size:11px;min-height:0}
+.cz231MonitorTable small{display:block;color:#b3bdc8;font-size:11px}
+@media(max-width:1150px){.cz231MonitorTable th,.cz231MonitorTable td{padding:6px 2px!important;font-size:12px}.cz231MonitorTable th{font-size:12px}}
+</style></head><body>
 <section id="login" class="login"><div class="loginbox"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><h3>Acesso ao sistema</h3><div class="field"><label>E-mail</label><input id="email" type="email"></div><div class="field"><label>Senha</label><input id="password" type="password"></div><button id="loginBtn" class="btn primary full" style="margin-top:18px">ENTRAR</button><button type="button" class="btn secondary full" style="margin-top:8px" onclick="recuperarSenha()">Esqueci minha senha</button><div id="loginMsg" class="msg"></div></div></section>
 <div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><div class="muted" style="font-size:12px">Sistema de gestão CZ · V221</div></div><div><span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
 <div id="clientModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="modalTitle">Novo cliente</h2><button class="btn secondary" onclick="closeClient()">Fechar</button></div>
@@ -142,9 +158,10 @@ function czAlert(mensagem,titulo='Aviso'){return czDialog({titulo,mensagem,tipo:
 function czConfirm(mensagem,titulo='Confirmação',confirmar='Confirmar'){return czDialog({titulo,mensagem,tipo:'confirmar',confirmar,cancelar:'Cancelar'})}
 function czPrompt(mensagem,valor='',titulo='Preenchimento'){return czDialog({titulo,mensagem,tipo:'prompt',valor,confirmar:'Continuar',cancelar:'Cancelar'})}
 window.alert=(m)=>{czAlert(m)};
-const modules=['Dashboard','Clientes','Orçamentos','Contratos','Eventos','Retorno de evento','Estoque','Ativos / Equipamentos','Colaboradores','Manutenção','Financeiro / DRE','Agenda','Relatórios','Configurações','Lista de compra','Veículos','Caixa','PDV','Sair pro Evento','Oficina','Inventário / Contagem'];
+const modules=['Dashboard','Clientes','Orçamentos','Contratos','Eventos','Retorno de evento','Estoque','Ativos / Equipamentos','Colaboradores','Manutenção','Financeiro / DRE','Agenda','Relatórios','Configurações','Lista de compra','Veículos','Caixa','PDV','Sair pro Evento','Oficina','Inventário / Contagem','Monitoramento de Eventos','Eventos Concluídos'];
 // V212 — grupos recolhíveis sem alterar os índices dos módulos.
 const cz212Menu=[
+ {i:21,label:'Monitoramento de Eventos'},{i:22,label:'Eventos Concluídos'},
  {i:2},{i:3},{i:1},{i:11},{i:4},{i:18,label:'Sair pro Evento'},
  {i:5},{i:12},{i:0},
  {g:'Estoque',items:[{i:7,label:'Ativos e Equipamentos'},{i:6,label:'Estoque Consumível'},{i:20},{i:14}]},
@@ -304,7 +321,7 @@ async function recuperarSenha(){
   if(msg)msg.textContent='Não foi possível solicitar o link: '+(e.message||e)+'. Confira no Supabase Auth > URL Configuration se este endereço está em Redirect URLs.';
  }finally{if(btn)btn.disabled=false}
 }
-async function renderModule(i){$('#pageTitle').textContent=modules[i];if(i===0)return renderDashboard();if(i===1)return renderClients();if(i===2)return renderOrcamentos();if(i===3)return renderContratosOficialCZ();if(i===4)return renderEventos();if(i===5)return renderRetornoEventos();if(i===6)return renderProducts();if(i===7)return renderAssets();if(i===8)return renderColaboradores();if(i===9)return renderManutencao();if(i===10)return renderFinanceiro();if(i===11)return renderAgenda();if(i===12)return renderRelatorios();if(i===13)return renderUsuariosPermissoes();if(i===14)return renderShoppingList();if(i===15)return renderVehicles();if(i===16)return renderCaixa();if(i===17)return renderPDV();if(i===18)return renderSairEventoV221();if(i===19)return renderOficinaV135();if(i===20)return renderInventarioV135();$('#content').innerHTML=`<div class="sectionhead"><h2>${modules[i]}</h2></div><div class="placeholder">Módulo já previsto no banco de dados. A tela operacional será ativada nas próximas versões sem precisar recriar sua estrutura.</div>`}
+async function renderModule(i){$('#pageTitle').textContent=modules[i];if(i===0)return renderDashboard();if(i===1)return renderClients();if(i===2)return renderOrcamentos();if(i===3)return renderContratosOficialCZ();if(i===4)return renderEventos();if(i===5)return renderRetornoEventos();if(i===6)return renderProducts();if(i===7)return renderAssets();if(i===8)return renderColaboradores();if(i===9)return renderManutencao();if(i===10)return renderFinanceiro();if(i===11)return renderAgenda();if(i===12)return renderRelatorios();if(i===13)return renderUsuariosPermissoes();if(i===14)return renderShoppingList();if(i===15)return renderVehicles();if(i===16)return renderCaixa();if(i===17)return renderPDV();if(i===18)return renderSairEventoV221();if(i===19)return renderOficinaV135();if(i===20)return renderInventarioV135();if(i===21)return cz231Monitor();if(i===22)return cz231Concluidos();$('#content').innerHTML=`<div class="sectionhead"><h2>${modules[i]}</h2></div><div class="placeholder">Módulo já previsto no banco de dados. A tela operacional será ativada nas próximas versões sem precisar recriar sua estrutura.</div>`}
 let agendaMesRef=null,agendaConsulta=0;
 var AGENDA_COMP_KEY='cz_agenda_compromissos_v1'; // V194: evita conflito de redeclaracao
 function agendaISO(data){return `${data.getFullYear()}-${String(data.getMonth()+1).padStart(2,'0')}-${String(data.getDate()).padStart(2,'0')}`}
@@ -931,12 +948,17 @@ async function abrirFechamentoEvento(id){
  const mats=(d.produtos||[]).map(x=>({nome:x.nome||custos[String(x.id)]?.nome||'Produto',q:Number(x.quantidade||0),unit:Number(custos[String(x.id)]?.valor_custo||0)}));
  const material=mats.reduce((s,x)=>s+x.q*x.unit,0);
  const despesas=finDespesas().filter(x=>{const ref=String(x.veiculo_evento||'').toLowerCase();return ref&&([e.nome_evento,e.cliente_nome,o?.numero].filter(Boolean).some(v=>ref.includes(String(v).toLowerCase())))});
- const extras=despesas.reduce((s,x)=>s+Number(x.valor||0),0), gastos=material+equipe+desloc+extras, lucro=total-gastos, margem=total>0?lucro/total*100:0;
+ const extras=despesas.reduce((s,x)=>s+Number(x.valor||0),0);
+ const pdvEvento=(caixaCache||[]).filter(x=>x.tipo==='entrada'&&String(x.origem_id||'').startsWith('pdv:')&&String(x.observacao||'').includes('CZ_EVENTO:'+id));
+ const receitaPDV=pdvEvento.reduce((s,x)=>s+Number(x.valor||0),0);
+ const substituicoes=cz231Ocorrencias().filter(x=>String(x.eventoId)===String(id)&&x.tipo==='substituicao');
+ const custoSubstituicao=substituicoes.reduce((s,x)=>s+Number(x.custo||0),0);
+ const receita=total+receitaPDV,gastos=material+equipe+desloc+extras+custoSubstituicao, lucro=receita-gastos, margem=receita>0?lucro/receita*100:0;
  const linha=(n,v,dest='')=>`<tr><td>${n}</td><td style="text-align:right;${dest}">${money(v)}</td></tr>`;
  $('#content').innerHTML=relTopo('🏁 Fechamento de Eventos','Relatório interno da CZ Efeitos Especiais')+`<div class="card" style="padding:14px 18px"><div style="display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:10px 22px"><div><b>Cliente</b><div>${esc(e.cliente_nome||'—')}</div></div><div><b>Evento</b><div>${esc(e.nome_evento||'—')}</div></div><div><b>Telefone</b><div>${esc(e.cliente_telefone||'—')}</div></div><div><b>Nº proposta</b><div>${esc(o?.numero||'—')}</div></div><div><b>Data do evento</b><div>${finDate(e.data_evento)}</div></div><div><b>Técnico responsável</b><div>${esc(e.tecnico_responsavel||'—')}</div></div><div><b>Responsável pelo evento</b><div>${esc(e.responsavel_evento||'—')}</div></div><div><b>Telefone responsável</b><div>${esc(e.telefone_responsavel||'—')}</div></div></div></div>
- <div class="card"><h3>Resumo financeiro</h3><div class="tablewrap"><table><tbody>${linha('Faturamento total',total,'font-weight:800')}${linha('Valor recebido',recebido)}${linha('Ainda a receber',falta)}${linha('Materiais / consumíveis (custo)',material)}${linha('Mão de obra / equipe',equipe)}${linha('Deslocamento',desloc)}${linha('Despesas extras',extras)}${linha('Total de gastos',gastos,'font-weight:800')}${linha('Mão de obra CZ cobrada',maoCZ,'font-weight:800')}${linha('Resultado / lucro do evento',lucro,`font-weight:900;color:${lucro>=0?'#55d884':'#ff7474'}`)}<tr><td><b>Margem de lucro</b></td><td style="text-align:right;font-weight:900">${margem.toFixed(2).replace('.',',')}%</td></tr></tbody></table></div></div>
+ <div class="card"><h3>Resumo financeiro</h3><div class="tablewrap"><table><tbody>${linha('Faturamento contratado',total,'font-weight:800')}${linha('Receita extra PDV',receitaPDV)}${linha('Receita total (incluindo PDV)',receita,'font-weight:800')}${linha('Valor recebido',recebido)}${linha('Ainda a receber',falta)}${linha('Materiais / consumíveis (custo)',material)}${linha('Mão de obra / equipe',equipe)}${linha('Deslocamento',desloc)}${linha('Despesas extras vinculadas',extras)}${linha('Substituições (custo CZ)',custoSubstituicao)}${linha('Total de gastos',gastos,'font-weight:800')}${linha('Mão de obra CZ cobrada',maoCZ,'font-weight:800')}${linha('Resultado / lucro do evento',lucro,`font-weight:900;color:${lucro>=0?'#55d884':'#ff7474'}`)}<tr><td><b>Margem de lucro</b></td><td style="text-align:right;font-weight:900">${margem.toFixed(2).replace('.',',')}%</td></tr></tbody></table></div></div>
  <div class="card"><h3>Materiais / consumíveis</h3><div class="tablewrap">${mats.length?`<table><thead><tr><th>Material</th><th>Qtd.</th><th>Custo un.</th><th>Total custo</th></tr></thead><tbody>${mats.map(x=>`<tr><td>${esc(x.nome)}</td><td>${x.q}</td><td>${money(x.unit)}</td><td>${money(x.q*x.unit)}</td></tr>`).join('')}</tbody></table>`:'<div class="muted">Sem produtos no orçamento.</div>'}</div></div>
- <div class="card"><h3>Despesas extras vinculadas</h3><div class="tablewrap">${despesas.length?`<table><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Valor</th></tr></thead><tbody>${despesas.map(x=>`<tr><td>${finDate(x.data||x.vencimento)}</td><td>${esc(x.descricao||'')}</td><td>${esc(x.categoria||'')}</td><td>${money(x.valor)}</td></tr>`).join('')}</tbody></table>`:'<div class="muted">Nenhuma despesa extra vinculada pelo nome do evento/cliente/proposta.</div>'}</div></div><div class="actions"><button class="btn primary" onclick="window.print()">Imprimir / Salvar PDF</button><button class="btn secondary" onclick="relFechamentoEventos()">Voltar</button></div>`;
+ <div class="card"><h3>Despesas extras vinculadas</h3><div class="tablewrap">${despesas.length?`<table><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Valor</th></tr></thead><tbody>${despesas.map(x=>`<tr><td>${finDate(x.data||x.vencimento)}</td><td>${esc(x.descricao||'')}</td><td>${esc(x.categoria||'')}</td><td>${money(x.valor)}</td></tr>`).join('')}</tbody></table>`:'<div class="muted">Nenhuma despesa extra vinculada pelo nome do evento/cliente/proposta.</div>'}</div></div><div class="card"><h3>Receitas extras do PDV</h3>${pdvEvento.length?pdvEvento.map(x=>`<p>${finDate(x.data)} — ${esc(x.descricao||'Venda PDV')} — ${money(x.valor)}</p>`).join(''):'<div class="muted">Sem vendas extras identificadas neste evento.</div>'}</div><div class="card"><h3>Substituições (custo interno CZ)</h3>${substituicoes.length?substituicoes.map(x=>`<p>${esc(x.material)} — ${x.quantidade} un. — ${money(x.custo)} — ${esc(x.observacao||'')}</p>`).join(''):'<div class="muted">Sem substituições registradas neste navegador.</div>'}</div><div class="actions"><button class="btn primary" onclick="window.print()">Imprimir / Salvar PDF</button><button class="btn secondary" onclick="relFechamentoEventos()">Voltar</button></div>`;
 }
 async function relFinanceiro(){const r=(await finRecebiveis()).filter(x=>relNoPeriodo(x.vencimento));await carregarCaixa();const mov=caixaCache.filter(x=>relNoPeriodo(relDataMov(x))),entradas=mov.filter(x=>x.tipo==='entrada').reduce((s,x)=>s+Number(x.valor||0),0),aberto=r.reduce((s,x)=>s+x.saldo,0);$('#content').innerHTML=relTopo('💰 Relatório Financeiro','Visão geral dos recebimentos')+relFiltroPeriodo('relFinanceiro')+`<div class="cards"><div class="card"><div class="muted">Recebido</div><div class="n">${money(entradas)}</div></div><div class="card"><div class="muted">A receber</div><div class="n">${money(aberto)}</div></div><div class="card"><div class="muted">Propostas com saldo</div><div class="n">${r.filter(x=>x.saldo>0).length}</div></div></div>`}
 // V172 — posição financeira por parcela, sem somar o valor integral da proposta.
@@ -1505,54 +1527,38 @@ async function renderOrcamentos(novo=false, dadosDuplicacao=null){
     <div class="card" style="margin-bottom:18px">
       <h3 style="margin:0">Itens do orçamento</h3>
       <div id="orcProdutosLista" style="margin-top:16px" class="muted">Nenhum item adicionado.</div>
+      <div class="field" style="margin-top:14px;max-width:320px"><label>Mão de obra CZ (interno)</label><input id="orcMaoObraCZ" type="number" min="0" step="0.01" value="0" inputmode="decimal" placeholder="R$ 0,00"></div>
     </div>
 
-    <!-- RESUMO -->
-    <div style="
-      background:linear-gradient(135deg,#ff641f,#d94700);
-      border-radius:18px;
-      padding:22px;
-      margin-bottom:20px
-    ">
-      <div style="font-size:13px;font-weight:800;letter-spacing:1px">
-        TOTAL DE INVESTIMENTO
-      </div>
-
-      <div style="margin-top:16px;font-size:14px">
-        Composição interna do orçamento
-      </div>
-
+    <!-- RESUMO V231 -->
+    <div class="card cz231Resumo" style="margin-bottom:18px">
+      <h3 class="cz231Titulo">TOTAL DE INVESTIMENTO</h3>
+      <div class="muted" style="margin:12px 0">Composição interna do orçamento</div>
       <div class="orc-discount-grid" style="margin-top:12px">
-        <div class="field"><label style="color:#fff">Desconto %</label><input id="orcDescontoPercentual" type="number" min="0" max="100" step="0.01" value="0" inputmode="decimal"></div>
-        <div class="field"><label style="color:#fff">Desconto em R$</label><input id="orcDescontoValor" readonly value="R$ 0,00"></div>
+        <div class="field"><label>Desconto %</label><input id="orcDescontoPercentual" type="number" min="0" max="100" step="0.01" value="0" inputmode="decimal"></div>
+        <div class="field"><label>Desconto em R$</label><input id="orcDescontoValor" readonly value="R$ 0,00"></div>
       </div>
-
-      <div class="field" style="margin-top:16px;max-width:320px">
-        <label style="color:#fff">Mão de obra CZ (interno)</label>
-        <input id="orcMaoObraCZ" type="number" min="0" step="0.01" value="0" inputmode="decimal" placeholder="R$ 0,00">
-      </div>
-
-      <div style="margin-top:18px;font-size:14px">
-        INVESTIMENTO DO CLIENTE
-      </div>
-
-      <div id="orcInvestimento" style="font-size:34px;font-weight:900;margin-top:4px">
-        R$ 0,00
-      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:20px;flex-wrap:wrap"><b>INVESTIMENTO DO CLIENTE R$</b><div id="orcInvestimento" style="font-size:27px;font-weight:900;background:#f36b16;color:#fff;padding:9px 15px;border-radius:9px">R$ 0,00</div></div>
     </div>
-
 
     <div class="card" style="margin-bottom:18px">
       <h3 style="margin-top:0">💳 Forma e condição de pagamento</h3>
       <div class="payment-options" role="radiogroup" aria-label="Condição de pagamento">
         <label class="payment-option"><input type="radio" name="orcCondicaoPagamento" value="avista" checked> À vista</label>
         <label class="payment-option"><input type="radio" name="orcCondicaoPagamento" value="contratual"> Parcelamento contratual</label>
+        <label class="payment-option"><input type="radio" name="orcCondicaoPagamento" value="cartao"> Cartão</label>
       </div>
       <div id="orcPagamentoVista" class="payment-grid">
         <div class="field"><label>Forma de pagamento</label><select id="orcFormaPagamento"><option>PIX</option><option>Dinheiro</option><option>Cartão de débito</option><option>Cartão de crédito</option><option>Transferência</option></select></div>
         <div class="field"><label>Valor total</label><input id="orcValorVista" readonly value="R$ 0,00"></div>
         <div class="field hidden" id="orcCartaoBox"><label>Parcelas do cartão</label><select id="orcParcelasCartao">${Array.from({length:10},(_,i)=>`<option value="${i+1}">${i+1}x</option>`).join('')}</select></div>
         <div id="orcCartaoValores" class="payment-wide hidden"></div>
+      </div>
+      <div id="cz231Cartao" class="hidden" style="padding:14px;background:#101a24;border:1px solid #384656;border-radius:12px;margin:12px 0">
+        <div class="field"><label>Modalidade do cartão</label><select id="cz231Modalidade"><option value="debito">Débito</option><option value="credito_avista">Crédito à vista</option><option value="credito_parcelado">Crédito parcelado</option></select></div>
+        <div class="field hidden" id="cz231QtdBox"><label>Quantidade de parcelas</label><input type="number" id="cz231Qtd" min="1" max="60" value="3" step="1"></div>
+        <div id="cz231CartaoResumo" style="font-weight:800;margin-top:10px"></div>
+        <div class="muted">Sem datas de vencimento para as parcelas do cartão.</div>
       </div>
       <div id="orcPagamentoContratual" class="hidden">
         <div class="payment-grid">
@@ -1655,6 +1661,7 @@ $('#orcDescontoPercentual').addEventListener('input',atualizarEquipe);
 document.querySelectorAll('input[name="orcCondicaoPagamento"]').forEach(r=>r.addEventListener('change',()=>atualizarPagamento()));
 $('#orcFormaPagamento').onchange=()=>atualizarPagamento();
 $('#orcParcelasCartao').onchange=()=>atualizarPagamento();
+$('#cz231Modalidade').onchange=()=>atualizarPagamento();$('#cz231Qtd').oninput=()=>atualizarPagamento();
 $('#orcEntradaPercentual').addEventListener('input',()=>atualizarPagamento());
 $('#orcParcelasContrato').onchange=()=>atualizarPagamento();
 $('#orcData').addEventListener('change',()=>atualizarPagamento());
@@ -1664,6 +1671,7 @@ function atualizarPagamento(){
   const modo=document.querySelector('input[name="orcCondicaoPagamento"]:checked')?.value||'avista';
   $('#orcPagamentoVista').classList.toggle('hidden',modo!=='avista');
   $('#orcPagamentoContratual').classList.toggle('hidden',modo!=='contratual');
+  cz231AtualizarCartao(modo,totalCent);
   $('#orcValorVista').value=money(totalCent/100);
   const credito=modo==='avista'&&$('#orcFormaPagamento').value==='Cartão de crédito';
   $('#orcCartaoBox').classList.toggle('hidden',!credito);
@@ -1861,6 +1869,7 @@ atualizarEquipe();
     for(const x of (Array.isArray(d.produtos)?d.produtos:[]))itensProduto.push({...x});
     for(const x of (Array.isArray(d.equipamentos)?d.equipamentos:[]))itensAtivo.push({...x});
     mostrarItens();
+    if(pg.modo==='cartao'){const radio=document.querySelector('input[name="orcCondicaoPagamento"][value="cartao"]');if(radio)radio.checked=true;set('cz231Modalidade',pg.modalidade_cartao||'debito');set('cz231Qtd',pg.parcelas||1);}
     if(pg.modo==='contratual'){
       const radio=document.querySelector('input[name="orcCondicaoPagamento"][value="contratual"]');
       if(radio)radio.checked=true;
@@ -1916,7 +1925,7 @@ atualizarEquipe();
       observacoes:$('#orcObservacoes')?.value.trim()||'',
       produtos:itensProduto.map(x=>({...x})), equipamentos:itensAtivo.map(x=>({...x})), equipe,
       deslocamento:{veiculo_id:$('#orcVeiculo').value||null,veiculo:veiculosOrc.find(v=>String(v.id)===$('#orcVeiculo').value)?.nome||'',km:Number($('#orcKm').value||0),valor_km:Number($('#orcValorKm').value||0),pedagio:Number($('#orcPedagio').value||0)},
-      pagamento:{modo,forma:modo==='avista'?$('#orcFormaPagamento').value:null,parcelas:modo==='avista'&&$('#orcFormaPagamento').value==='Cartão de crédito'?Number($('#orcParcelasCartao').value):1,entrada_percentual:entradaPercentual,entrada_valor:entradaValor,data_entrada:modo==='contratual'?$('#orcDataEntrada').value:null,forma_entrada:modo==='contratual'?$('#orcFormaEntrada').value:null,restante:Number((total-entradaValor).toFixed(2)),parcelas_detalhes:parcelasDetalhes,vencimento_saldo:parcelasDetalhes.at(-1)?.data||null,tipo_datas:modo==='contratual'?($('#orcTipoDatasParcelas')?.value||'manual'):'manual',intervalo_dias:Number($('#orcIntervaloDias')?.value||30),dia_mensal:Number($('#orcDiaMensal')?.value||10)},
+      pagamento:{modo,forma:modo==='cartao'?'Cartão — '+($('#cz231Modalidade').selectedOptions[0]?.textContent||''):modo==='avista'?$('#orcFormaPagamento').value:null,modalidade_cartao:modo==='cartao'?$('#cz231Modalidade').value:null,parcelas:modo==='cartao'&&$('#cz231Modalidade').value==='credito_parcelado'?Math.max(1,Math.min(60,Number($('#cz231Qtd').value)||1)):modo==='avista'&&$('#orcFormaPagamento').value==='Cartão de crédito'?Number($('#orcParcelasCartao').value):1,entrada_percentual:entradaPercentual,entrada_valor:entradaValor,data_entrada:modo==='contratual'?$('#orcDataEntrada').value:null,forma_entrada:modo==='contratual'?$('#orcFormaEntrada').value:null,restante:Number((total-entradaValor).toFixed(2)),parcelas_detalhes:parcelasDetalhes,vencimento_saldo:parcelasDetalhes.at(-1)?.data||null,tipo_datas:modo==='contratual'?($('#orcTipoDatasParcelas')?.value||'manual'):'manual',intervalo_dias:Number($('#orcIntervaloDias')?.value||30),dia_mensal:Number($('#orcDiaMensal')?.value||10)},
       mao_obra_cz:maoObraCZ,subtotal,desconto_percentual:descontoPercentual,desconto_valor:descontoValor,total
     };
   }
@@ -3991,7 +4000,7 @@ async function pdvFinalizar(orcamentoPdvId=null){
       alterados.push({id:item.id,estoque:atual});
     }
     const agora=new Date(),numero='PDV-'+String(agora.getFullYear())+String(agora.getMonth()+1).padStart(2,'0')+String(agora.getDate()).padStart(2,'0')+'-'+String(agora.getTime()).slice(-6);
-    await registrarCaixa({origem_id:'pdv:'+crypto.randomUUID(),tipo:'entrada',data:finISODate(agora),valor:total,cliente_nome:nome,proposta_numero:numero,orcamento_id:null,descricao:'Venda PDV',categoria:'Venda PDV',forma,observacao:telefone?('Telefone: '+telefone):null});
+    await registrarCaixa({origem_id:'pdv:'+crypto.randomUUID(),tipo:'entrada',data:finISODate(agora),valor:total,cliente_nome:nome,proposta_numero:numero,orcamento_id:null,descricao:'Venda PDV',categoria:'Venda PDV',forma,observacao:(telefone?('Telefone: '+telefone+' | '):'')+[...new Set(pdvCarrinho.filter(x=>x._cz226Referencia).map(x=>'CZ_EVENTO:'+x._cz226Referencia.eventoId))].join(' | ')||null});
     // Registro local para evitar repetir a mesma venda extra neste navegador.
     pdvCarrinho.filter(x=>x._cz226Referencia).forEach(x=>markSold226(x._cz226Referencia.eventoId,x._cz226Referencia.materialId,x.qtd));
     const venda={numero,dataHora:agora.toLocaleString('pt-BR'),cliente:nome,telefone,forma,total,itens:pdvCarrinho.map(x=>({...x}))};
@@ -4455,6 +4464,7 @@ function coPagamentoTexto(p){
   parcelas.forEach((x,i)=>itens.push(`Parcela ${i+1}/${parcelas.length}: ${money(x.valor)}, vencimento em ${dataBR(x.data)}, por ${x.forma||'forma a definir'}`));
   return itens.length?'Pagamento parcelado. '+itens.join('; ')+'.':'Parcelamento conforme condições definidas na proposta comercial.';
  }
+ if(pg.modo==='cartao')return `Pagamento por ${pg.forma||'cartão'}${Number(pg.parcelas)>1?`, em ${pg.parcelas} parcelas sem datas de vencimento definidas`:''}.`;
  if(pg.modo==='avista')return `Pagamento à vista, por ${pg.forma||'forma a definir'}${Number(pg.parcelas)>1?`, em ${pg.parcelas} parcelas no cartão`:''}.`;
  return 'Conforme condição de pagamento definida na proposta comercial.';
 }
@@ -4820,7 +4830,7 @@ async function prep141Salvar(id){
   const {error}=await db.from('eventos_operacionais').update({observacao:obs,atualizado_em:new Date().toISOString()}).eq('id',id);
   if(error)throw error;
   await czAlert('Preparação salva. Somente ativos e equipamentos ficam reservados automaticamente.','Evento');
-  prep141Abrir(id);
+  renderSairEventoV221();
  }catch(e){czAlert('Não foi possível salvar: '+e.message,'Evento')}
 }
 async function prep141Desenvolvimento(id){
@@ -5003,7 +5013,7 @@ async function sair142Abrir(eventoId){
    <div class="field" style="margin:0;width:170px;max-width:calc(50% - 5px)"><label for="sair225FiltroCodigo" style="font-size:12px;margin-bottom:4px">Filtrar pelo código</label><input id="sair225FiltroCodigo" type="search" placeholder="Código / rastreio" autocomplete="off" oninput="sair225FiltrarLista()" style="min-height:34px;padding:7px 9px;font-size:13px"></div>
    <span id="sair225ResumoFiltro" class="muted" style="font-size:12px;padding-bottom:8px">${mats.length} de ${mats.length} itens</span>
   </div>
-  <div class="tablewrap"><table id="sair222Tabela"><thead><tr><th>Sel.</th><th>Produto</th><th>Tipo</th><th>Origem</th><th>Código</th><th>Conferência</th></tr></thead><tbody>${mats.map(x=>{const q=sair220Qtd(x),n=Math.min(q,Number(c[x.id]||0)),f=Math.max(0,q-n),pronto=f===0;return `<tr class="sair223Linha ${pronto?'sair223Concluida':''}" data-material="${coEsc(String(x.id))}" onclick="sair222Selecionar('${eventoId}','${x.id}')"><td><input type="checkbox" aria-label="Selecionar ${coEsc(sair222Nome(x))}" ${pronto?'checked disabled':''} onclick="event.stopPropagation();sair222Selecionar('${eventoId}','${x.id}')"></td><td><b>${coEsc(sair222Nome(x))}</b></td><td>${sair220Ativo(x)?'Ativo':'Consumo'}</td><td>${sair222Origem(x)}</td><td><b>${coEsc(x._codigoExibicao||sair220Cod(x)||'Sem código')}</b></td><td><span class="${pronto?'sair224StatusPronto':'sair224StatusPendente'}">${pronto?'✓ Conferido':n+'/'+q+' • Faltam '+f}</span></td></tr>`}).join('')}</tbody></table></div>
+  <div class="tablewrap"><table id="sair222Tabela"><thead><tr><th>Sel.</th><th>Produto</th><th>Quantidade</th><th>Conferência</th><th>Origem</th><th>Código</th><th>Tipo</th></tr></thead><tbody>${mats.map(x=>{const q=sair220Qtd(x),n=Math.min(q,Number(c[x.id]||0)),f=Math.max(0,q-n),pronto=f===0;return `<tr class="sair223Linha ${pronto?'sair223Concluida':''}" data-material="${coEsc(String(x.id))}" onclick="sair222Selecionar('${eventoId}','${x.id}')"><td><input type="checkbox" aria-label="Selecionar ${coEsc(sair222Nome(x))}" ${pronto?'checked disabled':''} onclick="event.stopPropagation();sair222Selecionar('${eventoId}','${x.id}')"></td><td><b>${coEsc(sair222Nome(x))}</b></td><td>${sair220Ativo(x)?'Ativo':'Consumo'}</td><td>${sair222Origem(x)}</td><td><b>${coEsc(x._codigoExibicao||sair220Cod(x)||'Sem código')}</b></td><td><span class="${pronto?'sair224StatusPronto':'sair224StatusPendente'}">${pronto?'✓ Conferido':n+'/'+q+' • Faltam '+f}</span></td></tr>`}).join('')}</tbody></table></div>
   <div style="margin-top:14px"><b style="font-size:17px">Itens conferidos: ${mats.filter(x=>Number(c[x.id]||0)>=sair220Qtd(x)).length} de ${mats.length} • Unidades bipadas: ${conf}/${esperado} — ${pct}%</b><div style="height:10px;background:#26313b;border-radius:10px;margin-top:6px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${pct===100?'#45b879':'#d7a73b'}"></div></div></div></div>
   <div class="actions"><button class="btn primary" onclick="sair223AbrirConclusao('${eventoId}')">Concluir bipagem</button></div>`;
   sair223AtualizarModal(eventoId);
@@ -5198,7 +5208,7 @@ async function prep145Salvar(id){
  prep217Guardar(id);
  const {error}=await db.from('eventos_operacionais').update({anotacao_tecnica:$('#prep145Anotacao')?.value.trim()||null,atualizado_em:new Date().toISOString()}).eq('id',id);
  if(error){if(msg)msg.textContent='Erro ao salvar: '+error.message;return}
- await czAlert('Preparação salva.','Evento');prep141Abrir(id);
+ await czAlert('Preparação salva. Evento disponível na Saída.','Evento');renderSairEventoV221();
 }
 /* V217 — informações operacionais adicionais mantidas neste navegador (sem alteração SQL). */
 function prep217Local(id){try{return JSON.parse(localStorage.getItem('cz217_preparacao_'+id)||'{}')}catch(_){return {}}}
@@ -6027,7 +6037,7 @@ async function ret226Abrir(id){
   ret226Cache={e,mats};
   $('#content').innerHTML=`<div class="sectionhead"><div><h2>↩️ Retorno — ${coEsc(e.nome_evento||'Evento')}</h2><div class="muted">${coEsc(e.cliente_nome||'')} • ${finDate(e.data_evento)} • Conferência por material • Mesmas colunas da saída</div></div><button class="btn secondary" onclick="ret226Fechar();renderRetornoEventos()">Voltar</button></div>
   <style>
-  #ret226Tabela th{font-size:14px;padding:14px 12px}#ret226Tabela td{font-size:16px;padding:13px 12px;white-space:normal;vertical-align:middle}#ret226Tabela td b{font-size:17px}#ret226Tabela td:nth-child(6){min-width:210px}#ret226Tabela td:nth-child(6) button{font-size:12px;padding:7px 9px;margin:2px}
+  #ret226Tabela th{font-size:14px;padding:14px 12px}#ret226Tabela td{font-size:16px;padding:13px 12px;white-space:normal;vertical-align:middle}#ret226Tabela td b{font-size:17px}#ret226Tabela td:nth-child(4){min-width:160px}#ret226Tabela td:nth-child(4) button{font-size:12px;padding:7px 9px;margin:2px}
   #ret226Tabela .ret226Check{width:22px;height:22px;accent-color:#43c77d;cursor:pointer}
   .ret226Overlay{position:fixed;inset:0;z-index:220000;background:#000c;display:flex;align-items:center;justify-content:center;padding:16px}
   .ret226Dialog{position:relative;width:min(540px,100%);max-height:90vh;overflow:auto;background:#151f2a;color:white;border:1px solid #3b5369;border-radius:16px;padding:24px;box-shadow:0 20px 80px #000a}
@@ -6036,8 +6046,8 @@ async function ret226Abrir(id){
   <div class="card"><div class="muted" style="margin-bottom:12px">Selecione o quadrado para bipar a devolução de ativos e de qualquer consumível (contratado ou extra). Após conferir o retorno, confirme o consumo da quantidade não devolvida.</div>
   <div style="display:flex;gap:9px;flex-wrap:wrap;align-items:end;margin-bottom:12px"><div class="field" style="width:190px;margin:0"><label>Filtrar por nome</label><input id="ret226Nome" type="search" oninput="ret226Filtrar()" placeholder="Nome do produto" style="padding:8px;font-size:13px"></div><div class="field" style="width:170px;margin:0"><label>Filtrar por código</label><input id="ret226Codigo" type="search" oninput="ret226Filtrar()" placeholder="Código / rastreio" style="padding:8px;font-size:13px"></div><span id="ret226TotalFiltro" class="muted" style="font-size:12px">${mats.length} material(is)</span></div>
   <div class="tablewrap"><table id="ret226Tabela"><thead><tr><th>Sel.</th><th>Produto</th><th>Tipo</th><th>Origem</th><th>Código</th><th>Conferência</th></tr></thead><tbody>
-  ${mats.map(x=>{const q=ret226Esperado(x,e),dev=ret226Devolvido(x,e),cons=x.tipo==='produto',extra=ret226Extra(x),ativo=ret226Ativo(x),cod=x._codigoExibicao||x.codigo||'—';return `<tr data-id="${coEsc(String(x.id))}" data-nome="${coEsc(sair222Nome(x))}" data-codigo="${coEsc(cod)}"><td>${!finalizado&&(ativo||cons)?`<input class="ret226Check" type="checkbox" aria-label="Bipar ${coEsc(sair222Nome(x))}" onclick="ret226Selecionar('${id}','${x.id}')">`:'—'}</td><td><b>${coEsc(sair222Nome(x))}</b></td><td>${ativo?'Ativo':'Consumo'}</td><td>${extra?'Extra':'Contratado'}</td><td>${coEsc(cod)}</td><td><div class="ret226Ret" style="font-weight:800;margin-bottom:5px">${dev}/${q}</div><div class="ret226Estado" style="font-size:12px;margin-bottom:7px"></div>${cons&&!extra?`<button type="button" class="btn secondary ret226Consumo" ${finalizado?'disabled':''} onclick="ret226ConfirmarConsumo('${id}','${x.id}')">Confirmar consumo</button>`:ativo&&!finalizado?`<button type="button" class="btn secondary" onclick="marcarManutencaoRetorno('${id}','${x.id}','${x.item_id||''}')">Manutenção</button> <button type="button" class="btn danger" onclick="marcarPerdaRetorno('${id}','${x.id}','${x.item_id||''}')">Perda</button>`:extra?'Devolução por bipagem':'—'}</td></tr>`}).join('')||'<tr><td colspan="6">Nenhum material foi conferido na saída.</td></tr>'}</tbody></table></div></div>
-  ${!finalizado?`<div class="card" style="margin-top:15px"><div style="font-size:16px"><b>Produtos extras utilizados:</b> <span id="ret226ResumoExtra"></span></div><div class="muted" style="margin:7px 0">Somente as unidades extras não devolvidas serão encaminhadas à venda no PDV. A venda não será finalizada automaticamente.</div><div class="actions" style="flex-wrap:wrap"><button type="button" class="btn secondary" onclick="ret226AbrirPDV('${id}')">🛒 Abrir no PDV</button><button type="button" class="btn primary" onclick="ret226Concluir('${id}')">Concluir retorno</button></div></div>`:''}`;
+  ${mats.map(x=>{const q=ret226Esperado(x,e),dev=ret226Devolvido(x,e),cons=x.tipo==='produto',extra=ret226Extra(x),ativo=ret226Ativo(x),cod=x._codigoExibicao||x.codigo||'—';return `<tr data-id="${coEsc(String(x.id))}" data-nome="${coEsc(sair222Nome(x))}" data-codigo="${coEsc(cod)}"><td>${!finalizado&&(ativo||cons)?`<input class="ret226Check" type="checkbox" aria-label="Bipar ${coEsc(sair222Nome(x))}" onclick="ret226Selecionar('${id}','${x.id}')">`:'—'}</td><td><b>${coEsc(sair222Nome(x))}</b></td><td>${q}</td><td><div class="ret226Ret" style="font-weight:800;margin-bottom:5px">${dev}/${q}</div><div class="ret226Estado" style="font-size:12px;margin-bottom:7px"></div>${cons&&!extra?`<button type="button" class="btn secondary ret226Consumo" ${finalizado?'disabled':''} onclick="ret226ConfirmarConsumo('${id}','${x.id}')">Confirmar consumo</button>`:''}</td><td>${extra?'Extra':'Contratado'}</td><td>${coEsc(ativo?cz231RastreiosEvento(id,x):cod)}</td><td>${ativo?'Ativo':'Consumo'}</td></tr>`}).join('')||'<tr><td colspan="7">Nenhum material foi conferido na saída.</td></tr>'}</tbody></table></div></div>
+  ${!finalizado?`<div class="card" style="margin-top:15px"><div style="font-size:16px"><b>Produtos extras utilizados:</b> <span id="ret226ResumoExtra"></span></div><div class="muted" style="margin:7px 0">Somente as unidades extras não devolvidas serão encaminhadas à venda no PDV. A venda não será finalizada automaticamente.</div><div class="actions" style="flex-wrap:wrap"><button type="button" class="btn secondary" onclick="cz231Substituicao('${id}')">Substituição de material</button><button type="button" class="btn primary" onclick="ret226Concluir('${id}')">Concluir retorno</button></div></div>`:''}`;
   ret226Pintar(id);
  }catch(err){$('#content').innerHTML='<div class="msg">Erro ao carregar retorno: '+coEsc(err.message)+'</div>'}
 }
@@ -6058,7 +6068,7 @@ function ret226AtualizarModal(id){
  const x=ret226Cache?.mats.find(x=>String(x.id)===String(ret226Selecionado)),painel=document.getElementById('ret226Painel');if(!x||!painel)return;
  const q=ret226Esperado(x,ret226Cache.e),dev=ret226Devolvido(x,ret226Cache.e),falt=Math.max(0,q-dev);
  if(!falt){ret226Fechar();return}
- painel.innerHTML=`<div style="color:#ff884d;font-weight:900;font-size:12px">CONFERÊNCIA DE RETORNO</div><h2 style="margin:10px 0">${coEsc(sair222Nome(x))}</h2><div class="muted">${ret226Ativo(x)?'Ativo':ret226Extra(x)?'Consumo extra':'Consumo contratado'} • ${coEsc(x._codigoExibicao||x.codigo||'—')}</div><div class="ret226Nums"><div><small>QUANTIDADE</small><strong>${q}</strong></div><div><small>BIPADO</small><strong style="color:#7fdfa5">${dev}</strong></div><div><small>FALTANDO</small><strong style="color:#ffc27d">${falt}</strong></div></div><p class="muted" style="font-size:13px">Cada leitura confirma uma unidade devolvida.</p>`;
+ painel.innerHTML=`<div style="color:#ff884d;font-weight:900;font-size:12px">CONFERÊNCIA DE RETORNO</div><h2 style="margin:10px 0">${coEsc(sair222Nome(x))}</h2><div class="muted">${ret226Ativo(x)?'Ativo':ret226Extra(x)?'Consumo extra':'Consumo contratado'} • ${coEsc(x._codigoExibicao||x.codigo||'—')}</div><div class="ret226Nums"><div><small>QUANTIDADE</small><strong>${q}</strong></div><div><small>BIPADO</small><strong style="color:#7fdfa5">${dev}</strong></div><div><small>FALTANDO</small><strong style="color:#ffc27d">${falt}</strong></div></div><p class="muted" style="font-size:13px">Cada leitura confirma uma unidade devolvida.</p>${ret226Extra(x)&&falt?`<button type="button" class="btn primary" style="margin-top:10px" onclick="ret226Fechar();ret226AbrirPDV('${id}')">🛒 Abrir no PDV — ${falt} un.</button>`:''}`;
 }
 async function ret226Bipar(id){
  if(ret226Lendo)return;const inp=document.getElementById('scanRetorno');if(!inp?.value.trim())return;
@@ -6102,7 +6112,119 @@ async function ret226Concluir(id){
  if(semConsumo.length)return czAlert('Confirme o consumo dos produtos contratados antes de concluir: '+semConsumo.map(x=>x.nome_item).join(', '),'Retorno');
  const pendExtra=c.mats.filter(x=>ret226Extra(x)&&ret226Esperado(x,c.e)>ret226Devolvido(x,c.e)&&!usedAlready226(id,x.id));
  if(pendExtra.length)return czAlert('Há produtos extras utilizados aguardando venda no PDV. Abra o PDV e finalize a venda antes de concluir o retorno.','Retorno');
- return finalizarRetornoEvento(id);
+ return cz231ConcluirRetorno(id);
 }
+
+/* ===== CZ V231 — MONITORAMENTO, HISTÓRICO E AJUSTES OPERACIONAIS ===== */
+function cz231AtualizarCartao(modo,totalCent){
+ const box=document.getElementById('cz231Cartao');if(!box)return;
+ box.classList.toggle('hidden',modo!=='cartao');if(modo!=='cartao')return;
+ const mod=document.getElementById('cz231Modalidade')?.value||'debito';
+ const parcelado=mod==='credito_parcelado';document.getElementById('cz231QtdBox')?.classList.toggle('hidden',!parcelado);
+ const qtd=parcelado?Math.max(1,Math.min(60,Math.floor(Number(document.getElementById('cz231Qtd')?.value)||1))):1;
+ const base=Math.floor(totalCent/qtd),resto=totalCent-base*qtd;
+ document.getElementById('cz231CartaoResumo').textContent=`${qtd} parcela(s): ${Array.from({length:qtd},(_,i)=>money((base+(i===qtd-1?resto:0))/100)).join(' · ')}`;
+}
+function cz231RastreiosEvento(id,x){
+ if(!sair220Ativo(x))return x._codigoExibicao||x.codigo||'—';
+ const st=sair142State(id),logs=(st.historico||[]).filter(h=>String(h.material_id)===String(x.id)&&h.acao==='Conferência');
+ const codes=[...new Set(logs.map(h=>String(h.codigo||'').trim()).filter(Boolean))];
+ return codes.length?codes.join(' · '):'Rastreios da saída não registrados neste navegador';
+}
+function cz231Dias(data){if(!data)return 'Sem data';const hoje=new Date(),a=new Date(hoje.getFullYear(),hoje.getMonth(),hoje.getDate());const b=new Date(String(data).slice(0,10)+'T12:00:00');if(isNaN(b))return 'Sem data';const n=Math.round((b-a)/86400000);return n>0?n+' dia(s)':n===0?'Hoje':Math.abs(n)+' dia(s) atrás'}
+function cz231Pagto(total,pago){if(total<=0)return 'Pendente';if(pago>=total-.009)return 'Pago';return pago>0?'Parcial':'Pendente'}
+function cz231Icon(ok,eventoId,acao){return `<button class="cz231Icon" title="${ok?'Etapa concluída':'Etapa pendente'} — abrir" onclick="cz231Etapa('${eventoId}','${acao}')" style="color:${ok?'#5cdb8d':'#ff7474'}">${ok?'☑':'☒'}</button>`}
+async function cz231Etapa(id,acao){
+ if(acao==='fechamento')return abrirEvento(id);
+ if(acao==='contrato'){
+  const r=await db.from('eventos_operacionais').select('origem_orcamento_id').eq('id',id).single();
+  if(r.data?.origem_orcamento_id&&typeof cz150AbrirContrato==='function')return cz150AbrirContrato(r.data.origem_orcamento_id);
+  return renderModule(3);
+ }
+ if(acao==='preparacao')return prep145Abrir(id);
+ if(acao==='saida')return sair142Abrir(id);
+ if(acao==='retorno')return ret226Abrir(id);
+}
+async function cz231Monitor(abertas=false){
+ $('#pageTitle').textContent='Monitoramento de Eventos';
+ try{
+  const [er,or]=await Promise.all([db.from('eventos_operacionais').select('*').order('data_evento',{ascending:true}),db.from('orcamentos').select('*').order('criado_em',{ascending:false}).limit(1000)]);
+  if(er.error)throw er.error;if(or.error)throw or.error;
+  await carregarCaixa();
+  const eventos=(er.data||[]).filter(e=>e.status!=='finalizado');
+  const om=new Map((or.data||[]).map(o=>[String(o.id),o]));
+  const ids=new Set((er.data||[]).map(e=>String(e.origem_orcamento_id||'')).filter(Boolean));
+  const propostas=(or.data||[]).filter(o=>!ids.has(String(o.id)));
+  const hoje=finISODate();
+  const linhas=abertas?propostas.map(o=>{
+   const venc=String(o.validade_orcamento||o.dados?.validade_orcamento||'').slice(0,10);
+   const vencida=!!venc&&venc<hoje;
+   return `<tr><td>${esc(o.numero||'—')}</td><td>${esc(o.cliente_nome||o.dados?.cliente||'—')}<small>${esc(o.evento_nome||o.dados?.evento||'')}</small></td><td>${finDate(venc)}</td><td style="color:${vencida?'#ff7474':'#65da91'};font-weight:800">${vencida?'Vencida':'Em aberto'}</td><td><button class="btn secondary cz231Btn" onclick="renderOrcamentos()">Ver proposta</button></td></tr>`;
+  }):eventos.map(e=>{
+   const o=om.get(String(e.origem_orcamento_id)),d=o?.dados||{};
+   const pago=o?finPagoOrc(o.id):0,total=Number(o?.valor_total||0),pg=cz231Pagto(total,pago);
+   const saida=['aguardando_retorno','em_evento_divergencia','finalizado'].includes(e.status)||!!e.saida_baixada_em||!!sair142State(e.id).saida_em;
+   const retorno=e.status==='finalizado';
+   const prep=!!e.anotacao_tecnica||!!e.observacao||!!prep217Local(e.id).ocorrencias||['pronto','material_pronto','aguardando_retorno','em_evento_divergencia'].includes(e.status);
+   const contrato=!!e.origem_orcamento_id&&['Gerado','Enviado','Confirmado','Assinado'].includes(String(cz150ContratoLocal(e.origem_orcamento_id).status||''));
+   return `<tr><td class="cz231Data"><b>${finDate(e.data_evento)}</b><small>${cz231Dias(e.data_evento)}</small></td><td class="cz231Cliente"><b>${esc(e.cliente_nome||'—')}</b><small>${esc(e.nome_evento||'')}</small></td><td>${esc(o?.numero||'—')}</td><td>${esc(e.tecnico_responsavel||d.tecnico_responsavel||'—')}</td><td>${cz231Icon(true,e.id,'fechamento')}</td><td>${cz231Icon(contrato,e.id,'contrato')}</td><td>${cz231Icon(prep,e.id,'preparacao')}</td><td>${cz231Icon(saida,e.id,'saida')}</td><td>${cz231Icon(retorno,e.id,'retorno')}</td><td style="color:${pg==='Pago'?'#5cdb8d':pg==='Pendente'?'#ff7474':'#f9b55c'};font-weight:800">${pg}</td><td><div style="display:flex;gap:3px;justify-content:center"><button class="btn secondary cz231Btn" onclick="cz231Etapa('${e.id}','saida')" title="Saída do evento">Sai</button><button class="btn secondary cz231Btn" onclick="cz231Etapa('${e.id}','retorno')" title="Retorno do evento">Ret.</button></div></td></tr>`;
+  });
+  $('#content').innerHTML=`<div class="sectionhead"><div><h2>📊 Monitoramento de Eventos</h2><div class="muted">${abertas?'Propostas ainda não vinculadas a um evento':'Somente eventos não concluídos • Clique nos quadradinhos para abrir cada etapa'}</div></div></div>
+   <div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button class="btn secondary" onclick="cz231Monitor(${!abertas})">${abertas?'Voltar ao Monitoramento':'Propostas em aberto ('+propostas.length+')'}</button></div>
+   <div class="field" style="margin-bottom:12px"><input id="cz231Busca" type="search" placeholder="Pesquisar cliente, evento, proposta ou técnico" oninput="cz231Filtrar()"></div>
+   <div class="tablewrap"><table class="cz231MonitorTable" id="cz231MonitorTabela"><thead>${abertas?'<tr><th>Prop.</th><th>Cliente</th><th>Validade</th><th>Status</th><th>Ação</th></tr>':'<tr><th>Data</th><th>Cliente</th><th>Prop.</th><th>Téc.</th><th>Fech.</th><th>Cont.</th><th>Prep.</th><th>Saída</th><th>Ret.</th><th>Pagto.</th><th>Ações</th></tr>'}</thead><tbody>${linhas.join('')||`<tr><td colspan="${abertas?5:11}">Nenhum registro encontrado.</td></tr>`}</tbody></table></div>
+   ${abertas?'':`<div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:12px;font-size:13px"><span style="color:#5cdb8d">☑ Etapa concluída</span><span style="color:#ff7474">☒ Etapa pendente</span><span>Sai = Saída do Evento</span><span>Ret. = Retorno do Evento</span><span>Parcial = Pagamento incompleto</span><span>Pago = Quitado</span></div>`}
+   ${caixaErro?`<div class="msg">Pagamentos não atualizados: ${esc(caixaErro)}</div>`:''}`;
+ }catch(err){$('#content').innerHTML=`<div class="msg">Não foi possível carregar o Monitoramento: ${esc(err.message||String(err))}</div>`}
+}
+function cz231Filtrar(){const q=String(document.getElementById('cz231Busca')?.value||'').toLowerCase();document.querySelectorAll('#cz231MonitorTabela tbody tr').forEach(tr=>tr.style.display=tr.textContent.toLowerCase().includes(q)?'':'none')}
+async function cz231Concluidos(){
+ $('#pageTitle').textContent='Eventos Concluídos';
+ const {data,error}=await db.from('eventos_operacionais').select('*').eq('status','finalizado').order('data_evento',{ascending:false});
+ if(error){$('#content').innerHTML='<div class="msg">'+esc(error.message)+'</div>';return}
+ const ids=[...new Set((data||[]).map(x=>x.origem_orcamento_id).filter(Boolean))];
+ const o=ids.length?await db.from('orcamentos').select('id,numero').in('id',ids):{data:[]};const map=new Map((o.data||[]).map(x=>[String(x.id),x.numero]));
+ $('#content').innerHTML=`<div class="sectionhead"><h2>✅ Eventos Concluídos</h2></div><div class="field"><input type="search" id="cz231Busca" placeholder="Pesquisar evento ou cliente" oninput="cz231Filtrar()"></div><div class="tablewrap"><table id="cz231MonitorTabela"><thead><tr><th>Data</th><th>Cliente</th><th>Evento</th><th>Prop.</th><th>Técnico</th><th>Status</th><th>Relatório</th></tr></thead><tbody>${(data||[]).map(e=>`<tr><td>${finDate(e.data_evento)}</td><td>${esc(e.cliente_nome||'—')}</td><td>${esc(e.nome_evento||'—')}</td><td>${esc(map.get(String(e.origem_orcamento_id))||'—')}</td><td>${esc(e.tecnico_responsavel||'—')}</td><td style="color:#5cdb8d">✓ Concluído</td><td><button class="btn primary" onclick="abrirFechamentoEvento('${e.id}')">Relatório geral</button></td></tr>`).join('')||'<tr><td colspan="7">Nenhum evento concluído.</td></tr>'}</tbody></table></div>`;
+}
+// Ocorrências locais de substituição e perdas: registro informativo até integração transacional do banco.
+const CZ231_OC_KEY='cz231_ocorrencias';
+function cz231Ocorrencias(){try{return JSON.parse(localStorage.getItem(CZ231_OC_KEY)||'[]')}catch(_){return []}}
+function cz231GuardarOcorrencia(x){const a=cz231Ocorrencias();a.push({...x,id:crypto.randomUUID(),data:new Date().toISOString()});localStorage.setItem(CZ231_OC_KEY,JSON.stringify(a))}
+async function cz231Substituicao(eventoId){
+ const c=ret226Cache;if(!c||String(c.e.id)!==String(eventoId))return;
+ const materiais=c.mats.filter(x=>x.tipo==='produto'&&!ret226Extra(x));if(!materiais.length)return czAlert('Nenhum consumível contratado para substituir.','Substituição');
+ const lista=materiais.map((x,i)=>`${i+1} — ${sair222Nome(x)}`).join('\n');
+ const escolha=await czPrompt('Selecione o material contratado digitando o número:\n'+lista,'1','Substituição de material');if(escolha===null)return;
+ const mat=materiais[Number(escolha)-1];if(!mat)return czAlert('Material inválido.');
+ const qtd=Number(await czPrompt('Quantidade de material substituto utilizada (custo interno CZ):','1','Substituição'));
+ if(!Number.isInteger(qtd)||qtd<1)return czAlert('Informe uma quantidade válida.');
+ const custo=Number(await czPrompt('Custo total do material substituto em R$ (não é cobrança ao cliente):','0','Custo da substituição'));
+ if(!Number.isFinite(custo)||custo<0)return czAlert('Informe um custo válido.');
+ const obs=await czPrompt('Descrição do material substituto e motivo da substituição:','','Ocorrência');if(obs===null)return;
+ cz231GuardarOcorrencia({eventoId,tipo:'substituicao',materialId:mat.id,material:sair222Nome(mat),quantidade:qtd,custo,observacao:obs});
+ await czAlert('Substituição registrada como custo interno neste navegador. A baixa de estoque depende da integração transacional com o Supabase e NÃO foi efetuada.','Substituição registrada');
+}
+async function cz231ConcluirRetorno(id){
+ const c=ret226Cache;if(!c||String(c.e.id)!==String(id))return;
+ const pend=c.mats.filter(x=>sair220Ativo(x)&&ret226Esperado(x,c.e)>ret226Devolvido(x,c.e));
+ if(pend.length){
+  const itens=pend.map((x,i)=>`${i+1} — ${sair222Nome(x)} (${ret226Esperado(x,c.e)-ret226Devolvido(x,c.e)} faltando)`).join('\n');
+  const escolha=await czPrompt('Ativos faltando:\n'+itens+'\n\nDigite o número do ativo para registrar PERDA, ou Cancelar para continuar a bipagem.','','Conferência de ativos');
+  if(escolha===null)return;
+  const x=pend[Number(escolha)-1];if(!x)return czAlert('Selecione um ativo válido.');
+  return marcarPerdaRetorno(id,x.id,x.item_id||'');
+ }
+ await finalizarRetornoEvento(id);
+}
+async function cz231RelPerdas(){
+ const a=cz231Ocorrencias();
+ $('#content').innerHTML=relTopo('⚠️ Ocorrências e substituições','Registros locais deste navegador; confira os lançamentos oficiais no Supabase')+`<div class="tablewrap"><table><thead><tr><th>Data</th><th>Evento ID</th><th>Tipo</th><th>Material</th><th>Qtd.</th><th>Custo</th><th>Descrição</th></tr></thead><tbody>${a.map(x=>`<tr><td>${finDate(x.data)}</td><td>${esc(x.eventoId)}</td><td>${esc(x.tipo)}</td><td>${esc(x.material)}</td><td>${x.quantidade}</td><td>${money(x.custo||0)}</td><td>${esc(x.observacao||'')}</td></tr>`).join('')||'<tr><td colspan="7">Sem ocorrências locais.</td></tr>'}</tbody></table></div>`;
+}
+// Acrescenta relatório sem substituir os relatórios existentes.
+const cz231RenderRelatoriosOriginal=renderRelatorios;
+renderRelatorios=async function(){await cz231RenderRelatoriosOriginal();const el=document.querySelector('#content .cards');if(el){el.insertAdjacentHTML('beforeend',`<button type="button" class="card" onclick="cz231RelPerdas()" style="text-align:left;cursor:pointer;color:inherit"><div style="font-size:30px">⚠️</div><h3 style="margin:10px 0 6px">Perdas e substituições</h3><div class="muted">Ocorrências registradas na conferência</div></button><button type="button" class="card" onclick="relFechamentoEventos()" style="text-align:left;cursor:pointer;color:inherit"><div style="font-size:30px">📊</div><h3 style="margin:10px 0 6px">Eventos concluídos</h3><div class="muted">Fechamento e resultado dos eventos finalizados</div></button>`)}}
+// Ajustes visuais somente na página de criação de orçamento.
+const cz231RenderOrcOriginal=renderOrcamentos;
+renderOrcamentos=async function(){const r=await cz231RenderOrcOriginal.apply(this,arguments);const c=document.getElementById('orcProdutosLista');if(c){document.querySelectorAll('#content h3').forEach(h=>{h.textContent=h.textContent.replace(/^(\s*[^\w\s]?\s*)\d+\.\s*/, '$1');h.style.fontSize='18px';h.style.color='#fff';if(h.textContent.trim().startsWith('📋')){h.style.background='#e96513';h.style.display='table';h.style.padding='6px 10px';h.style.borderRadius='6px'}})}return r};
 
 </script></body></html>
