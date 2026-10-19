@@ -3422,11 +3422,11 @@ function cz185GravarRetorno(eventoId,rastreio){
  const lista=cz185Lidos(eventoId,'retorno');
  if(!lista.includes(rastreio))localStorage.setItem(chave,JSON.stringify([...lista,rastreio]));
 }
-async function biparRetornoEvento(eventoId){
+async function biparRetornoEvento(eventoId,materialSelecionadoId=null){
  const campo=$('#scanRetorno'),msg=$('#retMsg');
  if(cz185RetornoEmAndamento)return;
  const codigo=normalizarCodigoEvento(campo?.value);
- if(!codigo){if(msg)msg.textContent='Bipe ou digite o código de rastreio do equipamento.';return}
+ if(!codigo){if(msg)msg.textContent='Bipe o código de barras do produto ou o rastreio do equipamento.';return false}
  cz185RetornoEmAndamento=true;
  try{
   const [er,mr]=await Promise.all([
@@ -3459,24 +3459,39 @@ async function biparRetornoEvento(eventoId){
    });
    if(!material)throw new Error('A devolução deste tipo de equipamento já está completa.');
   }else{
-   // Consumíveis permanecem com a leitura do código de barras do produto.
+   // V228: consumíveis contratados e extras podem retornar pelo código do produto.
+   // Na janela de seleção, a linha escolhida tem prioridade, evitando confundir
+   // dois materiais do mesmo produto com origens diferentes.
    const produtos=materiais.filter(m=>m.tipo==='produto'&&Number(m.quantidade_bipada||0)>0);
-   material=produtos.find(m=>normalizarCodigoEvento(m.codigo)===codigo);
-   if(!material&&produtos.some(m=>m.item_id)){
-    const pids=[...new Set(produtos.map(m=>m.item_id).filter(Boolean))];
+   const pids=[...new Set(produtos.map(m=>m.item_id).filter(Boolean))];
+   let cadastrados=[];
+   if(pids.length){
     const r=await db.from('produtos').select('id,codigo_barras').in('id',pids);
     if(r.error)throw r.error;
-    const achado=(r.data||[]).find(p=>normalizarCodigoEvento(p.codigo_barras)===codigo);
-    if(achado)material=produtos.find(m=>String(m.item_id)===String(achado.id));
+    cadastrados=r.data||[];
    }
-   if(!material)throw new Error('Código não encontrado. Para ativos, bիպe exclusivamente o código de rastreio individual.');
+   const codigosDe=m=>[
+    m.codigo,m.codigo_barras,
+    cadastrados.find(p=>String(p.id)===String(m.item_id))?.codigo_barras
+   ].map(normalizarCodigoEvento).filter(Boolean);
+   const elegiveis=produtos.filter(m=>codigosDe(m).includes(codigo));
+   if(materialSelecionadoId){
+    material=elegiveis.find(m=>String(m.id)===String(materialSelecionadoId))||null;
+    if(!material)throw new Error('O código lido não corresponde ao produto selecionado. Confira o código de barras do cadastro.');
+   }else{
+    material=elegiveis.find(m=>{
+     const dev=e.saida_baixada_em?Number(m.quantidade_devolvida||0):Number(retornoInfo(m.id).qtd||0);
+     return dev<Number(m.quantidade_bipada||0);
+    })||null;
+   }
+   if(!material)throw new Error(elegiveis.length?'Todas as unidades deste produto já foram devolvidas.':'Código de barras não encontrado nos consumíveis deste evento. Confira o cadastro do produto.');
   }
   const esperado=Number(material.quantidade_bipada||0);
   const devolvido=e.saida_baixada_em?Number(material.quantidade_devolvida||0):Number(retornoInfo(material.id).qtd||0);
   if(devolvido>=esperado)throw new Error('A devolução deste item já está completa.');
   if(e.saida_baixada_em){
    // O banco possui RPC antiga por código de material; não usa o código de cadastro como entrada de bipagem.
-   const codigoMaterial=String(material.codigo||'').trim();
+   const codigoMaterial=String(material.codigo|| (material.tipo==='produto'?codigo:'')).trim();
    if(!codigoMaterial)throw new Error('Material sem código de referência no evento. Não foi possível registrar a devolução.');
    const {error}=await db.rpc('cz_confirmar_retorno_evento',{p_evento_id:eventoId,p_codigo:codigoMaterial});
    if(error)throw error;
@@ -3504,10 +3519,12 @@ async function biparRetornoEvento(eventoId){
   if(rastreio)cz185GravarRetorno(eventoId,codigo);
   if(campo)campo.value='';
   await abrirRetornoEvento(eventoId);
+  return true;
  }catch(err){
   if(msg){msg.style.color='#ffb0b0';msg.textContent='Não foi possível registrar o retorno: '+(err?.message||err)}
   else await czAlert(String(err?.message||err),'Retorno de evento');
   campo?.focus();campo?.select();
+  return false;
  }finally{cz185RetornoEmAndamento=false}
 }
 async function registrarOcorrenciaRetorno(eventoId,mid,ativoId,tipo){
@@ -5925,13 +5942,14 @@ function cz156OcultarEtiquetas(){
 new MutationObserver(()=>{clearTimeout(window.cz156t);window.cz156t=setTimeout(cz156OcultarEtiquetas,100)}).observe(document.documentElement,{subtree:true,childList:true});
 document.addEventListener('DOMContentLoaded',cz156OcultarEtiquetas);
 
-/* ===== CZ V227 — RETORNO COM AS MESMAS SEIS COLUNAS DA SAÍDA ===== */
+/* ===== CZ V228 — RETORNO DE CONSUMÍVEIS CONTRATADOS E EXTRAS POR BIPAGEM ===== */
 const RET226_CONSUMO='cz226_consumo_',RET226_VENDIDO='cz226_extra_vendido_';
 let ret226Cache=null,ret226Selecionado=null,ret226Timer=null,ret226Lendo=false;
 function ret226Key(id,mid){return String(id)+':'+String(mid)}
 function ret226Consumos(id){try{return JSON.parse(localStorage.getItem(RET226_CONSUMO+id)||'{}')}catch(_){return {}}}
 function ret226ConfirmarConsumo(id,mid){
  const x=ret226Cache?.mats.find(m=>String(m.id)===String(mid));if(!x||x.tipo!=='produto'||x.origem==='extra')return;
+ if(ret226Devolvido(x,ret226Cache.e)>=ret226Esperado(x,ret226Cache.e))return;
  const c=ret226Consumos(id);c[String(mid)]=!c[String(mid)];localStorage.setItem(RET226_CONSUMO+id,JSON.stringify(c));ret226Pintar(id);
 }
 function ret226Vendidos(id){try{return JSON.parse(localStorage.getItem(RET226_VENDIDO+id)||'{}')}catch(_){return {}}}
@@ -5957,14 +5975,14 @@ function ret226Pintar(id){
  for(const x of mats){
   const tr=document.querySelector('#ret226Tabela tbody tr[data-id="'+x.id+'"]');if(!tr)continue;
   const q=ret226Esperado(x,e),dev=ret226Devolvido(x,e),f=Math.max(0,q-dev),consumo=x.tipo==='produto',extra=ret226Extra(x);
-  const confirmado=consumo&&!extra&&!!consumos[String(x.id)];
-  const ok=extra?dev===q:consumo?false:dev===q;
+  const confirmado=consumo&&!extra&&f>0&&!!consumos[String(x.id)];
+  const ok=dev===q;
   tr.style.background=ok?'#17452e':consumo?'#341b21':'';
   tr.style.color=ok?'#d6ffe5':consumo?'#ffb4b4':'';
-  tr.querySelector('.ret226Ret')?.replaceChildren(document.createTextNode(consumo&&!extra?(confirmado?'✓ Consumo confirmado':'A confirmar'):(dev+'/'+q+' • Faltam '+f)));
-  const estado=tr.querySelector('.ret226Estado');if(estado)estado.textContent=ok?'✓ Conferido':extra?(f?'🔴 '+f+' utilizado(s)':'✓ Devolvido'):consumo?(confirmado?'✓ Consumo registrado':'🔴 Consumo'):'Pendente';
+  tr.querySelector('.ret226Ret')?.replaceChildren(document.createTextNode((dev+'/'+q+' • Faltam '+f)));
+  const estado=tr.querySelector('.ret226Estado');if(estado)estado.textContent=ok?'✓ Conferido':extra?(f?'🔴 '+f+' utilizado(s)':'✓ Devolvido'):consumo?(f?(confirmado?'✓ '+f+' consumido(s) confirmado(s)':'🔴 '+f+' consumido(s) a confirmar'):'✓ Devolvido'):'Pendente';
   const check=tr.querySelector('.ret226Check');if(check)check.checked=ok;
-  const bot=tr.querySelector('.ret226Consumo');if(bot){bot.textContent=confirmado?'✓ Consumo confirmado':'Confirmar consumo';bot.style.background=confirmado?'#256943':''}
+  const bot=tr.querySelector('.ret226Consumo');if(bot){bot.textContent=f===0?'Tudo devolvido':confirmado?'✓ '+f+' consumido(s) confirmado(s)':'Confirmar consumo ('+f+')';bot.disabled=f===0;bot.style.background=confirmado?'#256943':''}
  }
  const extras=mats.filter(ret226Extra).map(x=>({x,q:ret226Esperado(x,e),dev:ret226Devolvido(x,e)}));
  const usados=extras.reduce((a,v)=>a+Math.max(0,v.q-v.dev),0);
@@ -5986,17 +6004,17 @@ async function ret226Abrir(id){
   .ret226Dialog{position:relative;width:min(540px,100%);max-height:90vh;overflow:auto;background:#151f2a;color:white;border:1px solid #3b5369;border-radius:16px;padding:24px;box-shadow:0 20px 80px #000a}
   .ret226Nums{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:16px 0}.ret226Nums div{background:#0b1621;border:1px solid #304254;border-radius:10px;text-align:center;padding:14px 5px}.ret226Nums small{display:block;font-size:11px;color:#acb9c8}.ret226Nums strong{display:block;font-size:31px;margin-top:7px}
   </style>
-  <div class="card"><div class="muted" style="margin-bottom:12px">Ativos e produtos extras: selecione o quadrado para bipar o retorno. Consumos contratados: clique em <b>Confirmar consumo</b>.</div>
+  <div class="card"><div class="muted" style="margin-bottom:12px">Selecione o quadrado para bipar a devolução de ativos e de qualquer consumível (contratado ou extra). Após conferir o retorno, confirme o consumo da quantidade não devolvida.</div>
   <div style="display:flex;gap:9px;flex-wrap:wrap;align-items:end;margin-bottom:12px"><div class="field" style="width:190px;margin:0"><label>Filtrar por nome</label><input id="ret226Nome" type="search" oninput="ret226Filtrar()" placeholder="Nome do produto" style="padding:8px;font-size:13px"></div><div class="field" style="width:170px;margin:0"><label>Filtrar por código</label><input id="ret226Codigo" type="search" oninput="ret226Filtrar()" placeholder="Código / rastreio" style="padding:8px;font-size:13px"></div><span id="ret226TotalFiltro" class="muted" style="font-size:12px">${mats.length} material(is)</span></div>
   <div class="tablewrap"><table id="ret226Tabela"><thead><tr><th>Sel.</th><th>Produto</th><th>Tipo</th><th>Origem</th><th>Código</th><th>Conferência</th></tr></thead><tbody>
-  ${mats.map(x=>{const q=ret226Esperado(x,e),dev=ret226Devolvido(x,e),cons=x.tipo==='produto',extra=ret226Extra(x),ativo=ret226Ativo(x),cod=x._codigoExibicao||x.codigo||'—';return `<tr data-id="${coEsc(String(x.id))}" data-nome="${coEsc(sair222Nome(x))}" data-codigo="${coEsc(cod)}"><td>${!finalizado&&(ativo||extra)?`<input class="ret226Check" type="checkbox" aria-label="Bipar ${coEsc(sair222Nome(x))}" onclick="ret226Selecionar('${id}','${x.id}')">`:'—'}</td><td><b>${coEsc(sair222Nome(x))}</b></td><td>${ativo?'Ativo':'Consumo'}</td><td>${extra?'Extra':'Contratado'}</td><td>${coEsc(cod)}</td><td><div class="ret226Ret" style="font-weight:800;margin-bottom:5px">${dev}/${q}</div><div class="ret226Estado" style="font-size:12px;margin-bottom:7px"></div>${cons&&!extra?`<button type="button" class="btn secondary ret226Consumo" ${finalizado?'disabled':''} onclick="ret226ConfirmarConsumo('${id}','${x.id}')">Confirmar consumo</button>`:ativo&&!finalizado?`<button type="button" class="btn secondary" onclick="marcarManutencaoRetorno('${id}','${x.id}','${x.item_id||''}')">Manutenção</button> <button type="button" class="btn danger" onclick="marcarPerdaRetorno('${id}','${x.id}','${x.item_id||''}')">Perda</button>`:extra?'Devolução por bipagem':'—'}</td></tr>`}).join('')||'<tr><td colspan="6">Nenhum material foi conferido na saída.</td></tr>'}</tbody></table></div></div>
+  ${mats.map(x=>{const q=ret226Esperado(x,e),dev=ret226Devolvido(x,e),cons=x.tipo==='produto',extra=ret226Extra(x),ativo=ret226Ativo(x),cod=x._codigoExibicao||x.codigo||'—';return `<tr data-id="${coEsc(String(x.id))}" data-nome="${coEsc(sair222Nome(x))}" data-codigo="${coEsc(cod)}"><td>${!finalizado&&(ativo||cons)?`<input class="ret226Check" type="checkbox" aria-label="Bipar ${coEsc(sair222Nome(x))}" onclick="ret226Selecionar('${id}','${x.id}')">`:'—'}</td><td><b>${coEsc(sair222Nome(x))}</b></td><td>${ativo?'Ativo':'Consumo'}</td><td>${extra?'Extra':'Contratado'}</td><td>${coEsc(cod)}</td><td><div class="ret226Ret" style="font-weight:800;margin-bottom:5px">${dev}/${q}</div><div class="ret226Estado" style="font-size:12px;margin-bottom:7px"></div>${cons&&!extra?`<button type="button" class="btn secondary ret226Consumo" ${finalizado?'disabled':''} onclick="ret226ConfirmarConsumo('${id}','${x.id}')">Confirmar consumo</button>`:ativo&&!finalizado?`<button type="button" class="btn secondary" onclick="marcarManutencaoRetorno('${id}','${x.id}','${x.item_id||''}')">Manutenção</button> <button type="button" class="btn danger" onclick="marcarPerdaRetorno('${id}','${x.id}','${x.item_id||''}')">Perda</button>`:extra?'Devolução por bipagem':'—'}</td></tr>`}).join('')||'<tr><td colspan="6">Nenhum material foi conferido na saída.</td></tr>'}</tbody></table></div></div>
   ${!finalizado?`<div class="card" style="margin-top:15px"><div style="font-size:16px"><b>Produtos extras utilizados:</b> <span id="ret226ResumoExtra"></span></div><div class="muted" style="margin:7px 0">Somente as unidades extras não devolvidas serão encaminhadas à venda no PDV. A venda não será finalizada automaticamente.</div><div class="actions" style="flex-wrap:wrap"><button type="button" class="btn secondary" onclick="ret226AbrirPDV('${id}')">🛒 Abrir no PDV</button><button type="button" class="btn primary" onclick="ret226Concluir('${id}')">Concluir retorno</button></div></div>`:''}`;
   ret226Pintar(id);
  }catch(err){$('#content').innerHTML='<div class="msg">Erro ao carregar retorno: '+coEsc(err.message)+'</div>'}
 }
 function ret226Selecionar(id,mid){
  const x=ret226Cache?.mats.find(x=>String(x.id)===String(mid));if(!x||ret226Cache.e.status==='finalizado')return;
- if(!ret226Ativo(x)&&!ret226Extra(x))return;
+ if(!ret226Ativo(x)&&x.tipo!=='produto')return;
  ret226Selecionado=String(mid);ret226AbrirModal(id);
 }
 function ret226AbrirModal(id){
@@ -6011,7 +6029,7 @@ function ret226AtualizarModal(id){
  const x=ret226Cache?.mats.find(x=>String(x.id)===String(ret226Selecionado)),painel=document.getElementById('ret226Painel');if(!x||!painel)return;
  const q=ret226Esperado(x,ret226Cache.e),dev=ret226Devolvido(x,ret226Cache.e),falt=Math.max(0,q-dev);
  if(!falt){ret226Fechar();return}
- painel.innerHTML=`<div style="color:#ff884d;font-weight:900;font-size:12px">CONFERÊNCIA DE RETORNO</div><h2 style="margin:10px 0">${coEsc(sair222Nome(x))}</h2><div class="muted">${ret226Ativo(x)?'Ativo':'Consumo extra'} • ${coEsc(x._codigoExibicao||x.codigo||'—')}</div><div class="ret226Nums"><div><small>QUANTIDADE</small><strong>${q}</strong></div><div><small>BIPADO</small><strong style="color:#7fdfa5">${dev}</strong></div><div><small>FALTANDO</small><strong style="color:#ffc27d">${falt}</strong></div></div><p class="muted" style="font-size:13px">Cada leitura confirma uma unidade devolvida.</p>`;
+ painel.innerHTML=`<div style="color:#ff884d;font-weight:900;font-size:12px">CONFERÊNCIA DE RETORNO</div><h2 style="margin:10px 0">${coEsc(sair222Nome(x))}</h2><div class="muted">${ret226Ativo(x)?'Ativo':ret226Extra(x)?'Consumo extra':'Consumo contratado'} • ${coEsc(x._codigoExibicao||x.codigo||'—')}</div><div class="ret226Nums"><div><small>QUANTIDADE</small><strong>${q}</strong></div><div><small>BIPADO</small><strong style="color:#7fdfa5">${dev}</strong></div><div><small>FALTANDO</small><strong style="color:#ffc27d">${falt}</strong></div></div><p class="muted" style="font-size:13px">Cada leitura confirma uma unidade devolvida.</p>`;
 }
 async function ret226Bipar(id){
  if(ret226Lendo)return;const inp=document.getElementById('scanRetorno');if(!inp?.value.trim())return;
@@ -6020,8 +6038,8 @@ async function ret226Bipar(id){
   const x=ret226Cache?.mats.find(x=>String(x.id)===String(ret226Selecionado));if(!x)return;
   const codigo=normalizarCodigoEvento(inp.value),validos=x._codigos||[];
   if(!validos.some(c=>normalizarCodigoEvento(c)===codigo))throw new Error('Código diferente do material selecionado.');
-  await biparRetornoEvento(id);
-  if(document.getElementById('ret226Modal')){
+  const sucesso=await biparRetornoEvento(id,x.id);
+  if(sucesso&&document.getElementById('ret226Modal')){
    // Em caso de erro, a mensagem permanece na janela; em caso de sucesso atualiza os números.
    const erro=document.getElementById('retMsg')?.textContent||'';
    if(!erro){
@@ -6052,7 +6070,7 @@ async function ret226AbrirPDV(id){
 }
 async function ret226Concluir(id){
  const c=ret226Cache;if(!c||String(c.e.id)!==String(id))return;
- const semConsumo=c.mats.filter(x=>x.tipo==='produto'&&!ret226Extra(x)&&!ret226Consumos(id)[String(x.id)]);
+ const semConsumo=c.mats.filter(x=>x.tipo==='produto'&&!ret226Extra(x)&&ret226Esperado(x,c.e)>ret226Devolvido(x,c.e)&&!ret226Consumos(id)[String(x.id)]);
  if(semConsumo.length)return czAlert('Confirme o consumo dos produtos contratados antes de concluir: '+semConsumo.map(x=>x.nome_item).join(', '),'Retorno');
  const pendExtra=c.mats.filter(x=>ret226Extra(x)&&ret226Esperado(x,c.e)>ret226Devolvido(x,c.e)&&!usedAlready226(id,x.id));
  if(pendExtra.length)return czAlert('Há produtos extras utilizados aguardando venda no PDV. Abra o PDV e finalize a venda antes de concluir o retorno.','Retorno');
