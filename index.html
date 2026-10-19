@@ -5925,7 +5925,7 @@ function cz156OcultarEtiquetas(){
 new MutationObserver(()=>{clearTimeout(window.cz156t);window.cz156t=setTimeout(cz156OcultarEtiquetas,100)}).observe(document.documentElement,{subtree:true,childList:true});
 document.addEventListener('DOMContentLoaded',cz156OcultarEtiquetas);
 
-/* ===== CZ V226 — RETORNO EM LISTA, CONSUMO, BIPAGEM E PDV DE EXTRAS ===== */
+/* ===== CZ V227 — RETORNO COM AS MESMAS SEIS COLUNAS DA SAÍDA ===== */
 const RET226_CONSUMO='cz226_consumo_',RET226_VENDIDO='cz226_extra_vendido_';
 let ret226Cache=null,ret226Selecionado=null,ret226Timer=null,ret226Lendo=false;
 function ret226Key(id,mid){return String(id)+':'+String(mid)}
@@ -5961,8 +5961,8 @@ function ret226Pintar(id){
   const ok=extra?dev===q:consumo?false:dev===q;
   tr.style.background=ok?'#17452e':consumo?'#341b21':'';
   tr.style.color=ok?'#d6ffe5':consumo?'#ffb4b4':'';
-  tr.querySelector('.ret226Ret')?.replaceChildren(document.createTextNode(consumo&&!extra?(confirmado?'✓ Consumido':'A confirmar'):(dev+'/'+q+' • Faltam '+f)));
-  const estado=tr.querySelector('.ret226Estado');if(estado)estado.textContent=ok?'✓ Conferido':extra?(f?'🔴 '+f+' utilizado(s)':'✓ Devolvido'):consumo?'🔴 Consumo':'Pendente';
+  tr.querySelector('.ret226Ret')?.replaceChildren(document.createTextNode(consumo&&!extra?(confirmado?'✓ Consumo confirmado':'A confirmar'):(dev+'/'+q+' • Faltam '+f)));
+  const estado=tr.querySelector('.ret226Estado');if(estado)estado.textContent=ok?'✓ Conferido':extra?(f?'🔴 '+f+' utilizado(s)':'✓ Devolvido'):consumo?(confirmado?'✓ Consumo registrado':'🔴 Consumo'):'Pendente';
   const check=tr.querySelector('.ret226Check');if(check)check.checked=ok;
   const bot=tr.querySelector('.ret226Consumo');if(bot){bot.textContent=confirmado?'✓ Consumo confirmado':'Confirmar consumo';bot.style.background=confirmado?'#256943':''}
  }
@@ -5978,9 +5978,9 @@ async function ret226Abrir(id){
   if(er.error)throw er.error;
   const e=er.data,mats=ms.filter(x=>ret226Esperado(x,e)>0),finalizado=e.status==='finalizado';
   ret226Cache={e,mats};
-  $('#content').innerHTML=`<div class="sectionhead"><div><h2>↩️ Retorno — ${coEsc(e.nome_evento||'Evento')}</h2><div class="muted">${coEsc(e.cliente_nome||'')} • ${finDate(e.data_evento)} • Conferência por material</div></div><button class="btn secondary" onclick="ret226Fechar();renderRetornoEventos()">Voltar</button></div>
+  $('#content').innerHTML=`<div class="sectionhead"><div><h2>↩️ Retorno — ${coEsc(e.nome_evento||'Evento')}</h2><div class="muted">${coEsc(e.cliente_nome||'')} • ${finDate(e.data_evento)} • Conferência por material • Mesmas colunas da saída</div></div><button class="btn secondary" onclick="ret226Fechar();renderRetornoEventos()">Voltar</button></div>
   <style>
-  #ret226Tabela th{font-size:14px;padding:14px 12px}#ret226Tabela td{font-size:16px;padding:13px 12px;white-space:normal;vertical-align:middle}#ret226Tabela td b{font-size:17px}
+  #ret226Tabela th{font-size:14px;padding:14px 12px}#ret226Tabela td{font-size:16px;padding:13px 12px;white-space:normal;vertical-align:middle}#ret226Tabela td b{font-size:17px}#ret226Tabela td:nth-child(6){min-width:210px}#ret226Tabela td:nth-child(6) button{font-size:12px;padding:7px 9px;margin:2px}
   #ret226Tabela .ret226Check{width:22px;height:22px;accent-color:#43c77d;cursor:pointer}
   .ret226Overlay{position:fixed;inset:0;z-index:220000;background:#000c;display:flex;align-items:center;justify-content:center;padding:16px}
   .ret226Dialog{position:relative;width:min(540px,100%);max-height:90vh;overflow:auto;background:#151f2a;color:white;border:1px solid #3b5369;border-radius:16px;padding:24px;box-shadow:0 20px 80px #000a}
@@ -5988,8 +5988,8 @@ async function ret226Abrir(id){
   </style>
   <div class="card"><div class="muted" style="margin-bottom:12px">Ativos e produtos extras: selecione o quadrado para bipar o retorno. Consumos contratados: clique em <b>Confirmar consumo</b>.</div>
   <div style="display:flex;gap:9px;flex-wrap:wrap;align-items:end;margin-bottom:12px"><div class="field" style="width:190px;margin:0"><label>Filtrar por nome</label><input id="ret226Nome" type="search" oninput="ret226Filtrar()" placeholder="Nome do produto" style="padding:8px;font-size:13px"></div><div class="field" style="width:170px;margin:0"><label>Filtrar por código</label><input id="ret226Codigo" type="search" oninput="ret226Filtrar()" placeholder="Código / rastreio" style="padding:8px;font-size:13px"></div><span id="ret226TotalFiltro" class="muted" style="font-size:12px">${mats.length} material(is)</span></div>
-  <div class="tablewrap"><table id="ret226Tabela"><thead><tr><th>Sel.</th><th>Produto</th><th>Tipo</th><th>Origem</th><th>Código</th><th>Qtd.</th><th>Retorno</th><th>Confirmar consumo / Ocorrência</th><th>Status</th></tr></thead><tbody>
-  ${mats.map(x=>{const q=ret226Esperado(x,e),dev=ret226Devolvido(x,e),cons=x.tipo==='produto',extra=ret226Extra(x),ativo=ret226Ativo(x),cod=x._codigoExibicao||x.codigo||'—';return `<tr data-id="${coEsc(String(x.id))}" data-nome="${coEsc(sair222Nome(x))}" data-codigo="${coEsc(cod)}"><td>${!finalizado&&(ativo||extra)?`<input class="ret226Check" type="checkbox" aria-label="Bipar ${coEsc(sair222Nome(x))}" onclick="ret226Selecionar('${id}','${x.id}')">`:'—'}</td><td><b>${coEsc(sair222Nome(x))}</b></td><td>${ativo?'Ativo':'Consumo'}</td><td>${extra?'Extra':'Contratado'}</td><td>${coEsc(cod)}</td><td>${q}</td><td class="ret226Ret">${dev}/${q}</td><td>${cons&&!extra?`<button type="button" class="btn secondary ret226Consumo" ${finalizado?'disabled':''} onclick="ret226ConfirmarConsumo('${id}','${x.id}')">Confirmar consumo</button>`:ativo&&!finalizado?`<button type="button" class="btn secondary" onclick="marcarManutencaoRetorno('${id}','${x.id}','${x.item_id||''}')">Manutenção</button> <button type="button" class="btn danger" onclick="marcarPerdaRetorno('${id}','${x.id}','${x.item_id||''}')">Perda</button>`:extra?'Devolução por bipagem':'—'}</td><td class="ret226Estado"></td></tr>`}).join('')||'<tr><td colspan="9">Nenhum material foi conferido na saída.</td></tr>'}</tbody></table></div></div>
+  <div class="tablewrap"><table id="ret226Tabela"><thead><tr><th>Sel.</th><th>Produto</th><th>Tipo</th><th>Origem</th><th>Código</th><th>Conferência</th></tr></thead><tbody>
+  ${mats.map(x=>{const q=ret226Esperado(x,e),dev=ret226Devolvido(x,e),cons=x.tipo==='produto',extra=ret226Extra(x),ativo=ret226Ativo(x),cod=x._codigoExibicao||x.codigo||'—';return `<tr data-id="${coEsc(String(x.id))}" data-nome="${coEsc(sair222Nome(x))}" data-codigo="${coEsc(cod)}"><td>${!finalizado&&(ativo||extra)?`<input class="ret226Check" type="checkbox" aria-label="Bipar ${coEsc(sair222Nome(x))}" onclick="ret226Selecionar('${id}','${x.id}')">`:'—'}</td><td><b>${coEsc(sair222Nome(x))}</b></td><td>${ativo?'Ativo':'Consumo'}</td><td>${extra?'Extra':'Contratado'}</td><td>${coEsc(cod)}</td><td><div class="ret226Ret" style="font-weight:800;margin-bottom:5px">${dev}/${q}</div><div class="ret226Estado" style="font-size:12px;margin-bottom:7px"></div>${cons&&!extra?`<button type="button" class="btn secondary ret226Consumo" ${finalizado?'disabled':''} onclick="ret226ConfirmarConsumo('${id}','${x.id}')">Confirmar consumo</button>`:ativo&&!finalizado?`<button type="button" class="btn secondary" onclick="marcarManutencaoRetorno('${id}','${x.id}','${x.item_id||''}')">Manutenção</button> <button type="button" class="btn danger" onclick="marcarPerdaRetorno('${id}','${x.id}','${x.item_id||''}')">Perda</button>`:extra?'Devolução por bipagem':'—'}</td></tr>`}).join('')||'<tr><td colspan="6">Nenhum material foi conferido na saída.</td></tr>'}</tbody></table></div></div>
   ${!finalizado?`<div class="card" style="margin-top:15px"><div style="font-size:16px"><b>Produtos extras utilizados:</b> <span id="ret226ResumoExtra"></span></div><div class="muted" style="margin:7px 0">Somente as unidades extras não devolvidas serão encaminhadas à venda no PDV. A venda não será finalizada automaticamente.</div><div class="actions" style="flex-wrap:wrap"><button type="button" class="btn secondary" onclick="ret226AbrirPDV('${id}')">🛒 Abrir no PDV</button><button type="button" class="btn primary" onclick="ret226Concluir('${id}')">Concluir retorno</button></div></div>`:''}`;
   ret226Pintar(id);
  }catch(err){$('#content').innerHTML='<div class="msg">Erro ao carregar retorno: '+coEsc(err.message)+'</div>'}
