@@ -4918,6 +4918,25 @@ let sair220Timer=null,sair220Ocupado=false;
 let sair222Selecionado={};
 function sair222Origem(x){return ['extra','extras'].includes(String(x.origem||'').toLowerCase())?'Extra':'Contratado'}
 function sair222Nome(x){return String(x.nome_item||x.descricao||x.produto_nome||x.ativo_nome||'Material')}
+// V234: códigos exibidos são apenas os rastreios lidos para este material no evento.
+function sair234CodigosLidos(x,st){
+ if(!sair220Ativo(x))return x._codigoExibicao||sair220Cod(x)||'Sem código';
+ return (st.historico||[]).filter(h=>String(h.material_id)===String(x.id)&&h.acao==='Conferência')
+  .map(h=>String(h.codigo||'').trim()).filter(Boolean).join(' · ')||'Aguardando bipagem';
+}
+function sair234Extras(mats){return mats.filter(x=>sair222Origem(x)==='Extra')}
+function sair234Contratados(mats){return mats.filter(x=>sair222Origem(x)!=='Extra')}
+function sair234Usados(id){return sair142State(id).extrasUtilizados||{}}
+function sair234DefinirUso(id,mid,valor){
+ const mats=window.sair222MateriaisTela||[],x=mats.find(v=>String(v.id)===String(mid));if(!x)return;
+ const st=sair142State(id),c=sair220Contagens(mats,st),max=Math.min(sair220Qtd(x),Number(c[x.id]||0));
+ const n=Number(valor);if(!Number.isInteger(n)||n<0||n>max){czAlert('A quantidade utilizada deve ser um número inteiro de 0 até '+max+'.','Material extra');return}
+ sair142Set(id,{extrasUtilizados:{...(st.extrasUtilizados||{}),[mid]:n}});
+}
+function sair234Linhas(id,itens,c,st){return itens.map(x=>{
+ const q=sair220Qtd(x),n=Math.min(q,Number(c[x.id]||0)),f=Math.max(0,q-n),pronto=f===0;
+ return `<tr class="sair223Linha ${pronto?'sair223Concluida':''}" data-material="${coEsc(String(x.id))}" onclick="sair222Selecionar('${id}','${x.id}')"><td><input type="checkbox" aria-label="Selecionar ${coEsc(sair222Nome(x))}" ${pronto?'checked disabled':''} onclick="event.stopPropagation();sair222Selecionar('${id}','${x.id}')"></td><td><b>${coEsc(sair222Nome(x))}</b></td><td>${q}</td><td><span class="${pronto?'sair224StatusPronto':'sair224StatusPendente'}">${pronto?'✓ Conferido':n+'/'+q+' • Faltam '+f}</span></td><td>${sair222Origem(x)}</td><td><b>${coEsc(sair234CodigosLidos(x,st))}</b></td><td>${sair220Ativo(x)?'Ativo':'Consumo'}</td></tr>`
+ }).join('')}
 function sair223FecharModal(){clearTimeout(sair220Timer);document.getElementById('sair223Modal')?.remove();}
 function sair222Selecionar(eventoId,materialId){
  const mats=window.sair222MateriaisTela||[],x=mats.find(v=>String(v.id)===String(materialId));
@@ -4945,30 +4964,29 @@ function sair223AtualizarModal(eventoId){
  if(!painel||!x)return;
  const c=sair220Contagens(mats,sair142State(eventoId)),q=sair220Qtd(x),n=Math.min(q,Number(c[x.id]||0)),f=Math.max(0,q-n);
  if(f===0){sair223FecharModal();return}
- painel.innerHTML=`<div style="color:#ff884d;font-size:12px;font-weight:900;letter-spacing:.8px">CONFERÊNCIA DE MATERIAL</div><h2 style="margin:10px 0 6px;font-size:24px">${coEsc(sair222Nome(x))}</h2><div class="muted" style="font-size:13px">${sair220Ativo(x)?'Ativo':'Consumo'} • ${sair222Origem(x)} • ${coEsc(x._codigoExibicao||sair220Cod(x)||'Sem código')}</div><div class="sair223Numeros"><div><small>PARA BIPAR</small><strong>${q}</strong></div><div><small>BIPADO</small><strong style="color:#67dca2">${n}</strong></div><div><small>FALTAM</small><strong style="color:#ffbd72">${f}</strong></div></div><div style="font-size:13px;color:#b8c4d0;margin-top:12px">A cada leitura válida, a quantidade será atualizada automaticamente.</div>`;
+ painel.innerHTML=`<div style="color:#ff884d;font-size:12px;font-weight:900;letter-spacing:.8px">CONFERÊNCIA DE MATERIAL</div><h2 style="margin:10px 0 6px;font-size:24px">${coEsc(sair222Nome(x))}</h2><div class="muted" style="font-size:13px">${sair220Ativo(x)?'Ativo':'Consumo'} • ${sair222Origem(x)} • ${coEsc(sair234CodigosLidos(x,sair142State(eventoId)))}</div><div class="sair223Numeros"><div><small>PARA BIPAR</small><strong>${q}</strong></div><div><small>BIPADO</small><strong style="color:#67dca2">${n}</strong></div><div><small>FALTAM</small><strong style="color:#ffbd72">${f}</strong></div></div><div style="font-size:13px;color:#b8c4d0;margin-top:12px">A cada leitura válida, a quantidade será atualizada automaticamente.</div>`;
 }
 function sair223AbrirConclusao(eventoId){
  sair223FecharModal();document.getElementById('sair223Conclusao')?.remove();
  const ov=document.createElement('div');ov.id='sair223Conclusao';ov.className='sair223Overlay';
- ov.innerHTML=`<div class="sair223Dialog" role="dialog" aria-modal="true" aria-label="Concluir bipagem" style="max-width:420px"><h3 style="margin:0 0 8px">Concluir bipagem</h3><p class="muted" style="margin:0 0 18px">Imprimir relatório de conferência?</p><div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap"><button type="button" class="btn secondary" id="sair223Imprimir">Imprimir</button><button type="button" class="btn primary" id="sair223Confirmar">Confirmar bipagem</button></div></div>`;
+ ov.innerHTML=`<div class="sair223Dialog" role="dialog" aria-modal="true" aria-label="Concluir bipagem" style="max-width:480px"><button class="sair223Fechar" onclick="document.getElementById('sair223Conclusao')?.remove()">×</button><h3>Concluir bipagem e liberar saída</h3><p>O Supabase exige conferência concluída e relatório impresso antes de baixar o estoque.</p><button type="button" class="btn secondary" id="sair223Imprimir">🖨️ Imprimir relatório de conferência</button><label style="display:flex;align-items:center;gap:9px;margin:16px 0"><input type="checkbox" id="sair234ConfirmouImpressao" disabled> Confirmo que imprimi o relatório</label><button type="button" class="btn primary" id="sair223Confirmar" disabled>Confirmar bipagem e dar saída</button><p class="muted" style="font-size:12px">A baixa só será registrada após confirmação do Supabase.</p></div>`;
  document.body.appendChild(ov);
  ov.addEventListener('click',ev=>{if(ev.target===ov)ov.remove()});
- ov.querySelector('#sair223Imprimir').onclick=()=>sair142Imprimir(eventoId);
- ov.querySelector('#sair223Confirmar').onclick=async()=>{
-  const btn=ov.querySelector('#sair223Confirmar');btn.disabled=true;
-  try{await sair142DarSaida(eventoId)}finally{btn.disabled=false;if(document.getElementById('sair223Conclusao')===ov)ov.remove()}
- };
+ const imprimir=ov.querySelector('#sair223Imprimir'),check=ov.querySelector('#sair234ConfirmouImpressao'),btn=ov.querySelector('#sair223Confirmar');
+ imprimir.onclick=async()=>{try{const ok=await sair142Imprimir(eventoId);if(ok){check.disabled=false}}catch(err){await czAlert(err.message,'Relatório')}};
+ check.onchange=()=>{btn.disabled=!check.checked};
+ btn.onclick=async()=>{if(!check.checked)return;btn.disabled=true;try{await sair142DarSaida(eventoId,true)}finally{btn.disabled=false}};
 }
 // V225 — filtros compactos e independentes da lista de saída (nome e código).
 function sair225FiltrarLista(){
  const norm=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
  const nome=norm(document.getElementById('sair225FiltroNome')?.value);
  const codigo=norm(document.getElementById('sair225FiltroCodigo')?.value);
- const linhas=Array.from(document.querySelectorAll('#sair222Tabela tbody tr'));
+ const linhas=Array.from(document.querySelectorAll('#sair222Tabela tbody tr, #sair234TabelaExtras tbody tr'));
  let visiveis=0;
  linhas.forEach(tr=>{
   const produto=norm(tr.cells[1]?.textContent);
-  const cod=norm(tr.cells[4]?.textContent);
+  const cod=norm(tr.cells[5]?.textContent);
   const mostrar=(!nome||produto.includes(nome))&&(!codigo||cod.includes(codigo));
   tr.hidden=!mostrar;
   tr.style.display=mostrar?'':'none';
@@ -5013,7 +5031,11 @@ async function sair142Abrir(eventoId){
    <div class="field" style="margin:0;width:170px;max-width:calc(50% - 5px)"><label for="sair225FiltroCodigo" style="font-size:12px;margin-bottom:4px">Filtrar pelo código</label><input id="sair225FiltroCodigo" type="search" placeholder="Código / rastreio" autocomplete="off" oninput="sair225FiltrarLista()" style="min-height:34px;padding:7px 9px;font-size:13px"></div>
    <span id="sair225ResumoFiltro" class="muted" style="font-size:12px;padding-bottom:8px">${mats.length} de ${mats.length} itens</span>
   </div>
-  <div class="tablewrap"><table id="sair222Tabela"><thead><tr><th>Sel.</th><th>Produto</th><th>Quantidade</th><th>Conferência</th><th>Origem</th><th>Código</th><th>Tipo</th></tr></thead><tbody>${mats.map(x=>{const q=sair220Qtd(x),n=Math.min(q,Number(c[x.id]||0)),f=Math.max(0,q-n),pronto=f===0;return `<tr class="sair223Linha ${pronto?'sair223Concluida':''}" data-material="${coEsc(String(x.id))}" onclick="sair222Selecionar('${eventoId}','${x.id}')"><td><input type="checkbox" aria-label="Selecionar ${coEsc(sair222Nome(x))}" ${pronto?'checked disabled':''} onclick="event.stopPropagation();sair222Selecionar('${eventoId}','${x.id}')"></td><td><b>${coEsc(sair222Nome(x))}</b></td><td>${sair220Ativo(x)?'Ativo':'Consumo'}</td><td>${sair222Origem(x)}</td><td><b>${coEsc(x._codigoExibicao||sair220Cod(x)||'Sem código')}</b></td><td><span class="${pronto?'sair224StatusPronto':'sair224StatusPendente'}">${pronto?'✓ Conferido':n+'/'+q+' • Faltam '+f}</span></td></tr>`}).join('')}</tbody></table></div>
+  <h3 style="margin:15px 0 8px">Materiais contratados</h3>
+  <div class="tablewrap"><table id="sair222Tabela"><thead><tr><th>Sel.</th><th>Produto</th><th>Quantidade</th><th>Conferência</th><th>Origem</th><th>Código</th><th>Tipo</th></tr></thead><tbody>${sair234Linhas(eventoId,sair234Contratados(mats),c,st)}</tbody></table></div>
+  <h3 style="margin:24px 0 8px">Materiais extras — bipagem separada</h3>
+  <div class="muted" style="margin-bottom:8px">Selecione cada extra para bipar. Informe a quantidade utilizada no relatório; o valor não gera baixa adicional nesta tela.</div>
+  <div class="tablewrap"><table id="sair234TabelaExtras"><thead><tr><th>Sel.</th><th>Produto</th><th>Quantidade</th><th>Conferência</th><th>Origem</th><th>Código</th><th>Tipo</th><th>Qtd. utilizada</th></tr></thead><tbody>${sair234Extras(mats).map(x=>{const q=sair220Qtd(x),n=Math.min(q,Number(c[x.id]||0)),f=q-n,pronto=f===0,usados=sair234Usados(eventoId);return `<tr class="sair223Linha ${pronto?'sair223Concluida':''}" data-material="${coEsc(String(x.id))}" onclick="sair222Selecionar('${eventoId}','${x.id}')"><td><input type="checkbox" ${pronto?'checked disabled':''} onclick="event.stopPropagation();sair222Selecionar('${eventoId}','${x.id}')"></td><td><b>${coEsc(sair222Nome(x))}</b></td><td>${q}</td><td>${pronto?'✓ Conferido':n+'/'+q+' • Faltam '+f}</td><td>Extra</td><td>${coEsc(sair234CodigosLidos(x,st))}</td><td>${sair220Ativo(x)?'Ativo':'Consumo'}</td><td><input type="number" min="0" max="${n}" step="1" value="${Number(usados[x.id]||0)}" aria-label="Quantidade utilizada de ${coEsc(sair222Nome(x))}" style="width:75px" onclick="event.stopPropagation()" onchange="event.stopPropagation();sair234DefinirUso('${eventoId}','${x.id}',this.value)"></td></tr>`}).join('')}</tbody></table></div>
   <div style="margin-top:14px"><b style="font-size:17px">Itens conferidos: ${mats.filter(x=>Number(c[x.id]||0)>=sair220Qtd(x)).length} de ${mats.length} • Unidades bipadas: ${conf}/${esperado} — ${pct}%</b><div style="height:10px;background:#26313b;border-radius:10px;margin-top:6px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${pct===100?'#45b879':'#d7a73b'}"></div></div></div></div>
   <div class="actions"><button class="btn primary" onclick="sair223AbrirConclusao('${eventoId}')">Concluir bipagem</button></div>`;
   sair223AtualizarModal(eventoId);
@@ -5048,10 +5070,10 @@ async function sair142Bipar(id){
 }
 /* V232 — saída oficial: sincroniza conferência e aciona a baixa transacional do Supabase. */
 let cz232SaidaEmAndamento=false;
-async function sair142DarSaida(id,janelaRelatorio=null){
+async function sair142DarSaida(id,impressaoConfirmada=false){
  if(cz232SaidaEmAndamento)return czAlert('A saída deste evento já está sendo processada. Aguarde.','Saída');
  const resp=String(document.querySelector('#sair142Resp')?.value||sair142State(id).responsavel||'').trim();
- if(!resp){janelaRelatorio?.close();return czAlert('Informe o responsável pela conferência.','Saída')}
+ if(!resp){return czAlert('Informe o responsável pela conferência.','Saída')}
  cz232SaidaEmAndamento=true;
  try{
   const [evr,mr]=await Promise.all([
@@ -5079,14 +5101,36 @@ async function sair142DarSaida(id,janelaRelatorio=null){
    const confirmado=Math.max(0,Math.min(sair220Qtd(m),Math.floor(Number(c[m.id]||0))));
    if(confirmado===anterior)continue;
    if(confirmado<anterior)throw new Error('Há mais unidades conferidas no banco do que nesta tela para '+sair222Nome(m)+'. Atualize a conferência antes de prosseguir.');
-   const {data:salvo,error:up}=await db.from('evento_materiais')
-     .update({quantidade_bipada:confirmado})
-     .eq('id',m.id).eq('evento_id',id).eq('quantidade_bipada',anterior)
-     .select('id,quantidade_bipada');
+   let atualizacao=db.from('evento_materiais').update({quantidade_bipada:confirmado})
+     .eq('id',m.id).eq('evento_id',id);
+   atualizacao=(m.quantidade_bipada===null||m.quantidade_bipada===undefined)
+     ?atualizacao.is('quantidade_bipada',null)
+     :atualizacao.eq('quantidade_bipada',anterior);
+   const {data:salvo,error:up}=await atualizacao.select('id,quantidade_bipada');
    if(up)throw up;
    if(!salvo||salvo.length!==1)throw new Error('A conferência de '+sair222Nome(m)+' foi alterada por outra sessão. Reabra a saída e confira novamente.');
    alterados.push({id:m.id,anterior,confirmado});
   }
+  // A RPC exige status material_pronto e relatório_impresso_em. Só confirmamos
+  // depois da conferência integral e da declaração explícita de impressão.
+  if(falt.length)throw new Error('Para liberar a saída oficial, conclua a bipagem de todos os materiais. Há '+falt.length+' item(ns) pendente(s).');
+  if(!impressaoConfirmada)throw new Error('Imprima o relatório e marque a confirmação antes de liberar a saída.');
+  const {data:etapa,error:etapaErro}=await db.from('eventos_operacionais')
+    .select('status,relatorio_impresso_em,saida_baixada_em').eq('id',id).single();
+  if(etapaErro)throw etapaErro;
+  if(etapa.saida_baixada_em)throw new Error('Saída já registrada no Supabase. Não é permitido baixar duas vezes.');
+  if(etapa.status!=='material_pronto'){
+   if(!['separando','aguardando_evento','pronto','aguardando_separacao'].includes(etapa.status))
+    throw new Error('O evento está no status '+etapa.status+'. Conclua a preparação antes de liberar a saída.');
+   const {error:estadoErro}=await db.from('eventos_operacionais')
+     .update({status:'material_pronto',relatorio_impresso_em:null,atualizado_em:new Date().toISOString()})
+     .eq('id',id).eq('status',etapa.status);
+   if(estadoErro)throw estadoErro;
+  }
+  const {error:impErro}=await db.from('eventos_operacionais')
+   .update({relatorio_impresso_em:new Date().toISOString(),atualizado_em:new Date().toISOString()})
+   .eq('id',id).eq('status','material_pronto').is('saida_baixada_em',null);
+  if(impErro)throw impErro;
   // Nunca substitua esta chamada por um UPDATE direto de estoque_atual:
   // a RPC do Supabase deve fazer a baixa e marcar saida_baixada_em juntos.
   const {error:baixa}=await db.rpc('cz_liberar_saida_evento',{p_evento_id:id});
@@ -5103,13 +5147,21 @@ async function sair142DarSaida(id,janelaRelatorio=null){
   if(typeof renderModule==='function')renderModule(18);
  }catch(err){
   await czAlert(String(err?.message||err),'Saída não concluída');
- }finally{cz232SaidaEmAndamento=false;janelaRelatorio?.close()}
+ }finally{cz232SaidaEmAndamento=false}
 }
 
-async function sair142Imprimir(id,janelaRelatorio=null){
- const [{data:e},m]=await Promise.all([db.from('eventos_operacionais').select('*').eq('id',id).single(),sair221Materiais(id)]),st=sair142State(id),c=sair220Contagens(m||[],st);
- const w=janelaRelatorio||window.open('','_blank','width=900,height=800');if(!w)return czAlert('O navegador bloqueou a impressão. Use o botão Imprimir bipagem.','Relatório');
- w.document.write(`<html><head><title>Bipagem</title><style>body{font-family:Arial;padding:30px}h1{font-size:20px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:8px;text-align:left}</style></head><body><h1>RELATÓRIO DE CONFERÊNCIA / SAÍDA</h1><p><b>Evento:</b> ${coEsc(e?.nome_evento||'')}</p><p><b>Cliente:</b> ${coEsc(e?.cliente_nome||'')}</p><p><b>Responsável:</b> ${coEsc(st.responsavel||'')}</p><p><b>Data/hora:</b> ${new Date().toLocaleString('pt-BR')}</p><table><thead><tr><th>Produto</th><th>Código</th><th>Previsto</th><th>Conferido</th></tr></thead><tbody>${(m||[]).map(x=>`<tr><td>${coEsc(x.nome_item||'Material')}</td><td>${coEsc(x._codigoExibicao||sair220Cod(x))}</td><td>${sair220Qtd(x)}</td><td>${Number(c[x.id]||0)}</td></tr>`).join('')}</tbody></table>${st.motivo_pendencia?`<p><b>Divergência:</b> ${coEsc(st.motivo_pendencia)}</p>`:''}<script>window.onload=()=>window.print()<\/script></body></html>`);w.document.close();
+async function sair142Imprimir(id){
+ const w=window.open('','_blank','width=1000,height=800');
+ if(!w){await czAlert('O navegador bloqueou a impressão. Habilite janelas pop-up.','Relatório');return false}
+ try{
+ const [er,mr]=await Promise.all([db.from('eventos_operacionais').select('*').eq('id',id).single(),sair221Materiais(id)]);
+ if(er.error)throw er.error;
+ const e=er.data,m=mr||[],st=sair142State(id),c=sair220Contagens(m,st),extras=sair234Extras(m),normais=sair234Contratados(m);
+ const linhas=itens=>itens.map(x=>`<tr><td>${coEsc(sair222Nome(x))}</td><td>${sair220Ativo(x)?'Ativo':'Consumo'}</td><td>${coEsc(sair234CodigosLidos(x,st))}</td><td>${sair220Qtd(x)}</td><td>${Number(c[x.id]||0)}</td></tr>`).join('');
+ const usados=sair234Usados(id);
+ w.document.write(`<html><head><meta charset="utf-8"><title>Conferência CZ</title><style>body{font-family:Arial;padding:25px;color:#222}h1{font-size:21px}h2{font-size:16px;margin-top:24px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:7px;text-align:left}th{background:#eee}</style></head><body><h1>RELATÓRIO DE CONFERÊNCIA / SAÍDA</h1><p><b>Evento:</b> ${coEsc(e?.nome_evento||'')}<br><b>Cliente:</b> ${coEsc(e?.cliente_nome||'')}<br><b>Responsável:</b> ${coEsc(st.responsavel||'')}<br><b>Data/hora:</b> ${new Date().toLocaleString('pt-BR')}</p><h2>Materiais contratados</h2><table><thead><tr><th>Produto</th><th>Tipo</th><th>Código bipado</th><th>Quantidade</th><th>Conferido</th></tr></thead><tbody>${linhas(normais)}</tbody></table><h2>Materiais extras</h2><table><thead><tr><th>Produto</th><th>Tipo</th><th>Código bipado</th><th>Quantidade</th><th>Conferido</th><th>Quantidade utilizada</th></tr></thead><tbody>${extras.map(x=>`<tr><td>${coEsc(sair222Nome(x))}</td><td>${sair220Ativo(x)?'Ativo':'Consumo'}</td><td>${coEsc(sair234CodigosLidos(x,st))}</td><td>${sair220Qtd(x)}</td><td>${Number(c[x.id]||0)}</td><td>${Number(usados[x.id]||0)}</td></tr>`).join('')}</tbody></table><p style="font-size:11px">Quantidade utilizada dos extras: registro informativo nesta conferência, sem segunda baixa automática.</p>${st.motivo_pendencia?`<p><b>Divergência:</b> ${coEsc(st.motivo_pendencia)}</p>`:''}<script>window.onload=()=>window.print()<\/script></body></html>`);
+ w.document.close();return true;
+ }catch(err){w.document.body.textContent='Erro ao preparar relatório: '+err.message;return false}
 }
 
 /* ===== V143 — LIMPEZA OPERACIONAL / UM ÚNICO CAMINHO =====
