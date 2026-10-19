@@ -3435,6 +3435,13 @@ async function biparRetornoEvento(eventoId,materialSelecionadoId=null){
   ]);
   if(er.error||mr.error)throw er.error||mr.error;
   const e=er.data,materiais=mr.data||[];
+  // Mesma lista e os mesmos códigos apresentados na tela Sair pro Evento.
+  // A quantidade confirmada localmente também conta enquanto a saída ainda
+  // não foi baixada oficialmente no banco.
+  const codigosTela=await sair221Materiais(eventoId);
+  const porId=new Map(codigosTela.map(m=>[String(m.id),m]));
+  const contagensSaida=sair220Contagens(codigosTela,sair142State(eventoId));
+  const qtdSaida=m=>e.saida_baixada_em?Number(m.quantidade_bipada||0):Math.max(Number(m.quantidade_bipada||0),Number(contagensSaida[m.id]||0));
   const ids=[...new Set(materiais.filter(m=>m.tipo==='ativo'&&m.item_id).map(m=>m.item_id))];
   let ativos=[];
   if(ids.length){
@@ -3459,34 +3466,33 @@ async function biparRetornoEvento(eventoId,materialSelecionadoId=null){
    });
    if(!material)throw new Error('A devolução deste tipo de equipamento já está completa.');
   }else{
-   // V228: consumíveis contratados e extras podem retornar pelo código do produto.
-   // Na janela de seleção, a linha escolhida tem prioridade, evitando confundir
-   // dois materiais do mesmo produto com origens diferentes.
-   const produtos=materiais.filter(m=>m.tipo==='produto'&&Number(m.quantidade_bipada||0)>0);
-   const pids=[...new Set(produtos.map(m=>m.item_id).filter(Boolean))];
-   let cadastrados=[];
-   if(pids.length){
-    const r=await db.from('produtos').select('id,codigo_barras').in('id',pids);
-    if(r.error)throw r.error;
-    cadastrados=r.data||[];
-   }
-   const codigosDe=m=>[
-    m.codigo,m.codigo_barras,
-    cadastrados.find(p=>String(p.id)===String(m.item_id))?.codigo_barras
-   ].map(normalizarCodigoEvento).filter(Boolean);
-   const elegiveis=produtos.filter(m=>codigosDe(m).includes(codigo));
+   // V229: conferir pelo MESMO cadastro e pelos MESMOS códigos que a
+   // tela de saída usa, inclusive quando o evento possui código antigo.
+   // A linha selecionada determina a origem (contratado/extra) e evita
+   // atribuir uma devolução a outro item com o mesmo código de barras.
+   const produtos=materiais.filter(m=>m.tipo==='produto'&&qtdSaida(m)>0);
+   const corresponde=m=>{
+    const registro=porId.get(String(m.id));
+    const codigos=[...(registro?._codigos||[]),m.codigo,m.codigo_barras]
+      .map(normalizarCodigoEvento).filter(Boolean);
+    return codigos.includes(codigo);
+   };
    if(materialSelecionadoId){
-    material=elegiveis.find(m=>String(m.id)===String(materialSelecionadoId))||null;
-    if(!material)throw new Error('O código lido não corresponde ao produto selecionado. Confira o código de barras do cadastro.');
+    const selecionado=produtos.find(m=>String(m.id)===String(materialSelecionadoId));
+    if(!selecionado)throw new Error('Este produto não consta na saída confirmada do evento. Confira se a saída foi registrada.');
+    if(!corresponde(selecionado)){
+     const outro=produtos.find(m=>corresponde(m));
+     throw new Error(outro?'Este código pertence a outro produto da lista: '+String(outro.nome_item||'Produto')+'.':'Código diferente do produto selecionado. Confira o código exibido na coluna Código.');
+    }
+    material=selecionado;
    }else{
-    material=elegiveis.find(m=>{
-     const dev=e.saida_baixada_em?Number(m.quantidade_devolvida||0):Number(retornoInfo(m.id).qtd||0);
-     return dev<Number(m.quantidade_bipada||0);
-    })||null;
+    material=produtos.find(m=>corresponde(m)&&(
+     (e.saida_baixada_em?Number(m.quantidade_devolvida||0):Number(retornoInfo(m.id).qtd||0))<qtdSaida(m)
+    ))||null;
    }
-   if(!material)throw new Error(elegiveis.length?'Todas as unidades deste produto já foram devolvidas.':'Código de barras não encontrado nos consumíveis deste evento. Confira o cadastro do produto.');
+   if(!material)throw new Error('Não há unidades pendentes para esse código neste evento. Confira a saída e a linha selecionada.');
   }
-  const esperado=Number(material.quantidade_bipada||0);
+  const esperado=qtdSaida(material);
   const devolvido=e.saida_baixada_em?Number(material.quantidade_devolvida||0):Number(retornoInfo(material.id).qtd||0);
   if(devolvido>=esperado)throw new Error('A devolução deste item já está completa.');
   if(e.saida_baixada_em){
@@ -3518,7 +3524,14 @@ async function biparRetornoEvento(eventoId,materialSelecionadoId=null){
   }
   if(rastreio)cz185GravarRetorno(eventoId,codigo);
   if(campo)campo.value='';
-  await abrirRetornoEvento(eventoId);
+  if(materialSelecionadoId){
+   // Preserva a janela central e atualiza a contagem na própria tela.
+   const atual=await db.from('evento_materiais').select('*').eq('id',material.id).single();
+   if(!atual.error&&ret226Cache){
+    ret226Cache.mats=ret226Cache.mats.map(m=>String(m.id)===String(material.id)?{...m,...atual.data}:m);
+   }
+   ret226Pintar(eventoId);
+  }else await abrirRetornoEvento(eventoId);
   return true;
  }catch(err){
   if(msg){msg.style.color='#ffb0b0';msg.textContent='Não foi possível registrar o retorno: '+(err?.message||err)}
@@ -5942,7 +5955,7 @@ function cz156OcultarEtiquetas(){
 new MutationObserver(()=>{clearTimeout(window.cz156t);window.cz156t=setTimeout(cz156OcultarEtiquetas,100)}).observe(document.documentElement,{subtree:true,childList:true});
 document.addEventListener('DOMContentLoaded',cz156OcultarEtiquetas);
 
-/* ===== CZ V228 — RETORNO DE CONSUMÍVEIS CONTRATADOS E EXTRAS POR BIPAGEM ===== */
+/* ===== CZ V229 — RETORNO COM CÓDIGOS CONSISTENTES COM A SAÍDA ===== */
 const RET226_CONSUMO='cz226_consumo_',RET226_VENDIDO='cz226_extra_vendido_';
 let ret226Cache=null,ret226Selecionado=null,ret226Timer=null,ret226Lendo=false;
 function ret226Key(id,mid){return String(id)+':'+String(mid)}
@@ -6043,8 +6056,7 @@ async function ret226Bipar(id){
    // Em caso de erro, a mensagem permanece na janela; em caso de sucesso atualiza os números.
    const erro=document.getElementById('retMsg')?.textContent||'';
    if(!erro){
-    const r=await db.from('evento_materiais').select('*').eq('id',x.id).single();
-    if(!r.error&&ret226Cache){ret226Cache.mats=ret226Cache.mats.map(m=>String(m.id)===String(x.id)?{...m,...r.data}:m);ret226Pintar(id);ret226AtualizarModal(id)}
+    ret226Pintar(id);ret226AtualizarModal(id);
    }
   }
  }catch(err){const msg=document.getElementById('retMsg');if(msg)msg.textContent=err.message}
