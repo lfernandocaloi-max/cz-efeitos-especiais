@@ -3152,7 +3152,7 @@ async function renderEventos(){
 `;
   $('#novoEventoBtn').onclick=()=>renderOrcamentos();
 }
-function statusEventoLabel(s){return ({pendente:'📝 Evento pendente',aguardando_evento:'⏳ Aguardando evento',pronto:'✅ Evento pronto',aguardando_separacao:'⏳ Aguardando separação',separando:'📦 Separando',material_pronto:'✅ Material conferido',liberado:'🚚 Saída liberada',em_execucao:'🎆 Em execução',aguardando_retorno:'↩️ Aguardando retorno',finalizado:'🏁 Finalizado'})[s]||esc(s||'Aguardando separação')}
+function statusEventoLabel(s){return ({pendente:'📝 Evento pendente',em_preparacao:'📝 Em preparação',aguardando_evento:'⏳ Aguardando evento',pronto:'✅ Evento pronto',aguardando_separacao:'⏳ Aguardando separação',separando:'📦 Separando',material_pronto:'✅ Material conferido',liberado:'🚚 Saída liberada',em_execucao:'🎆 Em execução',aguardando_retorno:'↩️ Aguardando retorno',finalizado:'🏁 Finalizado'})[s]||esc(s||'Aguardando separação')}
 async function novoEventoManual(){
   const {data:cs}=await db.from('clientes').select('id,nome,telefone').order('nome');
   $('#content').innerHTML=`<div class="sectionhead"><div><h2>Novo evento</h2><div class="muted">Cadastro operacional. Os valores não aparecem neste módulo.</div></div><button class="btn secondary" onclick="renderEventos()">Voltar</button></div>
@@ -4845,11 +4845,31 @@ async function prep141Abrir(eventoId){
 function prep141Grupo(titulo,arr,linha,ajuda){
  return `<div class="card"><div class="sectionhead"><div><h3 style="margin:0">${titulo}</h3><div class="muted">${ajuda}</div></div></div>${arr.length?`<div class="tablewrap"><table><thead><tr><th>Descrição</th><th>Qtd.</th><th>Código</th><th>Observação</th></tr></thead><tbody>${arr.map(linha).join('')}</tbody></table></div>`:'<div class="empty">Nenhum material neste grupo.</div>'}</div>`;
 }
+/* V236 — conclusão real da preparação no Supabase.
+   Apenas eventos em_preparacao avançam para aguardando_separacao;
+   estados posteriores não são rebaixados ao salvar anotações. */
+async function cz236SalvarPreparacao(id,campos){
+ const {data:antes,error:leituraErro}=await db.from('eventos_operacionais')
+  .select('id,status,saida_baixada_em').eq('id',id).single();
+ if(leituraErro)throw leituraErro;
+ if(antes.saida_baixada_em)throw new Error('Este evento já teve saída registrada. A preparação não pode ser reaberta por este botão.');
+ const status=String(antes.status||'');
+ const permitidos=['em_preparacao','pendente','aguardando_separacao','aguardando_evento','pronto','separando','material_pronto'];
+ if(!permitidos.includes(status))throw new Error('O evento está no status '+status+' e não pode ter a preparação alterada por esta tela.');
+ const payload={...campos,atualizado_em:new Date().toISOString()};
+ if(status==='em_preparacao'||status==='pendente')payload.status='aguardando_separacao';
+ const {data:salvo,error:erro}=await db.from('eventos_operacionais')
+  .update(payload).eq('id',id).eq('status',status).is('saida_baixada_em',null)
+  .select('id,status').maybeSingle();
+ if(erro)throw erro;
+ if(!salvo)throw new Error('O banco não confirmou a preparação. Atualize a página e verifique se outro usuário alterou o evento.');
+ if(payload.status&&salvo.status!==payload.status)throw new Error('O status de preparação não foi atualizado no Supabase.');
+ return salvo;
+}
 async function prep141Salvar(id){
  try{
   const obs=$('#prep141Obs')?.value||'';
-  const {error}=await db.from('eventos_operacionais').update({observacao:obs,atualizado_em:new Date().toISOString()}).eq('id',id);
-  if(error)throw error;
+  await cz236SalvarPreparacao(id,{observacao:obs});
   await czAlert('Preparação salva. Somente ativos e equipamentos ficam reservados automaticamente.','Evento');
   renderSairEventoV221();
  }catch(e){czAlert('Não foi possível salvar: '+e.message,'Evento')}
@@ -5142,7 +5162,7 @@ async function sair142DarSaida(id){
   if(etapa.saida_baixada_em)throw new Error('Saída já registrada no Supabase. Não é permitido baixar duas vezes.');
   if(etapa.status!=='material_pronto'){
    if(!['separando','aguardando_evento','pronto','aguardando_separacao'].includes(etapa.status))
-    throw new Error('O evento está no status '+etapa.status+'. Conclua a preparação antes de liberar a saída.');
+    throw new Error('O evento está no status '+etapa.status+'. Abra Preparação, clique em Salvar preparação e confirme que o status mudou para Aguardando separação antes de liberar a saída.');
    const {error:estadoErro}=await db.from('eventos_operacionais')
      .update({status:'material_pronto',relatorio_impresso_em:null,atualizado_em:new Date().toISOString()})
      .eq('id',id).eq('status',etapa.status);
@@ -5332,8 +5352,8 @@ async function prep141Abrir(eventoId){
 async function prep145Salvar(id){
  const msg=$('#prep145Msg');if(msg)msg.textContent='Salvando...';
  prep217Guardar(id);
- const {error}=await db.from('eventos_operacionais').update({anotacao_tecnica:$('#prep145Anotacao')?.value.trim()||null,atualizado_em:new Date().toISOString()}).eq('id',id);
- if(error){if(msg)msg.textContent='Erro ao salvar: '+error.message;return}
+ try{await cz236SalvarPreparacao(id,{anotacao_tecnica:$('#prep145Anotacao')?.value.trim()||null})}
+ catch(error){if(msg)msg.textContent='Erro ao salvar: '+error.message;return}
  await czAlert('Preparação salva. Evento disponível na Saída.','Evento');renderSairEventoV221();
 }
 /* V217 — informações operacionais adicionais mantidas neste navegador (sem alteração SQL). */
