@@ -95,7 +95,7 @@
 @media(max-width:1150px){.cz231MonitorTable th,.cz231MonitorTable td{padding:6px 2px!important;font-size:12px}.cz231MonitorTable th{font-size:12px}}
 </style></head><body>
 <section id="login" class="login"><div class="loginbox"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><h3>Acesso ao sistema</h3><div class="field"><label>E-mail</label><input id="email" type="email"></div><div class="field"><label>Senha</label><input id="password" type="password"></div><button id="loginBtn" class="btn primary full" style="margin-top:18px">ENTRAR</button><button type="button" class="btn secondary full" style="margin-top:8px" onclick="recuperarSenha()">Esqueci minha senha</button><div id="loginMsg" class="msg"></div></div></section>
-<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><div class="muted" style="font-size:12px">Sistema de gestão CZ · V221</div></div><div><span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
+<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><div class="muted" style="font-size:12px">Sistema de gestão CZ · Operacional novo</div></div><div><span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
 <div id="clientModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="modalTitle">Novo cliente</h2><button class="btn secondary" onclick="closeClient()">Fechar</button></div>
   <input id="clientId" type="hidden"><div class="muted" id="clientOpenedAt" style="font-size:13px">Data de abertura: será definida ao salvar</div>
   <div class="row"><div class="field"><label>Nome / Razão social *</label><input id="clientName" autocomplete="name"></div><div class="field"><label>Telefone *</label><input id="clientPhone" type="tel" inputmode="tel" autocomplete="tel"></div></div>
@@ -5221,7 +5221,7 @@ async function sair142Imprimir(id){
  if(er.error)throw er.error;
  const e=er.data,m=mr||[],st=sair142State(id),c=sair220Contagens(m,st),extras=sair234Extras(m),normais=sair234Contratados(m);
  const linhas=itens=>itens.map(x=>`<tr><td>${coEsc(sair222Nome(x))}</td><td>${sair220Ativo(x)?'Ativo':'Consumo'}</td><td>${coEsc(sair234CodigosLidos(x,st))}</td><td>${sair220Qtd(x)}</td><td>${Number(c[x.id]||0)}</td></tr>`).join('');
- w.document.write(`<html><head><meta charset="utf-8"><title>Conferência CZ</title><style>body{font-family:Arial;padding:25px;color:#222}h1{font-size:21px}h2{font-size:16px;margin-top:24px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:7px;text-align:left}th{background:#eee}</style></head><body><h1>RELATÓRIO DE CONFERÊNCIA / SAÍDA</h1><p><b>Evento:</b> ${coEsc(e?.nome_evento||'')}<br><b>Cliente:</b> ${coEsc(e?.cliente_nome||'')}<br><b>Responsável:</b> ${coEsc(st.responsavel||'')}<br><b>Data/hora:</b> ${new Date().toLocaleString('pt-BR')}</p><h2>Materiais contratados</h2><table><thead><tr><th>Produto</th><th>Tipo</th><th>Código bipado</th><th>Quantidade</th><th>Conferido</th></tr></thead><tbody>${linhas(normais)}</tbody></table><h2>Materiais extras</h2><table><thead><tr><th>Produto</th><th>Tipo</th><th>Código bipado</th><th>Quantidade</th><th>Conferido</th></tr></thead><tbody>${extras.map(x=>`<tr><td>${coEsc(sair222Nome(x))}</td><td>${sair220Ativo(x)?'Ativo':'Consumo'}</td><td>${coEsc(sair234CodigosLidos(x,st))}</td><td>${sair220Qtd(x)}</td><td>${Number(c[x.id]||0)}</td></tr>`).join('')}</tbody></table>${st.motivo_pendencia?`<p><b>Divergência:</b> ${coEsc(st.motivo_pendencia)}</p>`:''}<script>window.onload=()=>window.print()<\/script></body></html>`);
+ w.document.write(`<html><head><meta charset="utf-8"><title>Conferência CZ</title><style>body{font-family:Arial;padding:25px;color:#222}h1{font-size:21px}h2{font-size:16px;margin-top:24px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:7px;text-align:left}th{background:#eee}</style></head><body><h1>RELATÓRIO DE CONFERÊNCIA / SAÍDA</h1><p><b>Evento:</b> ${coEsc(e?.nome_evento||'')}<br><b>Cliente:</b> ${coEsc(e?.cliente_nome||'')}<br><b>Responsável:</b> ${coEsc(st.responsavel||'')}<br><b>Data/hora:</b> ${new Date().toLocaleString('pt-BR')}</p><h2>Materiais contratados</h2><table><thead><tr><th>Produto</th><th>Tipo</th><th>Código bipado</th><th>Quantidade</th><th>Conferido</th></tr></thead><tbody>${linhas(normais)}</tbody></table><h2>Materiais extras</h2><table><thead><tr><th>Produto</th><th>Tipo</th><th>Código bipado</th><th>Quantidade</th><th>Conferido</th></tr></thead><tbody>${extras.map(x=>`<tr><td>${coEsc(sair222Nome(x))}</td><td>${sair220Ativo(x)?'Ativo':'Consumo'}</td><td>${coEsc(sair234CodigosLidos(x,st))}</td><td>${sair220Qtd(x)}</td><td>${Number(c[x.id]||0)}</td></tr>`).join('')}</tbody></table><h2>RELATÓRIO DE UTILIZAÇÃO NO EVENTO — PREENCHIMENTO DA EQUIPE</h2><p>Indique o que foi utilizado e o que ficou por conta da CZ. A devolução física será conferida na chegada.</p><table><thead><tr><th>Material extra</th><th>Levado</th><th>Cliente (cobrar)</th><th>Por conta da CZ</th><th>Retorno</th></tr></thead><tbody>${extras.map(x=>`<tr><td>${coEsc(sair222Nome(x))}</td><td>${Number(c[x.id]||0)}</td><td>________</td><td>________</td><td>________</td></tr>`).join('')}</tbody></table><p style="margin-top:20px"><b>Responsável pela utilização:</b> __________________________________ &nbsp; <b>Data:</b> ____/____/______</p>${st.motivo_pendencia?`<p><b>Divergência:</b> ${coEsc(st.motivo_pendencia)}</p>`:''}<script>window.onload=()=>window.print()<\/script></body></html>`);
  w.document.close();return true;
  }catch(err){w.document.body.textContent='Erro ao preparar relatório: '+err.message;return false}
 }
@@ -6321,7 +6321,7 @@ async function cz231Etapa(id,acao){
   if(r.data?.origem_orcamento_id&&typeof cz150AbrirContrato==='function')return cz150AbrirContrato(r.data.origem_orcamento_id);
   return renderModule(3);
  }
- if(acao==='preparacao')return prep145Abrir(id);
+ if(acao==='preparacao')return prep141Abrir(id);
  if(acao==='saida')return sair142Abrir(id);
  if(acao==='retorno')return ret226Abrir(id);
 }
@@ -6406,5 +6406,175 @@ renderRelatorios=async function(){await cz231RenderRelatoriosOriginal();const el
 // Ajustes visuais somente na página de criação de orçamento.
 const cz231RenderOrcOriginal=renderOrcamentos;
 renderOrcamentos=async function(){const r=await cz231RenderOrcOriginal.apply(this,arguments);const c=document.getElementById('orcProdutosLista');if(c){document.querySelectorAll('#content h3').forEach(h=>{h.textContent=h.textContent.replace(/^(\s*[^\w\s]?\s*)\d+\.\s*/, '$1');h.style.fontSize='18px';h.style.color='#fff';if(h.textContent.trim().startsWith('📋')){h.style.background='#e96513';h.style.display='table';h.style.padding='6px 10px';h.style.borderRadius='6px'}})}return r};
+
+
+/* ===== CZ NOVO FLUXO OPERACIONAL — BIPAGEM DIRETA NA TABELA =====
+   A interface antiga de seleção/modal foi substituída na operação.
+   As RPCs oficiais de saída e retorno permanecem preservadas.
+*/
+const czNovoSairAbrirOriginal=sair142Abrir;
+const czNovoSairBiparOriginal=sair142Bipar;
+let czNovoScannerOcupado=false;
+function czNovoScannerHTML(tipo){
+ const saida=tipo==='saida',id=saida?'sair142Cod':'scanRetorno';
+ return `<div class="card" style="margin:0 0 15px;border:2px solid #ff641f;background:#182430">
+  <label for="${id}" style="display:block;font-size:16px;font-weight:900;margin-bottom:8px">📷 BIPAGEM DIRETA — ${saida?'SAÍDA':'RETORNO'}</label>
+  <input id="${id}" type="text" autocomplete="off" inputmode="none" placeholder="Bipe o código e pressione Enter" style="width:100%;min-height:56px;padding:12px;background:#0b1118;color:#fff;border:1px solid #ff641f;border-radius:9px;font-size:20px;font-weight:800">
+  <div id="${saida?'sair220Aviso':'retMsg'}" role="status" aria-live="polite" style="min-height:23px;margin-top:8px;font-size:14px;color:#a7e7bc">O sistema encontra o produto automaticamente. Não é necessário selecionar a linha.</div>
+ </div>`;
+}
+function czNovoOcultarSelecao(tabela){
+ if(!tabela)return;
+ const head=tabela.querySelector('thead tr th:first-child');if(head)head.textContent='';
+ tabela.querySelectorAll('tbody tr').forEach(tr=>{
+  tr.removeAttribute('onclick');tr.style.cursor='default';
+  const cel=tr.querySelector('td:first-child');if(cel)cel.innerHTML='<span style="color:#8496a6">—</span>';
+ });
+}
+sair142Abrir=async function(id){
+ await czNovoSairAbrirOriginal(id);
+ const card=document.querySelector('#sair222Tabela')?.closest('.card');if(!card)return;
+ const antigo=card.querySelector('#sair142Cod');if(antigo)antigo.remove();
+ const topo=card.querySelector('.muted');if(topo&&topo.textContent.includes('Selecione o quadrado'))topo.textContent='Bipe diretamente no campo abaixo. O sistema identifica o material e os códigos individuais dos ativos. Linhas concluídas ficam verdes.';
+ card.insertAdjacentHTML('afterbegin',czNovoScannerHTML('saida'));
+ czNovoOcultarSelecao(document.getElementById('sair222Tabela'));
+ czNovoOcultarSelecao(document.getElementById('sair234TabelaExtras'));
+ const inp=document.getElementById('sair142Cod');
+ if(inp){inp.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key==='Tab'){ev.preventDefault();czNovoBiparSaida(id)}});inp.focus()}
+}
+async function czNovoBiparSaida(id){
+ if(czNovoScannerOcupado)return;
+ const inp=document.getElementById('sair142Cod'),cod=normalizarCodigoEvento(inp?.value||'');if(!cod)return;
+ czNovoScannerOcupado=true;
+ try{
+  const mats=await sair221Materiais(id),st=sair142State(id),c=sair220Contagens(mats,st);
+  const candidatos=mats.filter(x=>(x._codigos||[]).some(v=>normalizarCodigoEvento(v)===cod));
+  if(!candidatos.length)throw new Error('Código não encontrado nos materiais deste evento. Confira o cadastro.');
+  const aptos=candidatos.filter(x=>Number(c[x.id]||0)<sair220Qtd(x));
+  if(!aptos.length)throw new Error('Esse produto já está totalmente conferido.');
+  if(aptos.length>1)throw new Error('O código corresponde a mais de uma linha. Diferencie as linhas do evento antes de bipar.');
+  sair222Selecionado[String(id)]=String(aptos[0].id);
+  await czNovoSairBiparOriginal(id);
+ }catch(e){const el=document.getElementById('sair220Aviso');if(el){el.style.color='#ff9d9d';el.textContent=e.message}}
+ finally{czNovoScannerOcupado=false;const atual=document.getElementById('sair142Cod');if(atual){atual.value='';atual.focus()}}
+}
+const czNovoRetornoAbrirOriginal=ret226Abrir;
+ret226Abrir=async function(id){
+ await czNovoRetornoAbrirOriginal(id);
+ const card=document.querySelector('#ret226Tabela')?.closest('.card');if(!card)return;
+ const nota=card.querySelector('.muted');if(nota&&nota.textContent.includes('Selecione o quadrado'))nota.textContent='Bipe diretamente abaixo: cada código é identificado automaticamente. A conferência registra o que realmente retornou.';
+ card.insertAdjacentHTML('afterbegin',czNovoScannerHTML('retorno'));
+ czNovoOcultarSelecao(document.getElementById('ret226Tabela'));
+ czNovoOcultarSelecao(document.getElementById('ret237TabelaExtras'));
+ const inp=document.getElementById('scanRetorno');if(inp){inp.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key==='Tab'){ev.preventDefault();czNovoBiparRetorno(id)}});inp.focus()}
+ czNovoAdicionarClassificacao(id);
+}
+let czNovoRetornoLendo=false;
+async function czNovoBiparRetorno(id){
+ if(czNovoRetornoLendo)return;
+ const inp=document.getElementById('scanRetorno'),cod=normalizarCodigoEvento(inp?.value||'');if(!cod)return;
+ czNovoRetornoLendo=true;
+ try{
+  const c=ret226Cache;if(!c||String(c.e.id)!==String(id))throw new Error('Atualize a página do retorno.');
+  const matches=c.mats.filter(x=>(x._codigos||[]).some(v=>normalizarCodigoEvento(v)===cod)&&ret226Devolvido(x,c.e)<ret226Esperado(x,c.e));
+  if(!matches.length)throw new Error('Código não encontrado entre os itens pendentes da saída deste evento.');
+  if(matches.length>1)throw new Error('Código repetido em mais de uma linha pendente. Faça a conferência separada após corrigir o cadastro.');
+  ret226Selecionado=String(matches[0].id);
+  const ok=await biparRetornoEvento(id,matches[0].id);
+  if(ok){ret226Pintar(id);czNovoAtualizarClassificacao(id);const el=document.getElementById('retMsg');if(el){el.style.color='#8de8a8';el.textContent='✓ Devolução registrada: '+sair222Nome(matches[0]);}}
+ }catch(e){const el=document.getElementById('retMsg');if(el){el.style.color='#ff9d9d';el.textContent=e.message}}
+ finally{czNovoRetornoLendo=false;const novo=document.getElementById('scanRetorno');if(novo){novo.value='';novo.focus()}}
+}
+/* Relatório de utilização: classificação separada do que foi usado para cliente e CZ.
+   Rascunho local; o faturamento continua sujeito à confirmação no PDV. */
+const CZ_NOVO_CAMPO_KEY='cz_campo_utilizacao_v1_';
+function czNovoCampo(id){try{return JSON.parse(localStorage.getItem(CZ_NOVO_CAMPO_KEY+id)||'{}')}catch(_){return {}}}
+function czNovoCampoSalvar(id,mid,tipo,valor){
+ const c=ret226Cache,x=c?.mats.find(x=>String(x.id)===String(mid));if(!x)return;
+ const n=Number(valor),max=Math.max(0,ret226Esperado(x,c.e)-ret226Devolvido(x,c.e));
+ if(!Number.isInteger(n)||n<0||n>max){czAlert('Informe uma quantidade inteira entre 0 e '+max+'.');czNovoAtualizarClassificacao(id);return}
+ const data=czNovoCampo(id),linha={...(data[mid]||{cliente:0,cz:0})};linha[tipo]=n;
+ if(linha.cliente+linha.cz>max){czAlert('A soma de Cliente e CZ não pode ultrapassar o material não devolvido ('+max+').');czNovoAtualizarClassificacao(id);return}
+ data[mid]=linha;localStorage.setItem(CZ_NOVO_CAMPO_KEY+id,JSON.stringify(data));czNovoAtualizarClassificacao(id);
+}
+function czNovoAtualizarClassificacao(id){
+ const c=ret226Cache;if(!c||String(c.e.id)!==String(id))return;
+ const data=czNovoCampo(id);
+ c.mats.filter(x=>ret226Extra(x)&&!ret226Ativo(x)).forEach(x=>{
+  const tr=document.querySelector('#ret237TabelaExtras tbody tr[data-id="'+x.id+'"]');if(!tr)return;
+  const max=Math.max(0,ret226Esperado(x,c.e)-ret226Devolvido(x,c.e));
+  const linha=data[x.id]||{cliente:0,cz:0};
+  for(const tipo of ['cliente','cz']){const inp=tr.querySelector('[data-cz-tipo="'+tipo+'"]');if(inp){inp.max=max;if(document.activeElement!==inp)inp.value=linha[tipo]||0}}
+  const saldo=tr.querySelector('.czNovoDiferenca');if(saldo){const diff=max-(Number(linha.cliente)||0)-(Number(linha.cz)||0);saldo.textContent=diff===0?'✓ Fechado':diff+' a classificar';saldo.style.color=diff===0?'#80e7a8':'#ffbc7d'}
+ });
+}
+function czNovoAdicionarClassificacao(id){
+ const table=document.getElementById('ret237TabelaExtras');if(!table)return;
+ const cab=table.querySelector('thead tr');if(!cab)return;
+ const antigo=cab.querySelector('th:last-child');if(antigo&&antigo.textContent.includes('Qtd. utilizada'))antigo.textContent='Utilizado (total)';
+ table.querySelectorAll('input.ret237Uso').forEach(inp=>{inp.readOnly=true;inp.title='Total utilizado calculado a partir da saída e devolução; classifique nas colunas Cliente e CZ.'});
+ cab.insertAdjacentHTML('beforeend','<th>Cliente (cobrar)</th><th>Por conta CZ</th><th>Diferença</th>');
+ const data=czNovoCampo(id);
+ table.querySelectorAll('tbody tr[data-id]').forEach(tr=>{
+  const mid=tr.dataset.id,x=ret226Cache?.mats.find(v=>String(v.id)===mid);if(!x)return;
+  const editavel=ret226Cache.e.status!=='finalizado'&&!ret226Ativo(x);
+  const v=data[mid]||{cliente:0,cz:0};
+  tr.insertAdjacentHTML('beforeend',ret226Ativo(x)?'<td>—</td><td>—</td><td>—</td>':
+   `<td><input type="number" min="0" step="1" style="width:75px" data-cz-tipo="cliente" value="${v.cliente||0}" ${editavel?'':'disabled'} onchange="czNovoCampoSalvar('${id}','${mid}','cliente',this.value)"></td><td><input type="number" min="0" step="1" style="width:75px" data-cz-tipo="cz" value="${v.cz||0}" ${editavel?'':'disabled'} onchange="czNovoCampoSalvar('${id}','${mid}','cz',this.value)"></td><td class="czNovoDiferenca"></td>`);
+ });
+ const info=table.closest('.card');
+ if(info)info.insertAdjacentHTML('beforeend','<p class="muted">Cliente: encaminhar para cobrança no PDV. CZ: material consumido por nossa conta, sem cobrança. A quantidade devolvida é conferida pela bipagem; a diferença deve ser resolvida antes de concluir.</p>');
+ czNovoAtualizarClassificacao(id);
+}
+
+const czNovoPintarOriginal=ret226Pintar;
+ret226Pintar=function(id){const r=czNovoPintarOriginal(id);czNovoAtualizarClassificacao(id);return r};
+const czNovoAbrirPDVOriginal=ret226AbrirPDV;
+ret226AbrirPDV=async function(id){
+ const c=ret226Cache;if(!c||String(c.e.id)!==String(id))return;
+ const data=czNovoCampo(id);
+ // The legacy PDV sends all extras as customer charges; do not allow it to charge CZ items.
+ const extras=c.mats.filter(x=>ret226Extra(x)&&!ret226Ativo(x));
+ const classificados=extras.every(x=>{const n=Math.max(0,ret226Esperado(x,c.e)-ret226Devolvido(x,c.e));const l=data[x.id]||{cliente:0,cz:0};return (Number(l.cliente)||0)+(Number(l.cz)||0)===n});
+ if(!classificados)return czAlert('Classifique os materiais extras entre Cliente e CZ antes de abrir o PDV.','Conferência de campo');
+ const comCZ=extras.some(x=>(Number(data[x.id]?.cz)||0)>0);
+ if(comCZ)return czAlert('Há materiais por conta da CZ. O PDV antigo ainda não separa esses valores com segurança. A cobrança automática foi bloqueada para evitar cobrar a CZ do cliente. É necessária a integração de classificação no Supabase/PDV.','Proteção de cobrança');
+ return czNovoAbrirPDVOriginal(id);
+};
+const czNovoConcluirOriginal=ret226Concluir;
+ret226Concluir=async function(id){
+ const c=ret226Cache;if(!c||String(c.e.id)!==String(id))return;
+ const data=czNovoCampo(id);
+ const pend=c.mats.filter(x=>ret226Extra(x)&&!ret226Ativo(x)).filter(x=>{
+  const n=Math.max(0,ret226Esperado(x,c.e)-ret226Devolvido(x,c.e));const l=data[x.id]||{cliente:0,cz:0};return Number(l.cliente||0)+Number(l.cz||0)!==n;
+ });
+ if(pend.length)return czAlert('Classifique a quantidade usada entre Cliente e CZ antes de concluir: '+pend.map(x=>sair222Nome(x)).join(', '),'Retorno');
+ const cz=c.mats.some(x=>ret226Extra(x)&&!ret226Ativo(x)&&Number(data[x.id]?.cz||0)>0);
+ if(cz)return czAlert('Há material utilizado por conta da CZ. Para não lançar cobrança incorreta, a conclusão está protegida até integrar a classificação ao Supabase. As bipagens permanecem registradas.','Conferência de retorno');
+ return czNovoConcluirOriginal(id);
+};
+
+
+/* Preparação em dois momentos: salvar rascunho não libera saída. */
+const czNovoPrepAbrirOriginal=prep141Abrir;
+prep141Abrir=async function(id){
+ await czNovoPrepAbrirOriginal(id);
+ const a=document.querySelector('#content .actions');if(!a)return;
+ const bot=a.querySelector('button[onclick^="prep145Salvar"]');
+ if(bot){bot.textContent='✓ Concluir preparação';bot.classList.add('primary');
+  bot.insertAdjacentHTML('beforebegin',`<button type="button" class="btn secondary" onclick="czNovoSalvarRascunho('${id}')">Salvar rascunho</button>`)}
+ const h=document.querySelector('#content h2');if(h)h.textContent='Preparação — '+h.textContent;
+}
+async function czNovoSalvarRascunho(id){
+ const anotacao=document.getElementById('prep145Anotacao')?.value.trim()||null;
+ try{
+  const {data:ev,error:e}=await db.from('eventos_operacionais').select('status,saida_baixada_em').eq('id',id).single();if(e)throw e;
+  if(ev.saida_baixada_em)throw new Error('A saída já foi confirmada. Não é possível alterar o planejamento por esta tela.');
+  const {data,error}=await db.from('eventos_operacionais').update({anotacao_tecnica:anotacao,atualizado_em:new Date().toISOString()}).eq('id',id).eq('status',ev.status).is('saida_baixada_em',null).select('id').maybeSingle();
+  if(error||!data)throw error||new Error('Outro usuário alterou o evento. Atualize a preparação.');
+  prep217Guardar(id);
+  await czAlert('Rascunho salvo. A saída ainda não foi liberada.','Preparação');
+ }catch(err){await czAlert('Não foi possível salvar o rascunho: '+err.message,'Preparação')}
+}
 
 </script></body></html>
