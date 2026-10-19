@@ -3543,8 +3543,19 @@ async function biparRetornoEvento(eventoId,materialSelecionadoId=null){
   if(devolvido>=esperado)throw new Error('A devolução deste item já está completa.');
   if(e.saida_baixada_em){
    // O banco possui RPC antiga por código de material; não usa o código de cadastro como entrada de bipagem.
-   const codigoMaterial=String(material.codigo|| (material.tipo==='produto'?codigo:'')).trim();
-   if(!codigoMaterial)throw new Error('Material sem código de referência no evento. Não foi possível registrar a devolução.');
+   // V237: a RPC legada identifica a LINHA do evento por evento_materiais.codigo.
+   // Alguns extras/ativos antigos foram gravados sem esse campo. Geramos uma
+   // referência estável da linha, sem substituir o código de barras lido.
+   let codigoMaterial=String(material.codigo||'').trim();
+   if(!codigoMaterial){
+    codigoMaterial='CZRET-'+String(material.id).replace(/[^a-zA-Z0-9-]/g,'');
+    const {data:gravado,error:refErro}=await db.from('evento_materiais')
+     .update({codigo:codigoMaterial}).eq('id',material.id).eq('evento_id',eventoId)
+     .select('id,codigo').single();
+    if(refErro||!gravado||gravado.codigo!==codigoMaterial)
+     throw new Error('Não foi possível criar a referência deste material no Supabase: '+(refErro?.message||'confirmação ausente'));
+    material.codigo=codigoMaterial;
+   }
    const {error}=await db.rpc('cz_confirmar_retorno_evento',{p_evento_id:eventoId,p_codigo:codigoMaterial});
    if(error)throw error;
    // Reconsulta para não registrar o rastreio como devolvido se o RPC não atualizou a linha correta.
@@ -5074,8 +5085,8 @@ async function sair142Abrir(eventoId){
   <h3 style="margin:15px 0 8px">Materiais contratados</h3>
   <div class="tablewrap"><table id="sair222Tabela"><thead><tr><th>Sel.</th><th>Produto</th><th>Quantidade</th><th>Conferência</th><th>Origem</th><th>Código</th><th>Tipo</th></tr></thead><tbody>${sair234Linhas(eventoId,sair234Contratados(mats),c,st)}</tbody></table></div>
   <h3 style="margin:24px 0 8px">Materiais extras — bipagem separada</h3>
-  <div class="muted" style="margin-bottom:8px">Selecione cada extra para bipar. Informe a quantidade utilizada no relatório; o valor não gera baixa adicional nesta tela.</div>
-  <div class="tablewrap"><table id="sair234TabelaExtras"><thead><tr><th>Sel.</th><th>Produto</th><th>Quantidade</th><th>Conferência</th><th>Origem</th><th>Código</th><th>Tipo</th><th>Qtd. utilizada</th></tr></thead><tbody>${sair234Extras(mats).map(x=>{const q=sair220Qtd(x),n=Math.min(q,Number(c[x.id]||0)),f=q-n,pronto=f===0,usados=sair234Usados(eventoId);return `<tr class="sair223Linha ${pronto?'sair223Concluida':''}" data-material="${coEsc(String(x.id))}" onclick="sair222Selecionar('${eventoId}','${x.id}')"><td><input type="checkbox" ${pronto?'checked disabled':''} onclick="event.stopPropagation();sair222Selecionar('${eventoId}','${x.id}')"></td><td><b>${coEsc(sair222Nome(x))}</b></td><td>${q}</td><td>${pronto?'✓ Conferido':n+'/'+q+' • Faltam '+f}</td><td>Extra</td><td>${coEsc(sair234CodigosLidos(x,st))}</td><td>${sair220Ativo(x)?'Ativo':'Consumo'}</td><td><input type="number" min="0" max="${n}" step="1" value="${Number(usados[x.id]||0)}" aria-label="Quantidade utilizada de ${coEsc(sair222Nome(x))}" style="width:75px" onclick="event.stopPropagation()" onchange="event.stopPropagation();sair234DefinirUso('${eventoId}','${x.id}',this.value)"></td></tr>`}).join('')}</tbody></table></div>
+  <div class="muted" style="margin-bottom:8px">Selecione cada extra para bipar. A quantidade utilizada será informada somente no Retorno de Evento.</div>
+  <div class="tablewrap"><table id="sair234TabelaExtras"><thead><tr><th>Sel.</th><th>Produto</th><th>Quantidade</th><th>Conferência</th><th>Origem</th><th>Código</th><th>Tipo</th></tr></thead><tbody>${sair234Extras(mats).map(x=>{const q=sair220Qtd(x),n=Math.min(q,Number(c[x.id]||0)),f=q-n,pronto=f===0;return `<tr class="sair223Linha ${pronto?'sair223Concluida':''}" data-material="${coEsc(String(x.id))}" onclick="sair222Selecionar('${eventoId}','${x.id}')"><td><input type="checkbox" ${pronto?'checked disabled':''} onclick="event.stopPropagation();sair222Selecionar('${eventoId}','${x.id}')"></td><td><b>${coEsc(sair222Nome(x))}</b></td><td>${q}</td><td>${pronto?'✓ Conferido':n+'/'+q+' • Faltam '+f}</td><td>Extra</td><td>${coEsc(sair234CodigosLidos(x,st))}</td><td>${sair220Ativo(x)?'Ativo':'Consumo'}</td></tr>`}).join('')}</tbody></table></div>
   <div style="margin-top:14px"><b style="font-size:17px">Itens conferidos: ${mats.filter(x=>Number(c[x.id]||0)>=sair220Qtd(x)).length} de ${mats.length} • Unidades bipadas: ${conf}/${esperado} — ${pct}%</b><div style="height:10px;background:#26313b;border-radius:10px;margin-top:6px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${pct===100?'#45b879':'#d7a73b'}"></div></div></div></div>
   <div class="actions"><button class="btn primary" onclick="sair223AbrirConclusao('${eventoId}')">Concluir bipagem</button></div>`;
   sair223AtualizarModal(eventoId);
@@ -5210,8 +5221,7 @@ async function sair142Imprimir(id){
  if(er.error)throw er.error;
  const e=er.data,m=mr||[],st=sair142State(id),c=sair220Contagens(m,st),extras=sair234Extras(m),normais=sair234Contratados(m);
  const linhas=itens=>itens.map(x=>`<tr><td>${coEsc(sair222Nome(x))}</td><td>${sair220Ativo(x)?'Ativo':'Consumo'}</td><td>${coEsc(sair234CodigosLidos(x,st))}</td><td>${sair220Qtd(x)}</td><td>${Number(c[x.id]||0)}</td></tr>`).join('');
- const usados=sair234Usados(id);
- w.document.write(`<html><head><meta charset="utf-8"><title>Conferência CZ</title><style>body{font-family:Arial;padding:25px;color:#222}h1{font-size:21px}h2{font-size:16px;margin-top:24px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:7px;text-align:left}th{background:#eee}</style></head><body><h1>RELATÓRIO DE CONFERÊNCIA / SAÍDA</h1><p><b>Evento:</b> ${coEsc(e?.nome_evento||'')}<br><b>Cliente:</b> ${coEsc(e?.cliente_nome||'')}<br><b>Responsável:</b> ${coEsc(st.responsavel||'')}<br><b>Data/hora:</b> ${new Date().toLocaleString('pt-BR')}</p><h2>Materiais contratados</h2><table><thead><tr><th>Produto</th><th>Tipo</th><th>Código bipado</th><th>Quantidade</th><th>Conferido</th></tr></thead><tbody>${linhas(normais)}</tbody></table><h2>Materiais extras</h2><table><thead><tr><th>Produto</th><th>Tipo</th><th>Código bipado</th><th>Quantidade</th><th>Conferido</th><th>Quantidade utilizada</th></tr></thead><tbody>${extras.map(x=>`<tr><td>${coEsc(sair222Nome(x))}</td><td>${sair220Ativo(x)?'Ativo':'Consumo'}</td><td>${coEsc(sair234CodigosLidos(x,st))}</td><td>${sair220Qtd(x)}</td><td>${Number(c[x.id]||0)}</td><td>${Number(usados[x.id]||0)}</td></tr>`).join('')}</tbody></table><p style="font-size:11px">Quantidade utilizada dos extras: registro informativo nesta conferência, sem segunda baixa automática.</p>${st.motivo_pendencia?`<p><b>Divergência:</b> ${coEsc(st.motivo_pendencia)}</p>`:''}<script>window.onload=()=>window.print()<\/script></body></html>`);
+ w.document.write(`<html><head><meta charset="utf-8"><title>Conferência CZ</title><style>body{font-family:Arial;padding:25px;color:#222}h1{font-size:21px}h2{font-size:16px;margin-top:24px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:7px;text-align:left}th{background:#eee}</style></head><body><h1>RELATÓRIO DE CONFERÊNCIA / SAÍDA</h1><p><b>Evento:</b> ${coEsc(e?.nome_evento||'')}<br><b>Cliente:</b> ${coEsc(e?.cliente_nome||'')}<br><b>Responsável:</b> ${coEsc(st.responsavel||'')}<br><b>Data/hora:</b> ${new Date().toLocaleString('pt-BR')}</p><h2>Materiais contratados</h2><table><thead><tr><th>Produto</th><th>Tipo</th><th>Código bipado</th><th>Quantidade</th><th>Conferido</th></tr></thead><tbody>${linhas(normais)}</tbody></table><h2>Materiais extras</h2><table><thead><tr><th>Produto</th><th>Tipo</th><th>Código bipado</th><th>Quantidade</th><th>Conferido</th></tr></thead><tbody>${extras.map(x=>`<tr><td>${coEsc(sair222Nome(x))}</td><td>${sair220Ativo(x)?'Ativo':'Consumo'}</td><td>${coEsc(sair234CodigosLidos(x,st))}</td><td>${sair220Qtd(x)}</td><td>${Number(c[x.id]||0)}</td></tr>`).join('')}</tbody></table>${st.motivo_pendencia?`<p><b>Divergência:</b> ${coEsc(st.motivo_pendencia)}</p>`:''}<script>window.onload=()=>window.print()<\/script></body></html>`);
  w.document.close();return true;
  }catch(err){w.document.body.textContent='Erro ao preparar relatório: '+err.message;return false}
 }
@@ -5333,7 +5343,7 @@ async function prep141Abrir(eventoId){
   </div>
 
   <div class="card"><div class="sectionhead"><div><h3 style="margin:0">3. Produto Extra</h3><div class="muted">Selecione produtos e informe a quantidade.</div></div><button class="btn secondary" onclick="prep192AdicionarMaterial('${eventoId}','extra')">+ Adicionar produto extra</button></div>
-   ${grupos.extra.length?`<div class="tablewrap"><table><thead><tr><th>Produto</th><th>Quantidade</th><th>Código</th><th>Qtd. utilizada</th><th>Ação</th></tr></thead><tbody>${grupos.extra.map(x=>`<tr><td>${coEsc(x.nome_item)}</td><td>${Number(x.quantidade_necessaria||0)}</td><td>${coEsc(x.codigo||"—")}</td><td><input data-prep217-extra="${x.id}" type="number" min="0" step="1" placeholder="Qtd." value="${coEsc(info217.extra?.[x.id]||'')}" style="width:95px" aria-label="Quantidade utilizada de ${coEsc(x.nome_item)}"></td><td><button class="btn secondary" onclick="prep192RemoverMaterial('${x.id}','${eventoId}','extra')">Remover</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Nenhum produto extra adicionado.</div>'}
+   ${grupos.extra.length?`<div class="tablewrap"><table><thead><tr><th>Produto</th><th>Quantidade</th><th>Código</th><th>Ação</th></tr></thead><tbody>${grupos.extra.map(x=>`<tr><td>${coEsc(x.nome_item)}</td><td>${Number(x.quantidade_necessaria||0)}</td><td>${coEsc(x.codigo||"—")}</td><td><button class="btn secondary" onclick="prep192RemoverMaterial('${x.id}','${eventoId}','extra')">Remover</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Nenhum produto extra adicionado.</div>'}
   </div>
 
   <div class="card"><div class="sectionhead"><div><h3 style="margin:0">4. Materiais de Montagem</h3><div class="muted">Ativos do orçamento aparecem automaticamente. Adicione outros ativos, se necessário.</div></div><button class="btn secondary" onclick="prep192AdicionarMaterial('${eventoId}','montagem')">+ Adicionar material de montagem</button></div>
@@ -5375,8 +5385,8 @@ async function prep217Imprimir(id){
   const e=er.data,m=mr.data||[],o=cz135Evento(id),local=prep217Local(id);
   const dado=(titulo,valor)=>`<div class="dado"><b>${prep217Escapar(titulo)}</b><span>${prep217Escapar(valor||'—')}</span></div>`;
   const data=v=>v?finDate(v):'—';
-  const linha=x=>`<tr><td>${prep217Escapar(x.nome_item)}</td><td>${prep217Escapar(x.origem==='extra'?'Extra':x.origem==='montagem'?'Montagem':x.tipo==='ativo'?'Ativo contratado':'Contratado')}</td><td>${Number(x.quantidade_necessaria||0)}</td><td>${prep217Escapar(x.codigo)}</td><td>${x.origem==='extra'?prep217Escapar(local.extra?.[x.id]||'—'):'—'}</td></tr>`;
-  const html=`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Projeto de execução — ${prep217Escapar(e.nome_evento)}</title><style>@page{size:A4;margin:13mm}*{box-sizing:border-box}body{font:11px Arial,sans-serif;color:#1d2939}h1{font-size:18px;margin:0 0 4px}h2{font-size:13px;margin:20px 0 8px;padding:7px;background:#e9edf2;border-left:4px solid #344054;break-after:avoid}.sub{color:#667085;margin-bottom:15px}.dados{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}.dado{border:1px solid #d0d5dd;border-radius:4px;padding:7px;break-inside:avoid}.dado b{display:block;font-size:9px;color:#475467;margin-bottom:3px}.dado span{font-size:11px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #bfc7d1;padding:7px;text-align:left;vertical-align:top;overflow-wrap:anywhere}th{background:#eef1f5}svg{width:100%;height:auto;max-height:380px;border:1px solid #d0d5dd;break-inside:avoid}.texto{white-space:pre-wrap;border:1px solid #d0d5dd;padding:10px;min-height:42px;break-inside:avoid}.rodape{font-size:9px;color:#667085;margin-top:22px}.folha{break-before:page;page-break-before:always}.folha h2{margin-top:0}.folha svg{max-height:680px}.folha .texto{min-height:180px}@media print{button{display:none}}</style></head><body><h1>CZ EFEITOS ESPECIAIS</h1><div class="sub">PROJETO DE EXECUÇÃO E RELATÓRIO TÉCNICO DO EVENTO</div><h2>1. Dados do evento</h2><div class="dados">${dado('Cliente',e.cliente_nome)}${dado('Responsável pelo evento',e.responsavel_evento)}${dado('Projeto / Evento',e.nome_evento)}${dado('Data do evento',data(e.data_evento))}${dado('Local do evento',e.local_evento)}${dado('Cidade do evento',e.cidade_evento)}${dado('Horário inicial',e.horario_evento)}${dado('Telefone do responsável',e.telefone_responsavel)}</div><h2>2. Dados técnicos</h2><div class="dados">${dado('Início da montagem',data(e.data_inicio_montagem))}${dado('Término da montagem',data(e.data_termino_montagem))}${dado('Horário de montagem',e.horario_montagem)}${dado('Técnico responsável',e.tecnico_responsavel)}</div><h2>3. Materiais do evento</h2><table><thead><tr><th>Produto / Equipamento</th><th>Grupo</th><th>Quantidade</th><th>Código / Rastreio</th><th>Qtd. utilizada extra</th></tr></thead><tbody>${m.map(linha).join('')||'<tr><td colspan="5">Nenhum material registrado</td></tr>'}</tbody></table><section class="folha"><h2>4. Projeto de execução</h2><svg viewBox="0 0 900 500" xmlns="http://www.w3.org/2000/svg">${projetoExecucaoMarkup(e.projeto_execucao)}</svg></section><section class="folha"><h2>5. Anotação técnica</h2><div class="texto">${prep217Escapar(e.anotacao_tecnica)}</div></section><section class="folha"><h2>6. Documentação</h2><table><thead><tr><th>Documento</th><th>Situação</th></tr></thead><tbody><tr><td>Alvará de Queima de Fogos</td><td>${prep217Escapar(o.docs?.alvara||'Pendente')}</td></tr><tr><td>Croqui Polícia Civil</td><td>${prep217Escapar(o.docs?.croqui||'Pendente')}</td></tr></tbody></table></section><section class="folha"><h2>7. Ocorrências de campo</h2><div class="texto">${prep217Escapar(local.ocorrencias)}</div></section><div class="rodape">Gerado em ${prep217Escapar(new Date().toLocaleString('pt-BR'))} — CZ Efeitos Especiais</div><script>window.onload=()=>{window.focus();window.print()}<\/script></body></html>`;
+  const linha=x=>`<tr><td>${prep217Escapar(x.nome_item)}</td><td>${prep217Escapar(x.origem==='extra'?'Extra':x.origem==='montagem'?'Montagem':x.tipo==='ativo'?'Ativo contratado':'Contratado')}</td><td>${Number(x.quantidade_necessaria||0)}</td><td>${prep217Escapar(x.codigo)}</td></tr>`;
+  const html=`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Projeto de execução — ${prep217Escapar(e.nome_evento)}</title><style>@page{size:A4;margin:13mm}*{box-sizing:border-box}body{font:11px Arial,sans-serif;color:#1d2939}h1{font-size:18px;margin:0 0 4px}h2{font-size:13px;margin:20px 0 8px;padding:7px;background:#e9edf2;border-left:4px solid #344054;break-after:avoid}.sub{color:#667085;margin-bottom:15px}.dados{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}.dado{border:1px solid #d0d5dd;border-radius:4px;padding:7px;break-inside:avoid}.dado b{display:block;font-size:9px;color:#475467;margin-bottom:3px}.dado span{font-size:11px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #bfc7d1;padding:7px;text-align:left;vertical-align:top;overflow-wrap:anywhere}th{background:#eef1f5}svg{width:100%;height:auto;max-height:380px;border:1px solid #d0d5dd;break-inside:avoid}.texto{white-space:pre-wrap;border:1px solid #d0d5dd;padding:10px;min-height:42px;break-inside:avoid}.rodape{font-size:9px;color:#667085;margin-top:22px}.folha{break-before:page;page-break-before:always}.folha h2{margin-top:0}.folha svg{max-height:680px}.folha .texto{min-height:180px}@media print{button{display:none}}</style></head><body><h1>CZ EFEITOS ESPECIAIS</h1><div class="sub">PROJETO DE EXECUÇÃO E RELATÓRIO TÉCNICO DO EVENTO</div><h2>1. Dados do evento</h2><div class="dados">${dado('Cliente',e.cliente_nome)}${dado('Responsável pelo evento',e.responsavel_evento)}${dado('Projeto / Evento',e.nome_evento)}${dado('Data do evento',data(e.data_evento))}${dado('Local do evento',e.local_evento)}${dado('Cidade do evento',e.cidade_evento)}${dado('Horário inicial',e.horario_evento)}${dado('Telefone do responsável',e.telefone_responsavel)}</div><h2>2. Dados técnicos</h2><div class="dados">${dado('Início da montagem',data(e.data_inicio_montagem))}${dado('Término da montagem',data(e.data_termino_montagem))}${dado('Horário de montagem',e.horario_montagem)}${dado('Técnico responsável',e.tecnico_responsavel)}</div><h2>3. Materiais do evento</h2><table><thead><tr><th>Produto / Equipamento</th><th>Grupo</th><th>Quantidade</th><th>Código / Rastreio</th></tr></thead><tbody>${m.map(linha).join('')||'<tr><td colspan="4">Nenhum material registrado</td></tr>'}</tbody></table><section class="folha"><h2>4. Projeto de execução</h2><svg viewBox="0 0 900 500" xmlns="http://www.w3.org/2000/svg">${projetoExecucaoMarkup(e.projeto_execucao)}</svg></section><section class="folha"><h2>5. Anotação técnica</h2><div class="texto">${prep217Escapar(e.anotacao_tecnica)}</div></section><section class="folha"><h2>6. Documentação</h2><table><thead><tr><th>Documento</th><th>Situação</th></tr></thead><tbody><tr><td>Alvará de Queima de Fogos</td><td>${prep217Escapar(o.docs?.alvara||'Pendente')}</td></tr><tr><td>Croqui Polícia Civil</td><td>${prep217Escapar(o.docs?.croqui||'Pendente')}</td></tr></tbody></table></section><section class="folha"><h2>7. Ocorrências de campo</h2><div class="texto">${prep217Escapar(local.ocorrencias)}</div></section><div class="rodape">Gerado em ${prep217Escapar(new Date().toLocaleString('pt-BR'))} — CZ Efeitos Especiais</div><script>window.onload=()=>{window.focus();window.print()}<\/script></body></html>`;
   w.document.open();w.document.write(html);w.document.close();
  }catch(err){w.document.body.textContent='Não foi possível gerar o relatório: '+err.message}
 }
@@ -6145,20 +6155,36 @@ function ret226Esperado(x,e){
  return Math.max(0,Math.floor(e.saida_baixada_em?real:(Number(local[x.id]||0)||real)));
 }
 function ret226Devolvido(x,e){return Math.max(0,Math.min(ret226Esperado(x,e),Number(retornoInfoMaterial(x,e).qtd||0)))}
-function ret226Extra(x){return !sair220Ativo(x)&&x.origem==='extra'}
+function ret226Extra(x){return String(x.origem||'').toLowerCase()==='extra'}
 function ret226Ativo(x){return sair220Ativo(x)}
 function ret226Fechar(){clearTimeout(ret226Timer);document.getElementById('ret226Modal')?.remove()}
+// V237: quantidade utilizada é apurada exclusivamente no retorno.
+const RET237_USO='cz237_uso_extra_';
+function ret237Usos(id){try{return JSON.parse(localStorage.getItem(RET237_USO+id)||'{}')}catch(_){return {}}}
+function ret237Uso(id,x,e){const v=ret237Usos(id)[String(x.id)];return v===undefined?Math.max(0,ret226Esperado(x,e)-ret226Devolvido(x,e)):Number(v)}
+function ret237DefinirUso(id,mid,valor){
+ const c=ret226Cache,x=c?.mats.find(m=>String(m.id)===String(mid));if(!x||!ret226Extra(x))return;
+ const max=Math.max(0,ret226Esperado(x,c.e)-ret226Devolvido(x,c.e));
+ const n=Number(valor);
+ if(!Number.isInteger(n)||n<0||n>max){czAlert('Informe uma quantidade inteira entre 0 e '+max+'.','Quantidade utilizada');ret226Pintar(id);return}
+ const usos=ret237Usos(id);usos[String(mid)]=n;localStorage.setItem(RET237_USO+id,JSON.stringify(usos));ret226Pintar(id);
+}
+function ret237Linha(id,x,e,finalizado,extra){
+ const q=ret226Esperado(x,e),dev=ret226Devolvido(x,e),cons=x.tipo==='produto',ativo=ret226Ativo(x),cod=x._codigoExibicao||x.codigo||'—';
+ const uso=extra&&!ativo?`<td><input class="ret237Uso" type="number" min="0" max="${Math.max(0,q-dev)}" step="1" value="${ret237Uso(id,x,e)}" ${finalizado?'disabled':''} style="width:78px" aria-label="Quantidade utilizada de ${coEsc(sair222Nome(x))}" onchange="ret237DefinirUso('${id}','${x.id}',this.value)"></td>`:extra?'<td>—</td>':'';
+ return `<tr data-id="${coEsc(String(x.id))}" data-nome="${coEsc(sair222Nome(x))}" data-codigo="${coEsc(cod)}"><td>${!finalizado&&(ativo||cons)?`<input class="ret226Check" type="checkbox" aria-label="Bipar ${coEsc(sair222Nome(x))}" onclick="ret226Selecionar('${id}','${x.id}')">`:'—'}</td><td><b>${coEsc(sair222Nome(x))}</b></td><td>${q}</td><td><div class="ret226Ret" style="font-weight:800;margin-bottom:5px">${dev}/${q}</div><div class="ret226Estado" style="font-size:12px;margin-bottom:7px"></div>${cons&&!extra?`<button type="button" class="btn secondary ret226Consumo" ${finalizado?'disabled':''} onclick="ret226ConfirmarConsumo('${id}','${x.id}')">Confirmar consumo</button>`:''}</td><td>${extra?'Extra':'Contratado'}</td><td>${coEsc(ativo?cz231RastreiosEvento(id,x):cod)}</td><td>${ativo?'Ativo':'Consumo'}</td>${uso}</tr>`;
+}
 function ret226Filtrar(){
  const norm=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
  const nome=norm(document.getElementById('ret226Nome')?.value),cod=norm(document.getElementById('ret226Codigo')?.value);
- let n=0;document.querySelectorAll('#ret226Tabela tbody tr').forEach(tr=>{const ok=norm(tr.dataset.nome).includes(nome)&&norm(tr.dataset.codigo).includes(cod);tr.style.display=ok?'':'none';if(ok)n++});
+ let n=0;document.querySelectorAll('#ret226Tabela tbody tr, #ret237TabelaExtras tbody tr').forEach(tr=>{const ok=norm(tr.dataset.nome).includes(nome)&&norm(tr.dataset.codigo).includes(cod);tr.style.display=ok?'':'none';if(ok)n++});
  const el=document.getElementById('ret226TotalFiltro');if(el)el.textContent=n+' material(is)';
 }
 function ret226Pintar(id){
  if(!ret226Cache||String(ret226Cache.e.id)!==String(id))return;
  const {e,mats}=ret226Cache,consumos=ret226Consumos(id);
  for(const x of mats){
-  const tr=document.querySelector('#ret226Tabela tbody tr[data-id="'+x.id+'"]');if(!tr)continue;
+  const tr=document.querySelector('#ret226Tabela tbody tr[data-id="'+x.id+'"], #ret237TabelaExtras tbody tr[data-id="'+x.id+'"]');if(!tr)continue;
   const q=ret226Esperado(x,e),dev=ret226Devolvido(x,e),f=Math.max(0,q-dev),consumo=x.tipo==='produto',extra=ret226Extra(x);
   const confirmado=consumo&&!extra&&f>0&&!!consumos[String(x.id)];
   const ok=dev===q;
@@ -6167,9 +6193,10 @@ function ret226Pintar(id){
   tr.querySelector('.ret226Ret')?.replaceChildren(document.createTextNode((dev+'/'+q+' • Faltam '+f)));
   const estado=tr.querySelector('.ret226Estado');if(estado)estado.textContent=ok?'✓ Conferido':extra?(f?'🔴 '+f+' utilizado(s)':'✓ Devolvido'):consumo?(f?(confirmado?'✓ '+f+' consumido(s) confirmado(s)':'🔴 '+f+' consumido(s) a confirmar'):'✓ Devolvido'):'Pendente';
   const check=tr.querySelector('.ret226Check');if(check)check.checked=ok;
+  const usoInput=tr.querySelector('.ret237Uso');if(usoInput){usoInput.max=f;const valor=ret237Uso(id,x,e);if(document.activeElement!==usoInput)usoInput.value=valor;usoInput.title='Quantidade não devolvida: '+f;}
   const bot=tr.querySelector('.ret226Consumo');if(bot){bot.textContent=f===0?'Tudo devolvido':confirmado?'✓ '+f+' consumido(s) confirmado(s)':'Confirmar consumo ('+f+')';bot.disabled=f===0;bot.style.background=confirmado?'#256943':''}
  }
- const extras=mats.filter(ret226Extra).map(x=>({x,q:ret226Esperado(x,e),dev:ret226Devolvido(x,e)}));
+ const extras=mats.filter(x=>ret226Extra(x)&&!ret226Ativo(x)).map(x=>({x,q:ret226Esperado(x,e),dev:ret226Devolvido(x,e)}));
  const usados=extras.reduce((a,v)=>a+Math.max(0,v.q-v.dev),0);
  const el=document.getElementById('ret226ResumoExtra');if(el)el.textContent=usados+' unidade(s) extra não devolvida(s)';
 }
@@ -6183,16 +6210,21 @@ async function ret226Abrir(id){
   ret226Cache={e,mats};
   $('#content').innerHTML=`<div class="sectionhead"><div><h2>↩️ Retorno — ${coEsc(e.nome_evento||'Evento')}</h2><div class="muted">${coEsc(e.cliente_nome||'')} • ${finDate(e.data_evento)} • Conferência por material • Mesmas colunas da saída</div></div><button class="btn secondary" onclick="ret226Fechar();renderRetornoEventos()">Voltar</button></div>
   <style>
-  #ret226Tabela th{font-size:14px;padding:14px 12px}#ret226Tabela td{font-size:16px;padding:13px 12px;white-space:normal;vertical-align:middle}#ret226Tabela td b{font-size:17px}#ret226Tabela td:nth-child(4){min-width:160px}#ret226Tabela td:nth-child(4) button{font-size:12px;padding:7px 9px;margin:2px}
-  #ret226Tabela .ret226Check{width:22px;height:22px;accent-color:#43c77d;cursor:pointer}
+  #ret226Tabela th,#ret237TabelaExtras th{font-size:14px;padding:14px 12px}#ret226Tabela td,#ret237TabelaExtras td{font-size:16px;padding:13px 12px;white-space:normal;vertical-align:middle}#ret226Tabela td b,#ret237TabelaExtras td b{font-size:17px}#ret226Tabela td:nth-child(4){min-width:160px}#ret226Tabela td:nth-child(4) button{font-size:12px;padding:7px 9px;margin:2px}
+  #ret226Tabela .ret226Check,#ret237TabelaExtras .ret226Check{width:22px;height:22px;accent-color:#43c77d;cursor:pointer}
   .ret226Overlay{position:fixed;inset:0;z-index:220000;background:#000c;display:flex;align-items:center;justify-content:center;padding:16px}
   .ret226Dialog{position:relative;width:min(540px,100%);max-height:90vh;overflow:auto;background:#151f2a;color:white;border:1px solid #3b5369;border-radius:16px;padding:24px;box-shadow:0 20px 80px #000a}
   .ret226Nums{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:16px 0}.ret226Nums div{background:#0b1621;border:1px solid #304254;border-radius:10px;text-align:center;padding:14px 5px}.ret226Nums small{display:block;font-size:11px;color:#acb9c8}.ret226Nums strong{display:block;font-size:31px;margin-top:7px}
   </style>
   <div class="card"><div class="muted" style="margin-bottom:12px">Selecione o quadrado para bipar a devolução de ativos e de qualquer consumível (contratado ou extra). Após conferir o retorno, confirme o consumo da quantidade não devolvida.</div>
   <div style="display:flex;gap:9px;flex-wrap:wrap;align-items:end;margin-bottom:12px"><div class="field" style="width:190px;margin:0"><label>Filtrar por nome</label><input id="ret226Nome" type="search" oninput="ret226Filtrar()" placeholder="Nome do produto" style="padding:8px;font-size:13px"></div><div class="field" style="width:170px;margin:0"><label>Filtrar por código</label><input id="ret226Codigo" type="search" oninput="ret226Filtrar()" placeholder="Código / rastreio" style="padding:8px;font-size:13px"></div><span id="ret226TotalFiltro" class="muted" style="font-size:12px">${mats.length} material(is)</span></div>
-  <div class="tablewrap"><table id="ret226Tabela"><thead><tr><th>Sel.</th><th>Produto</th><th>Tipo</th><th>Origem</th><th>Código</th><th>Conferência</th></tr></thead><tbody>
-  ${mats.map(x=>{const q=ret226Esperado(x,e),dev=ret226Devolvido(x,e),cons=x.tipo==='produto',extra=ret226Extra(x),ativo=ret226Ativo(x),cod=x._codigoExibicao||x.codigo||'—';return `<tr data-id="${coEsc(String(x.id))}" data-nome="${coEsc(sair222Nome(x))}" data-codigo="${coEsc(cod)}"><td>${!finalizado&&(ativo||cons)?`<input class="ret226Check" type="checkbox" aria-label="Bipar ${coEsc(sair222Nome(x))}" onclick="ret226Selecionar('${id}','${x.id}')">`:'—'}</td><td><b>${coEsc(sair222Nome(x))}</b></td><td>${q}</td><td><div class="ret226Ret" style="font-weight:800;margin-bottom:5px">${dev}/${q}</div><div class="ret226Estado" style="font-size:12px;margin-bottom:7px"></div>${cons&&!extra?`<button type="button" class="btn secondary ret226Consumo" ${finalizado?'disabled':''} onclick="ret226ConfirmarConsumo('${id}','${x.id}')">Confirmar consumo</button>`:''}</td><td>${extra?'Extra':'Contratado'}</td><td>${coEsc(ativo?cz231RastreiosEvento(id,x):cod)}</td><td>${ativo?'Ativo':'Consumo'}</td></tr>`}).join('')||'<tr><td colspan="7">Nenhum material foi conferido na saída.</td></tr>'}</tbody></table></div></div>
+  <h3 style="margin:14px 0 8px">Materiais contratados</h3>
+  <div class="tablewrap"><table id="ret226Tabela"><thead><tr><th>Sel.</th><th>Produto</th><th>Quantidade</th><th>Conferência</th><th>Origem</th><th>Código</th><th>Tipo</th></tr></thead><tbody>
+  ${mats.filter(x=>!ret226Extra(x)).map(x=>ret237Linha(id,x,e,finalizado,false)).join('')||'<tr><td colspan="7">Nenhum material contratado na saída.</td></tr>'}</tbody></table></div>
+  <h3 style="margin:24px 0 8px">Materiais extras — retorno separado</h3>
+  <p class="muted">Bipe os materiais devolvidos e informe quantas unidades extras foram utilizadas. O sistema confere o valor com a quantidade não devolvida.</p>
+  <div class="tablewrap"><table id="ret237TabelaExtras"><thead><tr><th>Sel.</th><th>Produto</th><th>Quantidade</th><th>Conferência</th><th>Origem</th><th>Código</th><th>Tipo</th><th>Qtd. utilizada</th></tr></thead><tbody>
+  ${mats.filter(ret226Extra).map(x=>ret237Linha(id,x,e,finalizado,true)).join('')||'<tr><td colspan="8">Nenhum material extra na saída.</td></tr>'}</tbody></table></div></div>
   ${!finalizado?`<div class="card" style="margin-top:15px"><div style="font-size:16px"><b>Produtos extras utilizados:</b> <span id="ret226ResumoExtra"></span></div><div class="muted" style="margin:7px 0">Somente as unidades extras não devolvidas serão encaminhadas à venda no PDV. A venda não será finalizada automaticamente.</div><div class="actions" style="flex-wrap:wrap"><button type="button" class="btn secondary" onclick="cz231Substituicao('${id}')">Substituição de material</button><button type="button" class="btn primary" onclick="ret226Concluir('${id}')">Concluir retorno</button></div></div>`:''}`;
   ret226Pintar(id);
  }catch(err){$('#content').innerHTML='<div class="msg">Erro ao carregar retorno: '+coEsc(err.message)+'</div>'}
@@ -6236,10 +6268,10 @@ async function ret226Bipar(id){
 }
 async function ret226AbrirPDV(id){
  const c=ret226Cache;if(!c||String(c.e.id)!==String(id))return;
- const extras=c.mats.filter(ret226Extra).map(x=>({x,q:ret226Esperado(x,c.e),dev:ret226Devolvido(x,c.e)})).filter(v=>v.q>v.dev&&!usedAlready226(id,v.x.id));
+ const extras=c.mats.filter(x=>ret226Extra(x)&&!ret226Ativo(x)).map(x=>({x,q:ret226Esperado(x,c.e),dev:ret226Devolvido(x,c.e),uso:ret237Uso(id,x,c.e)})).filter(v=>v.uso>0&&!usedAlready226(id,v.x.id));
  if(!extras.length)return czAlert('Não há produtos extras utilizados e pendentes de venda.','Retorno');
  if(!await czConfirm('Abrir uma venda no PDV com os produtos extras não devolvidos? Confira as quantidades antes de finalizar.','Produtos extras','Abrir PDV'))return;
- const dados={eventoId:id,cliente:c.e.cliente_nome||'',telefone:c.e.cliente_telefone||'',itens:extras.map(v=>({materialId:v.x.id,produtoId:v.x.item_id,qtd:v.q-v.dev,nome:v.x.nome_item}))};
+ const dados={eventoId:id,cliente:c.e.cliente_nome||'',telefone:c.e.cliente_telefone||'',itens:extras.map(v=>({materialId:v.x.id,produtoId:v.x.item_id,qtd:v.uso,nome:v.x.nome_item}))};
  await renderPDV();
  $('#pdvClienteNome').value=dados.cliente;$('#pdvClienteTelefone').value=dados.telefone;
  const faltantes=[];
@@ -6256,7 +6288,9 @@ async function ret226Concluir(id){
  const c=ret226Cache;if(!c||String(c.e.id)!==String(id))return;
  const semConsumo=c.mats.filter(x=>x.tipo==='produto'&&!ret226Extra(x)&&ret226Esperado(x,c.e)>ret226Devolvido(x,c.e)&&!ret226Consumos(id)[String(x.id)]);
  if(semConsumo.length)return czAlert('Confirme o consumo dos produtos contratados antes de concluir: '+semConsumo.map(x=>x.nome_item).join(', '),'Retorno');
- const pendExtra=c.mats.filter(x=>ret226Extra(x)&&ret226Esperado(x,c.e)>ret226Devolvido(x,c.e)&&!usedAlready226(id,x.id));
+ const pendExtra=c.mats.filter(x=>ret226Extra(x)&&!ret226Ativo(x)&&ret237Uso(id,x,c.e)>0&&!usedAlready226(id,x.id));
+ const divergentes=c.mats.filter(x=>ret226Extra(x)&&!ret226Ativo(x)&&ret237Uso(id,x,c.e)!==ret226Esperado(x,c.e)-ret226Devolvido(x,c.e));
+ if(divergentes.length)return czAlert('A quantidade utilizada precisa corresponder às unidades não devolvidas. Confira: '+divergentes.map(x=>x.nome_item).join(', '),'Retorno');
  if(pendExtra.length)return czAlert('Há produtos extras utilizados aguardando venda no PDV. Abra o PDV e finalize a venda antes de concluir o retorno.','Retorno');
  return cz231ConcluirRetorno(id);
 }
