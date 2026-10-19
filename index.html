@@ -6577,4 +6577,104 @@ async function czNovoSalvarRascunho(id){
  }catch(err){await czAlert('Não foi possível salvar o rascunho: '+err.message,'Preparação')}
 }
 
-</script></body></html>
+
+/* ===== CZ CENTRAL UNIFICADA — Preparação, Saída e Retorno em uma tela ===== */
+const czCentralEstado={ativo:false,id:'',aba:'',eventos:[],busca:'',consulta:0};
+const czCentralRenderModuleOriginal=renderModule;
+modules[4]='Central Operacional';
+renderModule=async function(i){
+ if([4,5,18].includes(Number(i)))return czCentralAbrir();
+ czCentralEstado.ativo=false;
+ return czCentralRenderModuleOriginal(i);
+};
+// Substitui os três atalhos antigos por uma única entrada, preservando as rotinas internas.
+const czCentralMenuOriginal=cz212MontarMenu;
+cz212MontarMenu=function(){
+ czCentralMenuOriginal();
+ const nav=document.getElementById('nav');if(!nav)return;
+ const central=nav.querySelector('button[data-i="4"]');if(central)central.textContent='📋 Central Operacional';
+ for(const idx of [5,18])nav.querySelectorAll('button[data-i="'+idx+'"]').forEach(b=>b.remove());
+};
+cz212MontarMenu();
+function czCentralStatus(e){
+ if(e.status==='finalizado')return 'Concluído';
+ if(e.status==='aguardando_retorno'||e.saida_baixada_em)return 'Aguardando retorno';
+ if(['material_pronto','separando','aguardando_separacao','pronto','aguardando_evento'].includes(e.status))return 'Aguardando saída';
+ return 'Preparação';
+}
+function czCentralFiltros(){
+ const q=czCentralEstado.busca.toLocaleLowerCase('pt-BR');
+ return czCentralEstado.eventos.filter(e=>e.status!=='finalizado'&&[e.nome_evento,e.cliente_nome,e.cidade_evento,e.data_evento].some(v=>String(v||'').toLocaleLowerCase('pt-BR').includes(q))).sort((a,b)=>{
+  const ar=czCentralStatus(a)==='Aguardando retorno',br=czCentralStatus(b)==='Aguardando retorno';
+  if(ar!==br)return ar?-1:1;
+  return String(a.data_evento||'9999').localeCompare(String(b.data_evento||'9999'));
+ });
+}
+function czCentralLinha(e){
+ const st=czCentralStatus(e),sel=String(e.id)===String(czCentralEstado.id);
+ const btn=(aba,label)=>`<button type="button" class="btn ${sel&&czCentralEstado.aba===aba?'primary':'secondary'}" style="padding:7px 9px;font-size:12px" onclick="czCentralEtapa('${e.id}','${aba}')">${label}</button>`;
+ return `<tr style="${sel?'background:#253442;':''}"><td><b>${finDate(e.data_evento)}</b></td><td style="white-space:normal"><b>${esc(e.nome_evento||'Evento')}</b><div class="muted">${esc(e.cliente_nome||'')}</div></td><td>${esc(e.cidade_evento||'—')}</td><td style="color:${st==='Aguardando retorno'?'#ff9e83':'#cdd6e0'}">${esc(st)}</td><td><div style="display:flex;gap:5px">${btn('preparo','Preparação')}${btn('saida','Saída')}${btn('retorno','Retorno')}</div></td></tr>`;
+}
+function czCentralTabela(compacta=false){
+ const lista=czCentralFiltros();
+ return `<div class="tablewrap"><table class="czCentralTabela"><thead><tr><th>Data</th><th>Evento / Cliente</th><th>Cidade</th><th>Situação</th><th>Etapas</th></tr></thead><tbody>${lista.length?lista.slice(0,compacta?12:300).map(czCentralLinha).join(''):'<tr><td colspan="5" class="empty">Nenhum evento operacional encontrado.</td></tr>'}</tbody></table></div>`;
+}
+function czCentralCabecalho(){
+ const e=czCentralEstado.eventos.find(x=>String(x.id)===String(czCentralEstado.id));
+ if(!e)return '';
+ return `<div class="czCentralTopo"><div class="sectionhead" style="margin-bottom:10px"><div><h2 style="margin:0">📋 Central Operacional CZ</h2><div class="muted">${esc(e.nome_evento||'Evento')} • ${esc(e.cliente_nome||'')} • ${finDate(e.data_evento)}</div></div><button type="button" class="btn secondary" onclick="czCentralAbrir()">← Lista de eventos</button></div><div class="czCentralAbas"><button class="btn ${czCentralEstado.aba==='preparo'?'primary':'secondary'}" onclick="czCentralEtapa('${e.id}','preparo')">1 · Preparação</button><button class="btn ${czCentralEstado.aba==='saida'?'primary':'secondary'}" onclick="czCentralEtapa('${e.id}','saida')">2 · Bipagem de Saída</button><button class="btn ${czCentralEstado.aba==='retorno'?'primary':'secondary'}" onclick="czCentralEtapa('${e.id}','retorno')">3 · Retorno e Extras</button></div><details class="czCentralLista"><summary>Trocar evento · ${czCentralFiltros().length} evento(s) na lista</summary>${czCentralTabela(true)}</details></div>`;
+}
+function czCentralReporTopo(){
+ if(!czCentralEstado.ativo||!czCentralEstado.id||!czCentralEstado.aba)return;
+ const content=document.getElementById('content');if(!content||content.querySelector('.czCentralTopo'))return;
+ // Apenas restaura o cabeçalho se a página atual é realmente uma das três etapas.
+ const t=String(content.querySelector('h2')?.textContent||'').toLocaleLowerCase('pt-BR');
+ if(!/prepara|saída|saida|retorno|conferência de saída/.test(t))return;
+ content.insertAdjacentHTML('afterbegin',czCentralCabecalho());
+ document.getElementById('pageTitle').textContent='Central Operacional';
+}
+const czCentralObserver=new MutationObserver(()=>{
+ if(!czCentralEstado.ativo||!czCentralEstado.id)return;
+ if(czCentralEstado._timer)clearTimeout(czCentralEstado._timer);
+ czCentralEstado._timer=setTimeout(czCentralReporTopo,75);
+});
+czCentralObserver.observe(document.getElementById('content'),{childList:true});
+async function czCentralAbrir(){
+ czCentralEstado.ativo=true;czCentralEstado.id='';czCentralEstado.aba='';
+ const versao=++czCentralEstado.consulta;
+ document.getElementById('pageTitle').textContent='Central Operacional';
+ document.getElementById('content').innerHTML='<h2>📋 Central Operacional</h2><p class="muted">Carregando eventos...</p>';
+ const {data,error}=await db.from('eventos_operacionais').select('*').neq('status','finalizado').order('data_evento',{ascending:true});
+ if(versao!==czCentralEstado.consulta)return;
+ if(error){document.getElementById('content').innerHTML=`<div class="msg">Não foi possível carregar os eventos: ${esc(error.message)}</div>`;return}
+ czCentralEstado.eventos=data||[];
+ czCentralMostrarLista();
+}
+function czCentralMostrarLista(){
+ czCentralEstado.id='';czCentralEstado.aba='';
+ const es=czCentralEstado.eventos;
+ const retornos=es.filter(e=>czCentralStatus(e)==='Aguardando retorno').length;
+ const saidas=es.filter(e=>czCentralStatus(e)==='Aguardando saída').length;
+ document.getElementById('content').innerHTML=`<div class="sectionhead"><div><h2>📋 Central Operacional CZ</h2><div class="muted">Preparação, bipagem de saída e retorno na mesma tela. Eventos por data; retornos pendentes em destaque.</div></div><button class="btn secondary" onclick="czCentralAbrir()">↻ Atualizar</button></div><div class="cards" style="margin-bottom:14px"><div class="card"><div class="muted">Eventos ativos</div><div class="n">${es.length}</div></div><div class="card"><div class="muted">Aguardando saída</div><div class="n">${saidas}</div></div><div class="card"><div class="muted">Retornos pendentes</div><div class="n" style="color:#ff8b78">${retornos}</div></div></div><div class="field" style="margin:0 0 14px"><label>Buscar evento, cliente, cidade ou data</label><input id="czCentralBusca" value="${esc(czCentralEstado.busca)}" placeholder="Pesquisar..." oninput="czCentralPesquisar(this.value)"></div><div id="czCentralResultado">${czCentralTabela()}</div><p class="muted" style="font-size:12px">A Preparação não baixa estoque. Os ativos são identificados pelo rastreio individual durante a Saída e conferidos novamente no Retorno.</p>`;
+}
+function czCentralPesquisar(v){czCentralEstado.busca=v;const area=document.getElementById('czCentralResultado');if(area)area.innerHTML=czCentralTabela()}
+async function czCentralEtapa(id,aba){
+ czCentralEstado.ativo=true;czCentralEstado.id=String(id);czCentralEstado.aba=aba;
+ const e=czCentralEstado.eventos.find(x=>String(x.id)===String(id));if(!e)return czCentralAbrir();
+ document.getElementById('content').innerHTML='<div class="muted">Abrindo etapa...</div>';
+ try{
+  if(aba==='preparo')await prep141Abrir(id);
+  else if(aba==='saida')await sair142Abrir(id);
+  else if(aba==='retorno')await ret226Abrir(id);
+  else return czCentralAbrir();
+  czCentralReporTopo();
+ }catch(err){document.getElementById('content').innerHTML=`${czCentralCabecalho()}<div class="msg">Erro ao abrir etapa: ${esc(err.message||String(err))}</div>`}
+}
+
+</script><style>
+.czCentralTopo{position:sticky;top:0;z-index:4;background:#101923;border:1px solid #334354;border-radius:12px;padding:14px;margin-bottom:18px;box-shadow:0 7px 20px #0006}
+.czCentralAbas{display:flex;flex-wrap:wrap;gap:8px}.czCentralAbas .btn{flex:1;min-width:150px}
+.czCentralLista{margin-top:12px}.czCentralLista summary{cursor:pointer;color:#c9d4df;font-size:13px;padding:7px}
+.czCentralLista .tablewrap{max-height:250px;overflow:auto}.czCentralTabela th,.czCentralTabela td{padding:10px 8px;font-size:13px}
+@media(max-width:700px){.czCentralTopo{position:relative}.czCentralTabela{min-width:740px}}
+</style></body></html>
