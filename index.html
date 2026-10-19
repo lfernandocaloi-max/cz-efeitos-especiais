@@ -5046,24 +5046,66 @@ async function sair142Bipar(id){
  }catch(err){if(aviso){aviso.style.color='#ffb0b0';aviso.textContent=err.message}else if(typeof czAlert==='function')await czAlert(err.message,'Conferência')}
  finally{const novo=$('#sair142Cod')||input;if(novo){novo.value='';novo.focus()}sair220Ocupado=false}
 }
+/* V232 — saída oficial: sincroniza conferência e aciona a baixa transacional do Supabase. */
+let cz232SaidaEmAndamento=false;
 async function sair142DarSaida(id,janelaRelatorio=null){
- const resp=String($('#sair142Resp')?.value||'').trim();if(!resp){janelaRelatorio?.close();return czAlert('Informe o responsável pela conferência.','Saída')}
- const {data:m,error:em}=await db.from('evento_materiais').select('*').eq('evento_id',id);if(em){janelaRelatorio?.close();return czAlert(em.message,'Saída')}
- const mats=m||[],st=sair142State(id),c=sair220Contagens(mats,st);
- const falt=mats.filter(x=>Number(c[x.id]||0)<sair220Qtd(x));
- let motivo='';
- if(falt.length){
-   const faltQtd=falt.reduce((n,x)=>n+sair220Qtd(x)-Number(c[x.id]||0),0);
-   motivo=await czPrompt(`A conferência está incompleta.\n\nFaltam ${faltQtd} unidade(s). Informe obrigatoriamente o motivo para liberar a saída:`, '', 'Saída com pendência');
-   if(!String(motivo||'').trim()){janelaRelatorio?.close();return czAlert('O motivo é obrigatório para sair com pendência.','Saída')}
- }
- const status=falt.length?'em_evento_divergencia':'aguardando_retorno';
- const {error}=await db.from('eventos_operacionais').update({status,atualizado_em:new Date().toISOString()}).eq('id',id);if(error){janelaRelatorio?.close();return czAlert(error.message,'Saída')}
- const enviados=mats.flatMap(x=>Array.from({length:Math.min(sair220Qtd(x),Number(c[x.id]||0))},()=>String(x.codigo_barras||x.codigo||x.id)));
- sair142Set(id,{responsavel:resp,contagens:c,motivo_pendencia:motivo||'',saida_em:new Date().toISOString(),itens_enviados:enviados,historico:[...(st.historico||[]),{acao:falt.length?'Saída com divergência':'Saída',data:new Date().toISOString(),responsavel:resp,motivo:motivo||''}]});
- await czAlert(falt.length?'Bipagem confirmada com divergência registrada. Somente os materiais realmente bipados serão esperados no retorno.':'Bipagem confirmada e saída liberada.','Saída');
- if(typeof renderModule==='function')renderModule(18);
+ if(cz232SaidaEmAndamento)return czAlert('A saída deste evento já está sendo processada. Aguarde.','Saída');
+ const resp=String(document.querySelector('#sair142Resp')?.value||sair142State(id).responsavel||'').trim();
+ if(!resp){janelaRelatorio?.close();return czAlert('Informe o responsável pela conferência.','Saída')}
+ cz232SaidaEmAndamento=true;
+ try{
+  const [evr,mr]=await Promise.all([
+   db.from('eventos_operacionais').select('id,status,saida_baixada_em').eq('id',id).single(),
+   db.from('evento_materiais').select('*').eq('evento_id',id)
+  ]);
+  if(evr.error||mr.error)throw evr.error||mr.error;
+  if(evr.data.saida_baixada_em)throw new Error('Este evento já teve a saída oficial registrada. O estoque não será baixado novamente.');
+  const mats=mr.data||[];
+  if(!mats.length)throw new Error('O evento não possui materiais para a saída.');
+  const st=sair142State(id),c=sair220Contagens(mats,st);
+  const falt=mats.filter(x=>Number(c[x.id]||0)<sair220Qtd(x));
+  let motivo='';
+  if(falt.length){
+   const qtd=falt.reduce((n,x)=>n+sair220Qtd(x)-Number(c[x.id]||0),0);
+   motivo=await czPrompt(`A conferência está incompleta.\n\nFaltam ${qtd} unidade(s). Informe o motivo da divergência:`, '', 'Saída com pendência');
+   if(!String(motivo||'').trim())throw new Error('A saída com pendência exige um motivo.');
+  }
+  // A função oficial do banco usa evento_materiais.quantidade_bipada para calcular
+  // a baixa. As leituras desta tela eram guardadas apenas no localStorage.
+  // Atualizamos a conferência primeiro; a baixa em produtos acontece APENAS na RPC.
+  const alterados=[];
+  for(const m of mats){
+   const anterior=Number(m.quantidade_bipada||0);
+   const confirmado=Math.max(0,Math.min(sair220Qtd(m),Math.floor(Number(c[m.id]||0))));
+   if(confirmado===anterior)continue;
+   if(confirmado<anterior)throw new Error('Há mais unidades conferidas no banco do que nesta tela para '+sair222Nome(m)+'. Atualize a conferência antes de prosseguir.');
+   const {data:salvo,error:up}=await db.from('evento_materiais')
+     .update({quantidade_bipada:confirmado})
+     .eq('id',m.id).eq('evento_id',id).eq('quantidade_bipada',anterior)
+     .select('id,quantidade_bipada');
+   if(up)throw up;
+   if(!salvo||salvo.length!==1)throw new Error('A conferência de '+sair222Nome(m)+' foi alterada por outra sessão. Reabra a saída e confira novamente.');
+   alterados.push({id:m.id,anterior,confirmado});
+  }
+  // Nunca substitua esta chamada por um UPDATE direto de estoque_atual:
+  // a RPC do Supabase deve fazer a baixa e marcar saida_baixada_em juntos.
+  const {error:baixa}=await db.rpc('cz_liberar_saida_evento',{p_evento_id:id});
+  if(baixa){
+   // Preserva a conferência registrada; não altera o status e não declara saída.
+   throw new Error('A baixa oficial do estoque não foi confirmada pelo Supabase: '+baixa.message+'. A saída NÃO foi concluída.');
+  }
+  const {data:confirmacao,error:ce}=await db.from('eventos_operacionais')
+    .select('saida_baixada_em').eq('id',id).single();
+  if(ce||!confirmacao?.saida_baixada_em)throw new Error('A operação retornou sem confirmar saida_baixada_em. Verifique no Supabase antes de repetir a saída.');
+  const enviados=mats.flatMap(x=>Array.from({length:Math.min(sair220Qtd(x),Number(c[x.id]||0))},()=>String(x.codigo_barras||x.codigo||x.id)));
+  sair142Set(id,{responsavel:resp,contagens:c,motivo_pendencia:motivo,saida_em:confirmacao.saida_baixada_em,itens_enviados:enviados,historico:[...(st.historico||[]),{acao:falt.length?'Saída com divergência':'Saída',data:new Date().toISOString(),responsavel:resp,motivo}]});
+  await czAlert('Saída oficial confirmada. Os produtos de consumo foram movimentados pelo Supabase.','Saída concluída');
+  if(typeof renderModule==='function')renderModule(18);
+ }catch(err){
+  await czAlert(String(err?.message||err),'Saída não concluída');
+ }finally{cz232SaidaEmAndamento=false;janelaRelatorio?.close()}
 }
+
 async function sair142Imprimir(id,janelaRelatorio=null){
  const [{data:e},m]=await Promise.all([db.from('eventos_operacionais').select('*').eq('id',id).single(),sair221Materiais(id)]),st=sair142State(id),c=sair220Contagens(m||[],st);
  const w=janelaRelatorio||window.open('','_blank','width=900,height=800');if(!w)return czAlert('O navegador bloqueou a impressão. Use o botão Imprimir bipagem.','Relatório');
