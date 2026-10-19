@@ -3442,7 +3442,13 @@ async function biparRetornoEvento(eventoId,materialSelecionadoId=null){
   const porId=new Map(codigosTela.map(m=>[String(m.id),m]));
   const contagensSaida=sair220Contagens(codigosTela,sair142State(eventoId));
   const qtdSaida=m=>e.saida_baixada_em?Number(m.quantidade_bipada||0):Math.max(Number(m.quantidade_bipada||0),Number(contagensSaida[m.id]||0));
-  const ids=[...new Set(materiais.filter(m=>m.tipo==='ativo'&&m.item_id).map(m=>m.item_id))];
+  // V230: a saída atual (V223+) registra as bipagens por material no
+  // estado do evento, inclusive rastreios individuais. O fluxo anterior
+  // gravava cz184_rastreios_saida_. Aceitar ambos, sem presumir que todo
+  // ativo tenha quantidade_bipada no banco quando a saída foi local.
+  const stSaida=sair142State(eventoId);
+  const ativosDoEvento=materiais.filter(m=>sair220Ativo(m)&&m.item_id);
+  const ids=[...new Set(ativosDoEvento.map(m=>m.item_id))];
   let ativos=[];
   if(ids.length){
    const r=await db.from('ativos').select('id,observacoes').in('id',ids);
@@ -3455,16 +3461,26 @@ async function biparRetornoEvento(eventoId,materialSelecionadoId=null){
   let material=null,rastreio=false;
   if(ativo){
    rastreio=true;
-   const candidatos=materiais.filter(m=>m.tipo==='ativo'&&String(m.item_id)===String(ativo.id)&&Number(m.quantidade_bipada||0)>0);
-   if(!candidatos.length)throw new Error('O equipamento deste rastreio não consta na saída deste evento.');
-   const enviados=cz185Lidos(eventoId,'saida');
-   if(!enviados.includes(codigo))throw new Error('Este rastreio não foi registrado na saída deste evento neste dispositivo. Não é seguro conferir o retorno sem o registro individual da saída.');
+   const candidatos=ativosDoEvento.filter(m=>String(m.item_id)===String(ativo.id)&&qtdSaida(m)>0);
+   if(!candidatos.length)throw new Error('O ativo consta no cadastro, mas não há saída registrada para ele neste evento. Confira a conferência da saída.');
+   // Nunca creditar uma leitura a uma linha diferente da selecionada.
+   if(materialSelecionadoId&&!candidatos.some(m=>String(m.id)===String(materialSelecionadoId))){
+    throw new Error('O rastreio pertence a outro equipamento. Selecione a linha correta.');
+   }
+   const historico=Array.isArray(stSaida.historico)?stSaida.historico:[];
+   const leituraNaSaida=historico.some(h=>normalizarCodigoEvento(h.codigo)===codigo&&candidatos.some(m=>String(m.id)===String(h.material_id)));
+   const legado=cz185Lidos(eventoId,'saida').includes(codigo);
+   // Rastreamento por unidade: não basta o código existir no cadastro.
+   if(!leituraNaSaida&&!legado){
+    throw new Error('Este rastreio está cadastrado, mas não há registro da sua bipagem na saída deste evento neste navegador. Verifique o dispositivo usado na saída.');
+   }
    if(cz185Lidos(eventoId,'retorno').includes(codigo))throw new Error('Este equipamento já foi bipado no retorno deste evento.');
    material=candidatos.find(m=>{
+    if(materialSelecionadoId&&String(m.id)!==String(materialSelecionadoId))return false;
     const dev=e.saida_baixada_em?Number(m.quantidade_devolvida||0):Number(retornoInfo(m.id).qtd||0);
-    return dev<Number(m.quantidade_bipada||0);
+    return dev<qtdSaida(m);
    });
-   if(!material)throw new Error('A devolução deste tipo de equipamento já está completa.');
+   if(!material)throw new Error('A devolução deste equipamento já está completa.');
   }else{
    // V229: conferir pelo MESMO cadastro e pelos MESMOS códigos que a
    // tela de saída usa, inclusive quando o evento possui código antigo.
@@ -3517,7 +3533,7 @@ async function biparRetornoEvento(eventoId,materialSelecionadoId=null){
     const up=await db.from('produtos').update({estoque_atual:Number(pr.data.estoque_atual||0)+1}).eq('id',material.item_id);
     if(up.error){r.qtd--;r.registros.pop();salvarRetorno(material.id,r);throw up.error}
    }
-   if(material.tipo==='ativo'&&material.item_id){
+   if(sair220Ativo(material)&&material.item_id&&r.qtd>=qtdSaida(material)){
     const up=await db.from('ativos').update({status:'disponivel'}).eq('id',material.item_id);
     if(up.error)throw up.error;
    }
@@ -5973,8 +5989,8 @@ function ret226Esperado(x,e){
  return Math.max(0,Math.floor(e.saida_baixada_em?real:(Number(local[x.id]||0)||real)));
 }
 function ret226Devolvido(x,e){return Math.max(0,Math.min(ret226Esperado(x,e),Number(retornoInfoMaterial(x,e).qtd||0)))}
-function ret226Extra(x){return x.tipo==='produto'&&x.origem==='extra'}
-function ret226Ativo(x){return x.tipo==='ativo'}
+function ret226Extra(x){return !sair220Ativo(x)&&x.origem==='extra'}
+function ret226Ativo(x){return sair220Ativo(x)}
 function ret226Fechar(){clearTimeout(ret226Timer);document.getElementById('ret226Modal')?.remove()}
 function ret226Filtrar(){
  const norm=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
