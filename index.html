@@ -6701,7 +6701,7 @@ async function czCentralEtapa(id,aba){
 }
 
 
-/* CZ V238 — Central Operacional: conferência por seleção e lista de faltantes.
+/* CZ V239 — Central Operacional: conferência por seleção e lista de faltantes.
    Mantém as RPCs oficiais existentes. Resoluções sem integração persistente
    ficam em rascunho e NÃO autorizam finalizar o evento. */
 (function(){
@@ -6716,7 +6716,10 @@ async function czCentralEtapa(id,aba){
  @media(max-width:650px){.cz238Tbl{min-width:610px}.cz238Grid{gap:4px}.cz238Stat b{font-size:22px}}
  </style>`;
  const K='cz238_retorno_resolucoes_';
- let active='',groups=[],selection='',busy=false,readTimer=null;
+ const CK='cz239_conferidos_';
+ const checked=()=>{try{return JSON.parse(localStorage.getItem(CK+active)||'{}')}catch(e){return {}}};
+ const markChecked=(key)=>{const o=checked();o[key]=true;localStorage.setItem(CK+active,JSON.stringify(o))};
+ let active='',groups=[],selection='',busy=false,readTimer=null,modalOpen=false;
  const safe=x=>esc(String(x??''));
  const norm=x=>normalizarCodigoEvento(String(x??''));
  const key=x=>String(x.tipo||'')+'|'+(x.item_id?'ID:'+String(x.item_id):'NOME:'+norm(x.nome_item||x.descricao||''));
@@ -6749,9 +6752,9 @@ async function czCentralEtapa(id,aba){
  }
  const findSelected=()=>groups.find(g=>g.key===selection);
  function buttons(id,opts){return opts.map(([label,fn,kind])=>`<button type="button" class="cz238Btn ${kind||''}" onclick="${fn}">${label}</button>`).join('')}
- function detailsRows(kind){return groups.flatMap(g=>g.lines.filter(x=>kind==='extra'?isExtra(x):!isExtra(x)).map(x=>`<tr><td>${safe(sair222Nome(x))}</td><td>${qty(x)}</td><td>${back(x)}</td></tr>`)).join('')||'<tr><td colspan="3">Nenhum item</td></tr>'}
- function lineTable(){return groups.map((g,i)=>{const s=summary(g),selected=g.key===selection,ok=s.returnedAll===s.expected;
-  return `<tr class="${selected?'cz238Selected':ok?'cz238OK':''}" onclick="cz238Selecionar(${i})" style="cursor:pointer"><td><input type="radio" name="cz238Select" ${selected?'checked':''} aria-label="Selecionar ${safe(g.name)}" style="accent-color:#e56819" /></td><td><b>${safe(g.name)}</b><div class="cz238Muted">${s.asset?'Ativo • rastreio individual':'Consumível • código do produto'}</div></td><td>${s.expected}</td><td>${s.returnedAll}</td><td class="${s.expected-s.returnedAll?'cz238Bad':'cz238Good'}">${s.expected-s.returnedAll}</td></tr>`;
+ function contractedRows(){return groups.flatMap(g=>g.lines.filter(x=>!isExtra(x)).map(x=>`<tr><td style="font-weight:800">${qty(x)}</td><td>${safe(sair222Nome(x))}</td></tr>`)).join('')||'<tr><td colspan="2">Nenhum material contratado.</td></tr>'}
+ function lineTable(){return groups.map((g,i)=>{const s=summary(g),ok=!!checked()[g.key];
+  return `<tr class="${ok?'cz238OK':''}" style="cursor:pointer" onclick="cz238Selecionar(${i})"><td><input class="cz239Select" type="checkbox" ${ok?'checked':''} aria-label="Selecionar ${safe(g.name)}" onclick="event.preventDefault()" /></td><td><b>${safe(g.name)}</b><div class="cz238Muted">${s.asset?'Ativo':'Consumível'}</div></td><td style="text-align:center">${s.contracted}</td><td style="text-align:center">${s.extras}</td><td style="text-align:center;font-weight:900">${s.expected}</td></tr>`;
  }).join('')}
  function missingRows(){const data=store();return groups.map((g,i)=>{const s=summary(g),n=pending(g);if(n<=0)return '';
   const r=data[g.key],kind=s.asset?'Ativo':'Consumível';
@@ -6764,16 +6767,12 @@ async function czCentralEtapa(id,aba){
   if(!groups.some(g=>g.key===selection))selection=groups[0]?.key||'';
   const g=findSelected(),s=g&&summary(g),nMissing=groups.filter(g=>pending(g)>0).length;
   document.getElementById('pageTitle').textContent='Central Operacional';
-  document.getElementById('content').innerHTML=CSS+`<div class="sectionhead"><div><h2>↩️ Retorno — ${safe(e.nome_evento||'Evento')}</h2><div class="cz238Muted">${safe(e.cliente_nome||'')} • ${finDate(e.data_evento)} • Selecione, bipe e conclua cada material</div></div><button class="btn secondary" onclick="czCentralAbrir()">← Central Operacional</button></div>
-   <div class="cz238Panel"><h3>1. Lista geral — materiais que saíram</h3><div class="tablewrap"><table class="cz238Tbl"><thead><tr><th>Sel.</th><th>Descrição</th><th>Saiu</th><th>Voltou</th><th>Falta</th></tr></thead><tbody>${lineTable()}</tbody></table></div></div>
-   ${g?`<div class="cz238Panel"><h3>2. Bipagem do material selecionado: ${safe(g.name)}</h3><div class="cz238Grid"><div class="cz238Stat">Saiu<b>${s.expected}</b></div><div class="cz238Stat">Bipado<b>${s.returnedAll}</b></div><div class="cz238Stat">Falta<b class="${s.expected-s.returnedAll?'cz238Bad':'cz238Good'}">${s.expected-s.returnedAll}</b></div></div>
-   <p class="cz238Muted">${s.asset?'Bipe o código de rastreio individual do equipamento que saiu neste evento.':'Bipe o código de barras do produto devolvido. Cada leitura vale uma unidade.'}</p>
-   <input id="scanRetorno" class="cz238Input" autocomplete="off" placeholder="Bipar código do material selecionado..." ${e.status==='finalizado'?'disabled':''}/><div id="retMsg" class="cz238Muted" role="status" style="margin:8px 0;min-height:22px"></div>
-   ${buttons(0,[['Bipar',`cz238Bipar()`, 'cz238Primary'],['Concluir conferência',`cz238Conferir()`, 'cz238Green']])}
-   <div style="margin-top:14px;border-top:1px solid #3b4b5c;padding-top:12px"><b>Resultado automático</b><p class="cz238Muted">Contratado: ${s.contracted} • Extra: ${s.extras} • Extra devolvido: ${s.extraReturned}/${s.extras} • ${s.asset?'Equipamentos não devolvidos: '+(s.expected-s.returnedAll):'Contratado para confirmar consumo: '+s.contractedMissing}</p></div></div>`:'<p>Nenhum material com saída registrada.</p>'}
-   <div class="cz238Panel"><h3>3. Lista automática de materiais faltantes <span class="cz238Bad">(${nMissing})</span></h3><p class="cz238Muted">Consumíveis: aparecem apenas extras não devolvidos. Ativos: aparecem equipamentos não devolvidos. Resolva pela ação na própria linha.</p><div class="tablewrap"><table class="cz238Tbl"><thead><tr><th>Descrição</th><th>Falta</th><th>Ações</th></tr></thead><tbody>${missingRows()}</tbody></table></div></div>
-   <div class="cz238Panel"><h3>Materiais Contratados</h3><div class="tablewrap"><table class="cz238Tbl"><thead><tr><th>Descrição</th><th>Saiu</th><th>Voltou (por linha)</th></tr></thead><tbody>${detailsRows('contratado')}</tbody></table></div><h3 style="margin-top:20px">Materiais Extras</h3><div class="tablewrap"><table class="cz238Tbl"><thead><tr><th>Descrição</th><th>Saiu</th><th>Voltou (por linha)</th></tr></thead><tbody>${detailsRows('extra')}</tbody></table></div><p class="cz238Muted">A conferência do consumível é agrupada e as devoluções são atribuídas primeiro aos extras. A distribuição física por linha depende dos registros de retorno do banco.</p></div>
-   <div class="cz238Panel"><button class="cz238Btn cz238Primary" onclick="cz238Finalizar()">Concluir retorno do evento</button><p class="cz238Muted">Não finaliza enquanto houver diferenças sem resolução oficial. Rascunhos locais não equivalem a baixa, venda ou perda registrada no Supabase.</p></div>`;
+  document.getElementById('content').innerHTML=CSS+`<div class="sectionhead"><div><h2>↩️ Retorno — ${safe(e.nome_evento||'Evento')}</h2><div class="cz238Muted">${safe(e.cliente_nome||'')} • ${finDate(e.data_evento)} • Clique no quadradinho para abrir a bipagem</div></div><button class="btn secondary" onclick="czCentralAbrir()">← Central Operacional</button></div>
+   <div class="cz238Panel"><h3>Lista geral de materiais</h3><div class="tablewrap"><table class="cz238Tbl"><thead><tr><th>Sel.</th><th>Descrição</th><th style="text-align:center">Contratado</th><th style="text-align:center">Extra</th><th style="text-align:center">Total</th></tr></thead><tbody>${lineTable()}</tbody></table></div><p class="cz238Muted">Ao concluir a conferência, a linha inteira fica verde.</p></div>
+   <div class="cz238Panel"><h3>Lista automática de materiais faltantes <span class="cz238Bad">(${nMissing})</span></h3><p class="cz238Muted">Os botões ficam na linha do material faltante. Extras consumíveis: PDV ou Substituição. Ativos: Perda ou Aguardar.</p><div class="tablewrap"><table class="cz238Tbl"><thead><tr><th>Descrição</th><th>Falta</th><th>Ações</th></tr></thead><tbody>${missingRows()}</tbody></table></div></div>
+   <div class="cz238Panel"><h3>Materiais Contratados</h3><div class="tablewrap"><table class="cz238Tbl"><thead><tr><th style="width:130px">Quantidade</th><th>Descrição do produto</th></tr></thead><tbody>${contractedRows()}</tbody></table></div></div>
+   <div class="cz238Panel"><button class="cz238Btn cz238Primary" onclick="cz238Finalizar()">Concluir retorno do evento</button><p class="cz238Muted">A finalização oficial continua protegida enquanto houver diferenças não registradas no Supabase.</p></div>
+   ${modalOpen&&g?`<div class="cz239Overlay" role="presentation" onclick="if(event.target===this)cz239Fechar()"><div class="cz239Modal" role="dialog" aria-modal="true" aria-label="Bipagem de ${safe(g.name)}"><button class="cz239Close" type="button" onclick="cz239Fechar()" aria-label="Fechar">×</button><h2 style="margin:0 38px 6px 0">Bipagem — ${safe(g.name)}</h2><p class="cz238Muted">${s.asset?'Bipe o código de rastreio individual':'Bipe o código de barras do produto'} • Contratado: ${s.contracted} • Extra: ${s.extras}</p><div class="cz238Grid" style="margin:20px 0"><div class="cz238Stat">Total<b>${s.expected}</b></div><div class="cz238Stat">Bipado<b class="cz238Good">${s.returnedAll}</b></div><div class="cz238Stat">Falta<b class="${s.expected-s.returnedAll?'cz238Bad':'cz238Good'}">${Math.max(0,s.expected-s.returnedAll)}</b></div></div><label for="scanRetorno" style="display:block;margin-bottom:7px;font-weight:700">Campo de bipagem</label><input id="scanRetorno" class="cz238Input" autocomplete="off" placeholder="Bipar código aqui..." ${e.status==='finalizado'?'disabled':''}/><div id="retMsg" class="cz238Muted" role="status" style="margin:8px 0;min-height:22px"></div><button type="button" class="cz238Btn cz238Primary" onclick="cz238Bipar()">Bipar</button><button type="button" class="cz238Btn cz238Green" style="display:block;width:100%;margin:18px 0 0;padding:15px" onclick="cz238Conferir()">✓ Concluir conferência</button></div></div>`:''}`;
   const inp=document.getElementById('scanRetorno');if(inp){inp.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key==='Tab'){ev.preventDefault();clearTimeout(readTimer);window.cz238Bipar()}});inp.addEventListener('input',()=>{clearTimeout(readTimer);if(inp.value.trim())readTimer=setTimeout(()=>window.cz238Bipar(),650)});inp.focus()}
   if(typeof czCentralReporTopo==='function')czCentralReporTopo();
  }
@@ -6783,7 +6782,8 @@ async function czCentralEtapa(id,aba){
   ret226Cache={e:er.data,mats:ms.filter(x=>Number(x.quantidade_bipada||0)>0)};
   render();
  }
- window.cz238Selecionar=function(i){selection=groups[i]?.key||'';render()};
+ window.cz238Selecionar=function(i){selection=groups[i]?.key||'';modalOpen=true;render()};
+ window.cz239Fechar=function(){modalOpen=false;render()};
  window.cz238Bipar=async function(){
   if(busy)return;const g=findSelected(),inp=document.getElementById('scanRetorno');const code=norm(inp?.value);
   if(!g||!code)return;busy=true;clearTimeout(readTimer);
@@ -6805,10 +6805,14 @@ async function czCentralEtapa(id,aba){
  };
  window.cz238Conferir=async function(){
   const g=findSelected();if(!g)return;const s=summary(g);
-  if(s.asset){if(s.returnedAll===s.expected)await czAlert('Ativos devolvidos 100%. Conferência completa.','Conferência');else await czAlert('Faltam '+(s.expected-s.returnedAll)+' unidade(s). Use Perda ou Aguardar na lista de faltantes.','Conferência')}
-  else if(s.extraMissing>0)await czAlert('Extra faltante: '+s.extraMissing+' unidade(s). Resolva por Venda PDV ou Substituição na lista de faltantes.','Conferência');
-  else if(s.contractedMissing>0){const ok=await czConfirm('Confirmar '+s.contractedMissing+' unidade(s) contratada(s) como consumo normal do evento?','Consumo contratado','Confirmar consumo');if(ok){const d=store();d[g.key]={...(d[g.key]||{}),consumoConfirmado:s.contractedMissing};save(d);await czAlert('Consumo confirmado neste navegador. A integração definitiva do relatório com Supabase ainda precisa ser validada.','Consumo')}}
-  else await czAlert('Devolução completa, sem faltas.','Conferência');render();
+  if(!s.asset&&s.extraMissing===0&&s.contractedMissing>0){
+   const ok=await czConfirm('Confirmar '+s.contractedMissing+' unidade(s) contratada(s) como consumo normal do evento?','Consumo contratado','Confirmar consumo');
+   if(!ok)return;
+   const d=store();d[g.key]={...(d[g.key]||{}),consumoConfirmado:s.contractedMissing};save(d);
+  }
+  markChecked(g.key);modalOpen=false;render();
+  if(s.asset&&s.returnedAll<s.expected)await czAlert('Conferência salva. Há '+(s.expected-s.returnedAll)+' ativo(s) faltante(s): resolva na lista de materiais faltantes.','Pendência');
+  else if(!s.asset&&s.extraMissing>0)await czAlert('Conferência salva. Há '+s.extraMissing+' extra(s) faltante(s): resolva na lista de materiais faltantes.','Pendência');
  };
  window.cz238Acao=async function(i,action){
   const g=groups[i];if(!g)return;const s=summary(g),n=pending(g);if(n<=0)return;
@@ -6861,7 +6865,7 @@ async function czCentralEtapa(id,aba){
  czCentralLinha=function(e){return marcarEtapas(antigaLinha(e),e)};
  czCentralCabecalho=function(){const e=czCentralEstado.eventos.find(x=>String(x.id)===String(czCentralEstado.id));return e?marcarEtapas(antigoCabecalho(),e):antigoCabecalho()};
  // Desativa a interface antiga de retorno. A rotina de banco é preservada.
- ret226Abrir=async function(id){active=String(id);selection='';document.getElementById('content').innerHTML='<div class="card">Carregando conferência de retorno...</div>';try{await refresh()}catch(e){document.getElementById('content').innerHTML='<div class="msg">Erro ao carregar retorno: '+safe(e.message)+'</div>'}};
+ ret226Abrir=async function(id){active=String(id);selection='';modalOpen=false;document.getElementById('content').innerHTML='<div class="card">Carregando conferência de retorno...</div>';try{await refresh()}catch(e){document.getElementById('content').innerHTML='<div class="msg">Erro ao carregar retorno: '+safe(e.message)+'</div>'}};
  // Volta à bipagem por seleção na saída, sem a interface de scanner automático.
  sair142Abrir=async function(id){await czNovoSairAbrirOriginal(id);const area=document.getElementById('content');if(!area)return;area.querySelectorAll('input[id*="sair225"], input[placeholder*="Filtrar pelo nome"],input[placeholder*="Filtrar pelo código"]').forEach(el=>{const parent=el.closest('.field');(parent||el).remove()});};
  // Mantém a navegação única da Central, inclusive a partir do monitoramento.
