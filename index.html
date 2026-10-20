@@ -5345,9 +5345,7 @@ async function prep141Abrir(eventoId){
    ${grupos.montagem.length?`<div class="tablewrap"><table><thead><tr><th>Produto</th><th>Quantidade</th><th>Código</th><th>Ação</th></tr></thead><tbody>${grupos.montagem.map(x=>`<tr><td>${coEsc(x.nome_item)}</td><td>${Number(x.quantidade_necessaria||0)}</td><td>${coEsc(x.codigo||"—")}</td><td>${x.origem==='orcamento'?'<span class="muted">Do orçamento</span>':`<button class="btn secondary" onclick="prep192RemoverMaterial('${x.id}','${eventoId}','montagem')">Remover</button>`}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Nenhum ativo de montagem selecionado.</div>'}
   </div>
 
-  <div class="card"><div class="sectionhead"><div><h3 style="margin:0">5. Projeto de execução</h3><div class="muted">Desenho técnico, montagem, técnico responsável e materiais de montagem.</div></div><button class="btn primary" onclick="editarProjetoEvento('${eventoId}')">Editar projeto de execução</button></div>
-   <svg class="projeto-canvas" viewBox="0 0 900 500" xmlns="http://www.w3.org/2000/svg">${projetoExecucaoMarkup(e.projeto_execucao)}</svg>
-  </div>
+  <div class="card"><div class="sectionhead"><div><h3 style="margin:0">5. Projeto de execução</h3><div class="muted">O desenho fica oculto até abrir o projeto. O desenho salvo será preservado.</div></div><button type="button" class="btn primary" onclick="editarProjetoEvento('${eventoId}')">✎ Abrir Projeto</button></div></div>
 
   <div class="card"><h3 style="margin-top:0">6. Anotação técnica</h3><textarea id="prep145Anotacao" rows="6" placeholder="Orientações para montagem e operação">${coEsc(e.anotacao_tecnica||'')}</textarea></div>
 
@@ -6641,8 +6639,10 @@ function czCentralFiltros(){
 }
 function czCentralLinha(e){
  const st=czCentralStatus(e),sel=String(e.id)===String(czCentralEstado.id);
- const btn=(aba,label)=>`<button type="button" class="btn ${sel&&czCentralEstado.aba===aba?'primary':'secondary'}" style="padding:7px 9px;font-size:12px" onclick="czCentralEtapa('${e.id}','${aba}')">${label}</button>`;
- return `<tr style="${sel?'background:#253442;':''}"><td><b>${finDate(e.data_evento)}</b></td><td style="white-space:normal"><b>${esc(e.nome_evento||'Evento')}</b><div class="muted">${esc(e.cliente_nome||'')}</div></td><td>${esc(e.cidade_evento||'—')}</td><td style="color:${st==='Aguardando retorno'?'#ff9e83':'#cdd6e0'}">${esc(st)}</td><td><div style="display:flex;gap:5px">${btn('preparo','Preparação')}${btn('saida','Saída')}${btn('retorno','Retorno')}</div></td></tr>`;
+ const aba=st==='Aguardando retorno'?'retorno':st==='Aguardando saída'?'saida':'preparo';
+ const rotulo=aba==='retorno'?'Retorno do Evento':aba==='saida'?'Saída do Evento':'Preparação';
+ const botao=`<button type="button" class="btn primary" style="padding:7px 12px;font-size:12px" onclick="czCentralEtapa('${e.id}','${aba}')">${rotulo}</button>`;
+ return `<tr style="${sel?'background:#253442;':''}"><td><b>${finDate(e.data_evento)}</b></td><td style="white-space:normal"><b>${esc(e.nome_evento||'Evento')}</b><div class="muted">${esc(e.cliente_nome||'')}</div></td><td>${esc(e.cidade_evento||'—')}</td><td style="color:${st==='Aguardando retorno'?'#ff9e83':'#cdd6e0'}">${esc(st)}</td><td>${botao}</td></tr>`;
 }
 function czCentralTabela(compacta=false){
  const lista=czCentralFiltros();
@@ -6651,7 +6651,7 @@ function czCentralTabela(compacta=false){
 function czCentralCabecalho(){
  const e=czCentralEstado.eventos.find(x=>String(x.id)===String(czCentralEstado.id));
  if(!e)return '';
- return `<div class="czCentralTopo"><div class="sectionhead" style="margin-bottom:10px"><div><h2 style="margin:0">📋 Central Operacional CZ</h2><div class="muted">${esc(e.nome_evento||'Evento')} • ${esc(e.cliente_nome||'')} • ${finDate(e.data_evento)}</div></div><button type="button" class="btn secondary" onclick="czCentralAbrir()">← Lista de eventos</button></div><div class="czCentralAbas"><button class="btn ${czCentralEstado.aba==='preparo'?'primary':'secondary'}" onclick="czCentralEtapa('${e.id}','preparo')">1 · Preparação</button><button class="btn ${czCentralEstado.aba==='saida'?'primary':'secondary'}" onclick="czCentralEtapa('${e.id}','saida')">2 · Bipagem de Saída</button><button class="btn ${czCentralEstado.aba==='retorno'?'primary':'secondary'}" onclick="czCentralEtapa('${e.id}','retorno')">3 · Retorno e Extras</button></div><details class="czCentralLista"><summary>Trocar evento · ${czCentralFiltros().length} evento(s) na lista</summary>${czCentralTabela(true)}</details></div>`;
+ return `<div class="czCentralTopo"><div class="sectionhead" style="margin-bottom:10px"><div><h2 style="margin:0">📋 Central Operacional CZ</h2><div class="muted">${esc(e.nome_evento||'Evento')} • ${esc(e.cliente_nome||'')} • ${finDate(e.data_evento)}</div></div><button type="button" class="btn secondary" onclick="czCentralAbrir()">← Lista de eventos</button></div><div class="czCentralAbas"><span class="muted">Etapa atual: ${esc(czCentralStatus(e))}</span></div><details class="czCentralLista"><summary>Trocar evento · ${czCentralFiltros().length} evento(s) na lista</summary>${czCentralTabela(true)}</details></div>`;
 }
 function czCentralReporTopo(){
  if(!czCentralEstado.ativo||!czCentralEstado.id||!czCentralEstado.aba)return;
