@@ -6700,6 +6700,175 @@ async function czCentralEtapa(id,aba){
  }catch(err){document.getElementById('content').innerHTML=`${czCentralCabecalho()}<div class="msg">Erro ao abrir etapa: ${esc(err.message||String(err))}</div>`}
 }
 
+
+/* CZ V238 — Central Operacional: conferência por seleção e lista de faltantes.
+   Mantém as RPCs oficiais existentes. Resoluções sem integração persistente
+   ficam em rascunho e NÃO autorizam finalizar o evento. */
+(function(){
+ const CSS=`<style>
+ .cz238Panel{border:1px solid #385063;border-radius:14px;background:#14202c;padding:17px;margin:14px 0}
+ .cz238Tbl{width:100%;border-collapse:collapse}.cz238Tbl th,.cz238Tbl td{padding:12px 9px;border-bottom:1px solid #344354;text-align:left;vertical-align:middle}
+ .cz238Tbl th{font-size:12px;color:#b5c3d0}.cz238Tbl tr.cz238Selected{background:#24405a}.cz238Tbl tr.cz238OK{background:#17452e}
+ .cz238Grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.cz238Stat{padding:13px 7px;background:#0c1721;border:1px solid #31475a;border-radius:9px;text-align:center}.cz238Stat b{font-size:28px;display:block}
+ .cz238Btn{border:1px solid #526477;border-radius:8px;padding:8px 11px;background:#243546;color:white;cursor:pointer;margin:2px;font-weight:700}
+ .cz238Btn:disabled{opacity:.45;cursor:not-allowed}.cz238Btn.cz238Primary{background:#e56819;border-color:#e56819}.cz238Btn.cz238Green{background:#1c6944;border-color:#359c67}
+ .cz238Muted{color:#b4c1cd;font-size:12px}.cz238Bad{color:#ff9999}.cz238Good{color:#8be9b1}.cz238Input{width:100%;padding:12px;font-size:20px;border-radius:8px;border:2px solid #e56819;background:#0c1620;color:white}
+ @media(max-width:650px){.cz238Tbl{min-width:610px}.cz238Grid{gap:4px}.cz238Stat b{font-size:22px}}
+ </style>`;
+ const K='cz238_retorno_resolucoes_';
+ let active='',groups=[],selection='',busy=false,readTimer=null;
+ const safe=x=>esc(String(x??''));
+ const norm=x=>normalizarCodigoEvento(String(x??''));
+ const key=x=>String(x.tipo||'')+'|'+(x.item_id?'ID:'+String(x.item_id):'NOME:'+norm(x.nome_item||x.descricao||''));
+ const qty=x=>ret226Esperado(x,ret226Cache.e);
+ const back=x=>ret226Devolvido(x,ret226Cache.e);
+ const isExtra=x=>ret226Extra(x)||String(x.origem||'').toLowerCase()==='extras';
+ const isAsset=x=>ret226Ativo(x);
+ const total=xs=>xs.reduce((a,x)=>a+qty(x),0);
+ const returned=xs=>xs.reduce((a,x)=>a+back(x),0);
+ const store=()=>{try{return JSON.parse(localStorage.getItem(K+active)||'{}')}catch(e){return {}}};
+ const save=o=>localStorage.setItem(K+active,JSON.stringify(o));
+ const summary=g=>{
+  const contracted=total(g.lines.filter(x=>!isExtra(x))),extras=total(g.lines.filter(isExtra));
+  const returnedAll=returned(g.lines);
+  const extraReturned=Math.min(extras,returnedAll);
+  const extraMissing=Math.max(0,extras-returnedAll);
+  const contractedReturned=Math.max(0,returnedAll-extras);
+  const contractedMissing=Math.max(0,contracted-contractedReturned);
+  const asset=isAsset(g.lines[0]);
+  return {contracted,extras,returnedAll,extraReturned,extraMissing,contractedReturned,contractedMissing,asset,expected:contracted+extras};
+ };
+ const pending=g=>{
+  const s=summary(g);
+  return s.asset?s.expected-s.returnedAll:s.extraMissing;
+ };
+ function makeGroups(mats){
+  const map=new Map();
+  mats.filter(x=>qty(x)>0).forEach(x=>{const k=key(x);if(!map.has(k))map.set(k,{key:k,name:sair222Nome(x),lines:[]});map.get(k).lines.push(x)});
+  return [...map.values()].sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
+ }
+ const findSelected=()=>groups.find(g=>g.key===selection);
+ function buttons(id,opts){return opts.map(([label,fn,kind])=>`<button type="button" class="cz238Btn ${kind||''}" onclick="${fn}">${label}</button>`).join('')}
+ function detailsRows(kind){return groups.flatMap(g=>g.lines.filter(x=>kind==='extra'?isExtra(x):!isExtra(x)).map(x=>`<tr><td>${safe(sair222Nome(x))}</td><td>${qty(x)}</td><td>${back(x)}</td></tr>`)).join('')||'<tr><td colspan="3">Nenhum item</td></tr>'}
+ function lineTable(){return groups.map((g,i)=>{const s=summary(g),selected=g.key===selection,ok=s.returnedAll===s.expected;
+  return `<tr class="${selected?'cz238Selected':ok?'cz238OK':''}" onclick="cz238Selecionar(${i})" style="cursor:pointer"><td><input type="radio" name="cz238Select" ${selected?'checked':''} aria-label="Selecionar ${safe(g.name)}" style="accent-color:#e56819" /></td><td><b>${safe(g.name)}</b><div class="cz238Muted">${s.asset?'Ativo • rastreio individual':'Consumível • código do produto'}</div></td><td>${s.expected}</td><td>${s.returnedAll}</td><td class="${s.expected-s.returnedAll?'cz238Bad':'cz238Good'}">${s.expected-s.returnedAll}</td></tr>`;
+ }).join('')}
+ function missingRows(){const data=store();return groups.map((g,i)=>{const s=summary(g),n=pending(g);if(n<=0)return '';
+  const r=data[g.key],kind=s.asset?'Ativo':'Consumível';
+  const action=s.asset?buttons(i,[['Perda',`cz238Acao(${i},'perda')`],['Aguardar',`cz238Acao(${i},'aguardar')`]]):buttons(i,[['Venda PDV',`cz238Acao(${i},'pdv')`],['Substituição',`cz238Acao(${i},'substituicao')`]]);
+  return `<tr><td><b>${safe(g.name)}</b><div class="cz238Muted">${kind}${s.asset?' • códigos individuais pendentes':''}</div>${r?`<div class="cz238Muted">Escolha registrada: ${safe(r.action)} • ${safe(r.status||'rascunho')}</div>`:''}</td><td style="font-weight:900;color:#ffb0a5">${n}</td><td>${action}</td></tr>`;
+ }).filter(Boolean).join('')||'<tr><td colspan="3" class="cz238Good">Nenhum material extra ou ativo faltante.</td></tr>'}
+ function render(){
+  const e=ret226Cache?.e;if(!e||String(e.id)!==String(active))return;
+  groups=makeGroups(ret226Cache.mats);
+  if(!groups.some(g=>g.key===selection))selection=groups[0]?.key||'';
+  const g=findSelected(),s=g&&summary(g),nMissing=groups.filter(g=>pending(g)>0).length;
+  document.getElementById('pageTitle').textContent='Central Operacional';
+  document.getElementById('content').innerHTML=CSS+`<div class="sectionhead"><div><h2>↩️ Retorno — ${safe(e.nome_evento||'Evento')}</h2><div class="cz238Muted">${safe(e.cliente_nome||'')} • ${finDate(e.data_evento)} • Selecione, bipe e conclua cada material</div></div><button class="btn secondary" onclick="czCentralAbrir()">← Central Operacional</button></div>
+   <div class="cz238Panel"><h3>1. Lista geral — materiais que saíram</h3><div class="tablewrap"><table class="cz238Tbl"><thead><tr><th>Sel.</th><th>Descrição</th><th>Saiu</th><th>Voltou</th><th>Falta</th></tr></thead><tbody>${lineTable()}</tbody></table></div></div>
+   ${g?`<div class="cz238Panel"><h3>2. Bipagem do material selecionado: ${safe(g.name)}</h3><div class="cz238Grid"><div class="cz238Stat">Saiu<b>${s.expected}</b></div><div class="cz238Stat">Bipado<b>${s.returnedAll}</b></div><div class="cz238Stat">Falta<b class="${s.expected-s.returnedAll?'cz238Bad':'cz238Good'}">${s.expected-s.returnedAll}</b></div></div>
+   <p class="cz238Muted">${s.asset?'Bipe o código de rastreio individual do equipamento que saiu neste evento.':'Bipe o código de barras do produto devolvido. Cada leitura vale uma unidade.'}</p>
+   <input id="scanRetorno" class="cz238Input" autocomplete="off" placeholder="Bipar código do material selecionado..." ${e.status==='finalizado'?'disabled':''}/><div id="retMsg" class="cz238Muted" role="status" style="margin:8px 0;min-height:22px"></div>
+   ${buttons(0,[['Bipar',`cz238Bipar()`, 'cz238Primary'],['Concluir conferência',`cz238Conferir()`, 'cz238Green']])}
+   <div style="margin-top:14px;border-top:1px solid #3b4b5c;padding-top:12px"><b>Resultado automático</b><p class="cz238Muted">Contratado: ${s.contracted} • Extra: ${s.extras} • Extra devolvido: ${s.extraReturned}/${s.extras} • ${s.asset?'Equipamentos não devolvidos: '+(s.expected-s.returnedAll):'Contratado para confirmar consumo: '+s.contractedMissing}</p></div></div>`:'<p>Nenhum material com saída registrada.</p>'}
+   <div class="cz238Panel"><h3>3. Lista automática de materiais faltantes <span class="cz238Bad">(${nMissing})</span></h3><p class="cz238Muted">Consumíveis: aparecem apenas extras não devolvidos. Ativos: aparecem equipamentos não devolvidos. Resolva pela ação na própria linha.</p><div class="tablewrap"><table class="cz238Tbl"><thead><tr><th>Descrição</th><th>Falta</th><th>Ações</th></tr></thead><tbody>${missingRows()}</tbody></table></div></div>
+   <div class="cz238Panel"><h3>Materiais Contratados</h3><div class="tablewrap"><table class="cz238Tbl"><thead><tr><th>Descrição</th><th>Saiu</th><th>Voltou (por linha)</th></tr></thead><tbody>${detailsRows('contratado')}</tbody></table></div><h3 style="margin-top:20px">Materiais Extras</h3><div class="tablewrap"><table class="cz238Tbl"><thead><tr><th>Descrição</th><th>Saiu</th><th>Voltou (por linha)</th></tr></thead><tbody>${detailsRows('extra')}</tbody></table></div><p class="cz238Muted">A conferência do consumível é agrupada e as devoluções são atribuídas primeiro aos extras. A distribuição física por linha depende dos registros de retorno do banco.</p></div>
+   <div class="cz238Panel"><button class="cz238Btn cz238Primary" onclick="cz238Finalizar()">Concluir retorno do evento</button><p class="cz238Muted">Não finaliza enquanto houver diferenças sem resolução oficial. Rascunhos locais não equivalem a baixa, venda ou perda registrada no Supabase.</p></div>`;
+  const inp=document.getElementById('scanRetorno');if(inp){inp.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key==='Tab'){ev.preventDefault();clearTimeout(readTimer);window.cz238Bipar()}});inp.addEventListener('input',()=>{clearTimeout(readTimer);if(inp.value.trim())readTimer=setTimeout(()=>window.cz238Bipar(),650)});inp.focus()}
+  if(typeof czCentralReporTopo==='function')czCentralReporTopo();
+ }
+ async function refresh(){
+  const [er,ms]=await Promise.all([db.from('eventos_operacionais').select('*').eq('id',active).single(),sair221Materiais(active)]);
+  if(er.error)throw er.error;
+  ret226Cache={e:er.data,mats:ms.filter(x=>Number(x.quantidade_bipada||0)>0)};
+  render();
+ }
+ window.cz238Selecionar=function(i){selection=groups[i]?.key||'';render()};
+ window.cz238Bipar=async function(){
+  if(busy)return;const g=findSelected(),inp=document.getElementById('scanRetorno');const code=norm(inp?.value);
+  if(!g||!code)return;busy=true;clearTimeout(readTimer);
+  try{
+   const s=summary(g);if(s.returnedAll>=s.expected)throw Error('Material já totalmente devolvido.');
+   const valid=g.lines.filter(x=>(x._codigos||[]).some(v=>norm(v)===code));
+   if(!valid.length)throw Error('Código diferente do material selecionado. Confira o código de barras ou rastreio.');
+   const avail=valid.filter(x=>back(x)<qty(x));
+   if(!avail.length)throw Error('As linhas correspondentes já estão completas.');
+   // Consumíveis: primeiro os extras. Ativos: primeiro o rastreio comprovadamente registrado na saída.
+   const st=sair142State(active),logs=st.historico||[];
+   const candidates=avail.sort((a,b)=>Number(isExtra(b))-Number(isExtra(a)));
+   const target=s.asset?(candidates.find(x=>logs.some(h=>String(h.material_id)===String(x.id)&&norm(h.codigo)===code))||candidates[0]):candidates[0];
+   const ok=await biparRetornoEvento(active,target.id);
+   if(!ok){const error=document.getElementById('retMsg')?.textContent||'Falha ao registrar a leitura no banco.';throw Error(error)}
+   await refresh();const msg=document.getElementById('retMsg');if(msg){msg.style.color='#8be9b1';msg.textContent='✓ Retorno registrado: '+g.name}
+  }catch(err){const msg=document.getElementById('retMsg');if(msg){msg.style.color='#ff9999';msg.textContent=err.message||String(err)}}
+  finally{busy=false;const input=document.getElementById('scanRetorno');if(input){input.value='';input.focus()}}
+ };
+ window.cz238Conferir=async function(){
+  const g=findSelected();if(!g)return;const s=summary(g);
+  if(s.asset){if(s.returnedAll===s.expected)await czAlert('Ativos devolvidos 100%. Conferência completa.','Conferência');else await czAlert('Faltam '+(s.expected-s.returnedAll)+' unidade(s). Use Perda ou Aguardar na lista de faltantes.','Conferência')}
+  else if(s.extraMissing>0)await czAlert('Extra faltante: '+s.extraMissing+' unidade(s). Resolva por Venda PDV ou Substituição na lista de faltantes.','Conferência');
+  else if(s.contractedMissing>0){const ok=await czConfirm('Confirmar '+s.contractedMissing+' unidade(s) contratada(s) como consumo normal do evento?','Consumo contratado','Confirmar consumo');if(ok){const d=store();d[g.key]={...(d[g.key]||{}),consumoConfirmado:s.contractedMissing};save(d);await czAlert('Consumo confirmado neste navegador. A integração definitiva do relatório com Supabase ainda precisa ser validada.','Consumo')}}
+  else await czAlert('Devolução completa, sem faltas.','Conferência');render();
+ };
+ window.cz238Acao=async function(i,action){
+  const g=groups[i];if(!g)return;const s=summary(g),n=pending(g);if(n<=0)return;
+  if(action==='pdv'){
+   // O PDV legado não suporta venda parcial com rateio entre contratado e extra.
+   const extraLines=g.lines.filter(isExtra),legacySafe=extraLines.length===1&&qty(extraLines[0])-back(extraLines[0])===n&&n>0;
+   if(!legacySafe)return czAlert('Esta diferença está distribuída entre linhas. A cobrança automática foi bloqueada para evitar valores errados. É necessário registrar a divisão antes do PDV.','PDV');
+   const mid=String(extraLines[0].id),data=czNovoCampo(active);data[mid]={cliente:n,cz:0};localStorage.setItem(CZ_NOVO_CAMPO_KEY+active,JSON.stringify(data));
+   const usos=ret237Usos(active);usos[mid]=n;localStorage.setItem(RET237_USO+active,JSON.stringify(usos));
+   // Só abrir PDV quando não existirem outros extras sem classificação.
+   const outros=ret226Cache.mats.filter(x=>isExtra(x)&&!isAsset(x)&&String(x.id)!==mid&&qty(x)>back(x));
+   if(outros.length)return czAlert('Existem outros extras pendentes. Resolva-os antes de abrir o PDV para não cobrar materiais indevidos.','PDV');
+   const d=store();d[g.key]={action:'pdv',qtd:n,status:'aguardando confirmação no PDV'};save(d);
+   await ret226AbrirPDV(active);return;
+  }
+  if(action==='perda'){
+   if(!s.asset)return;
+   if(g.lines.length!==1)return czAlert('Existem múltiplas linhas deste ativo. A perda deve ser identificada por rastreio antes de registrar no banco.','Perda');
+   const x=g.lines[0];await registrarOcorrenciaRetorno(active,x.id,x.item_id,'perda');
+   const d=store();d[g.key]={action:'perda',qtd:n,status:'verificar registro oficial'};save(d);await refresh();return;
+  }
+  if(action==='substituicao'){
+   const motivo=await czPrompt('Descreva qual material substituiu as '+n+' unidade(s) de '+g.name+' e o motivo:','','Substituição');if(motivo===null||!motivo.trim())return;
+   const custo=Number(await czPrompt('Custo total interno da CZ (R$):','0','Custo de substituição'));if(!Number.isFinite(custo)||custo<0)return czAlert('Custo inválido.');
+   cz231GuardarOcorrencia({eventoId:active,tipo:'substituicao',materialId:g.lines[0]?.id,material:g.name,quantidade:n,custo,observacao:motivo});
+   const d=store();d[g.key]={action:'substituicao',qtd:n,status:'rascunho local — pendente de integração'};save(d);render();return;
+  }
+  if(action==='aguardar'){
+   const d=store();d[g.key]={action:'aguardar',qtd:n,status:'pendente de devolução'};save(d);render();return;
+  }
+ };
+ window.cz238Finalizar=async function(){
+  const faltas=groups.filter(g=>pending(g)>0),consumos=groups.filter(g=>{const s=summary(g);return !s.asset&&s.contractedMissing>0&&Number(store()[g.key]?.consumoConfirmado)!==s.contractedMissing});
+  if(consumos.length)return czAlert('Confirme o consumo contratado antes de concluir: '+consumos.map(g=>g.name).join(', '),'Retorno');
+  if(faltas.length)return czAlert('Ainda há '+faltas.length+' material(is) com diferenças. As ações locais ou Aguardar não finalizam a ocorrência no Supabase. Conclua as vendas/perdas e valide os registros oficiais.','Retorno pendente');
+  await czAlert('A conferência está completa. Antes de finalizar definitivamente, confirme que todos os consumos e movimentações foram registrados no Supabase. O fechamento automático permanece bloqueado nesta versão de teste para evitar perda de dados.','Validação necessária');
+ };
+ // Etapas ficam verdes somente quando a conclusão está confirmada no evento.
+ const antigaLinha=czCentralLinha,antigoCabecalho=czCentralCabecalho;
+ function marcarEtapas(html,e){
+  const prep=['aguardando_separacao','separando','material_pronto','pronto','aguardando_evento','aguardando_retorno','finalizado'].includes(e.status)||!!e.saida_baixada_em;
+  const saida=!!e.saida_baixada_em;
+  const retorno=e.status==='finalizado';
+  for(const [titulo,ok] of [['Preparação',prep],['Saída',saida],['Retorno',retorno],['1 · Preparação',prep],['2 · Bipagem de Saída',saida],['3 · Retorno e Extras',retorno]]){
+   if(!ok)continue;
+   html=html.replace(new RegExp('(<button\\b[^>]*)(>'+titulo.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'<\\/button>)','g'),(m,a,b)=>a+' style="background:#1b7547!important;border-color:#39b976!important;color:#fff!important"'+b);
+  }
+  return html;
+ }
+ czCentralLinha=function(e){return marcarEtapas(antigaLinha(e),e)};
+ czCentralCabecalho=function(){const e=czCentralEstado.eventos.find(x=>String(x.id)===String(czCentralEstado.id));return e?marcarEtapas(antigoCabecalho(),e):antigoCabecalho()};
+ // Desativa a interface antiga de retorno. A rotina de banco é preservada.
+ ret226Abrir=async function(id){active=String(id);selection='';document.getElementById('content').innerHTML='<div class="card">Carregando conferência de retorno...</div>';try{await refresh()}catch(e){document.getElementById('content').innerHTML='<div class="msg">Erro ao carregar retorno: '+safe(e.message)+'</div>'}};
+ // Volta à bipagem por seleção na saída, sem a interface de scanner automático.
+ sair142Abrir=async function(id){await czNovoSairAbrirOriginal(id);const area=document.getElementById('content');if(!area)return;area.querySelectorAll('input[id*="sair225"], input[placeholder*="Filtrar pelo nome"],input[placeholder*="Filtrar pelo código"]').forEach(el=>{const parent=el.closest('.field');(parent||el).remove()});};
+ // Mantém a navegação única da Central, inclusive a partir do monitoramento.
+ const oldEtapa=cz231Etapa;
+ cz231Etapa=async function(id,acao){if(['preparacao','saida','retorno'].includes(acao)){if(!czCentralEstado.eventos.some(x=>String(x.id)===String(id))){const {data}=await db.from('eventos_operacionais').select('*').eq('id',id).single();if(data)czCentralEstado.eventos.push(data)}return czCentralEtapa(id,acao==='preparacao'?'preparo':acao)}return oldEtapa(id,acao)};
+})();
+
 </script><style>
 .czCentralTopo{position:sticky;top:0;z-index:4;background:#101923;border:1px solid #334354;border-radius:12px;padding:14px;margin-bottom:18px;box-shadow:0 7px 20px #0006}
 .czCentralAbas{display:flex;flex-wrap:wrap;gap:8px}.czCentralAbas .btn{flex:1;min-width:150px}
