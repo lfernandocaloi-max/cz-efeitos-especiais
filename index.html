@@ -5076,16 +5076,11 @@ async function sair142Abrir(eventoId){
   .sair223Concluida input{accent-color:#41c47a;cursor:default}
   @media(max-width:600px){.sair223Numeros strong{font-size:25px}.sair223Numeros small{font-size:10px}}
   </style>
-  <div class="card"><div class="field" style="max-width:360px;margin:0 0 14px"><label>Responsável pela conferência *</label><input id="sair142Resp" value="${coEsc(st.responsavel||'')}" placeholder="Digite o colaborador" onchange="sair142Set('${eventoId}',{responsavel:this.value.trim()})"></div><div class="muted" style="margin-bottom:10px">Selecione o quadrado do material para abrir a conferência. Os itens totalmente bipados ficam verdes.</div>
-  <div style="display:flex;align-items:end;gap:9px;flex-wrap:wrap;margin:0 0 10px">
-   <div class="field" style="margin:0;width:190px;max-width:calc(50% - 5px)"><label for="sair225FiltroNome" style="font-size:12px;margin-bottom:4px">Filtrar pelo nome</label><input id="sair225FiltroNome" type="search" placeholder="Nome do produto" autocomplete="off" oninput="sair225FiltrarLista()" style="min-height:34px;padding:7px 9px;font-size:13px"></div>
-   <div class="field" style="margin:0;width:170px;max-width:calc(50% - 5px)"><label for="sair225FiltroCodigo" style="font-size:12px;margin-bottom:4px">Filtrar pelo código</label><input id="sair225FiltroCodigo" type="search" placeholder="Código / rastreio" autocomplete="off" oninput="sair225FiltrarLista()" style="min-height:34px;padding:7px 9px;font-size:13px"></div>
-   <span id="sair225ResumoFiltro" class="muted" style="font-size:12px;padding-bottom:8px">${mats.length} de ${mats.length} itens</span>
-  </div>
+  <div class="card"><div class="field" style="max-width:360px;margin:0 0 14px"><label>Responsável pela conferência *</label><input id="sair142Resp" value="${coEsc(st.responsavel||'')}" placeholder="Digite o colaborador" onchange="sair142Set('${eventoId}',{responsavel:this.value.trim()})"></div><div class="muted" style="margin-bottom:10px">Bipe diretamente no campo de leitura. Cada unidade válida aumenta a conferência; linhas completas ficam verdes.</div>
   <h3 style="margin:15px 0 8px">Materiais contratados</h3>
   <div class="tablewrap"><table id="sair222Tabela"><thead><tr><th>Sel.</th><th>Produto</th><th>Quantidade</th><th>Conferência</th><th>Origem</th><th>Código</th><th>Tipo</th></tr></thead><tbody>${sair234Linhas(eventoId,sair234Contratados(mats),c,st)}</tbody></table></div>
   <h3 style="margin:24px 0 8px">Materiais extras — bipagem separada</h3>
-  <div class="muted" style="margin-bottom:8px">Selecione cada extra para bipar. A quantidade utilizada será informada somente no Retorno de Evento.</div>
+  <div class="muted" style="margin-bottom:8px">Bipe os extras diretamente no campo de leitura. A quantidade utilizada será informada no Retorno de Evento.</div>
   <div class="tablewrap"><table id="sair234TabelaExtras"><thead><tr><th>Sel.</th><th>Produto</th><th>Quantidade</th><th>Conferência</th><th>Origem</th><th>Código</th><th>Tipo</th></tr></thead><tbody>${sair234Extras(mats).map(x=>{const q=sair220Qtd(x),n=Math.min(q,Number(c[x.id]||0)),f=q-n,pronto=f===0;return `<tr class="sair223Linha ${pronto?'sair223Concluida':''}" data-material="${coEsc(String(x.id))}" onclick="sair222Selecionar('${eventoId}','${x.id}')"><td><input type="checkbox" ${pronto?'checked disabled':''} onclick="event.stopPropagation();sair222Selecionar('${eventoId}','${x.id}')"></td><td><b>${coEsc(sair222Nome(x))}</b></td><td>${q}</td><td>${pronto?'✓ Conferido':n+'/'+q+' • Faltam '+f}</td><td>Extra</td><td>${coEsc(sair234CodigosLidos(x,st))}</td><td>${sair220Ativo(x)?'Ativo':'Consumo'}</td></tr>`}).join('')}</tbody></table></div>
   <div style="margin-top:14px"><b style="font-size:17px">Itens conferidos: ${mats.filter(x=>Number(c[x.id]||0)>=sair220Qtd(x)).length} de ${mats.length} • Unidades bipadas: ${conf}/${esperado} — ${pct}%</b><div style="height:10px;background:#26313b;border-radius:10px;margin-top:6px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${pct===100?'#45b879':'#d7a73b'}"></div></div></div></div>
   <div class="actions"><button class="btn primary" onclick="sair223AbrirConclusao('${eventoId}')">Concluir bipagem</button></div>`;
@@ -6440,23 +6435,57 @@ sair142Abrir=async function(id){
  czNovoOcultarSelecao(document.getElementById('sair222Tabela'));
  czNovoOcultarSelecao(document.getElementById('sair234TabelaExtras'));
  const inp=document.getElementById('sair142Cod');
- if(inp){inp.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key==='Tab'){ev.preventDefault();czNovoBiparSaida(id)}});inp.focus()}
+ if(inp){let timer=null;inp.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key==='Tab'){ev.preventDefault();clearTimeout(timer);czNovoBiparSaida(id)}});inp.addEventListener('input',()=>{clearTimeout(timer);if(inp.value.trim())timer=setTimeout(()=>czNovoBiparSaida(id),650)});inp.focus()}
 }
+// Bipagem de saída V2: conta cada leitura de consumível, sem seleção ou modal.
+// A conferência é um rascunho local; a baixa oficial continua em sair142DarSaida.
 async function czNovoBiparSaida(id){
  if(czNovoScannerOcupado)return;
- const inp=document.getElementById('sair142Cod'),cod=normalizarCodigoEvento(inp?.value||'');if(!cod)return;
+ const inp=document.getElementById('sair142Cod');
+ const codigo=normalizarCodigoEvento(inp?.value||'');
+ if(!codigo)return;
  czNovoScannerOcupado=true;
+ const aviso=document.getElementById('sair220Aviso');
  try{
-  const mats=await sair221Materiais(id),st=sair142State(id),c=sair220Contagens(mats,st);
-  const candidatos=mats.filter(x=>(x._codigos||[]).some(v=>normalizarCodigoEvento(v)===cod));
-  if(!candidatos.length)throw new Error('Código não encontrado nos materiais deste evento. Confira o cadastro.');
-  const aptos=candidatos.filter(x=>Number(c[x.id]||0)<sair220Qtd(x));
-  if(!aptos.length)throw new Error('Esse produto já está totalmente conferido.');
-  if(aptos.length>1)throw new Error('O código corresponde a mais de uma linha. Diferencie as linhas do evento antes de bipar.');
-  sair222Selecionado[String(id)]=String(aptos[0].id);
-  await czNovoSairBiparOriginal(id);
- }catch(e){const el=document.getElementById('sair220Aviso');if(el){el.style.color='#ff9d9d';el.textContent=e.message}}
- finally{czNovoScannerOcupado=false;const atual=document.getElementById('sair142Cod');if(atual){atual.value='';atual.focus()}}
+  const resp=String(document.getElementById('sair142Resp')?.value||sair142State(id).responsavel||'').trim();
+  if(!resp)throw new Error('Informe o responsável pela conferência antes de bipar.');
+  const mats=await sair221Materiais(id);
+  const st=sair142State(id),contagens=sair220Contagens(mats,st);
+  // Consumível: o mesmo código de barras é lido repetidamente, uma vez por unidade.
+  // Ativo: somente o rastreio individual é aceito, e nunca duas vezes.
+  const candidatos=mats.filter(x=>{
+   const codigos=[...(x._codigos||[])];
+   if(!sair220Ativo(x))codigos.push(x.codigo_barras,x.codigo,x.codigo_rastreio);
+   return codigos.some(v=>v!=null&&normalizarCodigoEvento(v)===codigo);
+  });
+  if(!candidatos.length)throw new Error('Código '+codigo+' não encontrado nos materiais do evento. Confira o código de barras do cadastro.');
+  const aptos=candidatos.filter(x=>Number(contagens[x.id]||0)<sair220Qtd(x));
+  if(!aptos.length)throw new Error('Quantidade já conferida para este produto ('+codigo+').');
+  // Se um produto está em duas linhas, confere primeiro a linha ainda pendente.
+  // Para ativos, um rastreio não pode estar repetido em linhas diferentes.
+  if(aptos.length>1&&aptos.some(sair220Ativo))throw new Error('Rastreio duplicado em linhas do evento. Corrija o cadastro antes de conferir.');
+  const item=aptos[0];
+  if(sair220Ativo(item)&&(st.rastreiosLidos||[]).some(v=>normalizarCodigoEvento(v)===codigo))
+   throw new Error('Este equipamento já foi bipado nesta saída.');
+  contagens[item.id]=Number(contagens[item.id]||0)+1;
+  const historico=[...(st.historico||[]),{acao:'Conferência',codigo,material_id:item.id,data:new Date().toISOString(),responsavel:resp}];
+  sair142Set(id,{
+   responsavel:resp,contagens,
+   bipados:[...new Set([...(st.bipados||[]),String(item.codigo_barras||item.codigo||item.id)])],
+   rastreiosLidos:sair220Ativo(item)?[...(st.rastreiosLidos||[]),codigo]:(st.rastreiosLidos||[]),
+   historico
+  });
+  // Recarrega as tabelas e o resumo, sem abrir a antiga janela de bipagem.
+  await sair142Abrir(id);
+  const status=document.getElementById('sair220Aviso');
+  if(status){status.style.color='#8de8a8';status.textContent='✓ '+sair222Nome(item)+' — '+contagens[item.id]+'/'+sair220Qtd(item)+' unidades conferidas';}
+ }catch(e){
+  const status=document.getElementById('sair220Aviso')||aviso;
+  if(status){status.style.color='#ff9d9d';status.textContent=e.message||String(e);}
+ }finally{
+  czNovoScannerOcupado=false;
+  const novo=document.getElementById('sair142Cod');if(novo){novo.value='';novo.focus();}
+ }
 }
 const czNovoRetornoAbrirOriginal=ret226Abrir;
 ret226Abrir=async function(id){
