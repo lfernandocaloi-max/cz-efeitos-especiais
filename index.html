@@ -143,7 +143,7 @@ const $=s=>document.querySelector(s); let clients=[],products=[],assets=[],purch
 function czDialog({titulo='CZ Efeitos Especiais',mensagem='',tipo='alerta',valor='',placeholder='',confirmar='OK',cancelar='Cancelar'}={}){
  return new Promise(resolve=>{
   document.getElementById('czDialogOverlay')?.remove();
-  const ov=document.createElement('div');ov.id='czDialogOverlay';ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:200000;display:flex;align-items:center;justify-content:center;padding:18px';
+  const ov=document.createElement('div');ov.id='czDialogOverlay';ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:2147483100;display:flex;align-items:center;justify-content:center;padding:18px';
   const box=document.createElement('div');box.style.cssText='width:min(520px,100%);background:#151b26;border:1px solid #30394a;border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.55);padding:22px;color:#fff';
   const campo=tipo==='prompt'?`<input id="czDialogInput" value="${esc(String(valor??''))}" placeholder="${esc(placeholder||'')}" style="width:100%;margin-top:14px;box-sizing:border-box;background:#0f141d;color:#fff;border:1px solid #384254;border-radius:10px;padding:12px;font-size:14px;outline:none">`:'';
   box.innerHTML=`<div style="font-size:12px;color:#ff641f;font-weight:900;letter-spacing:.8px">CZ EFEITOS ESPECIAIS</div><h3 style="margin:5px 0 12px;font-size:21px">${esc(titulo)}</h3><div style="white-space:pre-wrap;line-height:1.5;color:#dce2eb">${esc(String(mensagem||''))}</div>${campo}<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px">${tipo!=='alerta'?`<button id="czDialogCancelar" class="btn secondary" type="button">${esc(cancelar)}</button>`:''}<button id="czDialogOk" class="btn primary" type="button">${esc(confirmar)}</button></div>`;
@@ -7014,6 +7014,9 @@ function desenharModal(){if(!modal)return;const x=mat.find(x=>chave(x)===modal.m
  if(modal.tipo==='cons'){
   const usado=ler().uso?.[chave(x)];const valor=usado===undefined?qtd(x):usado;
   popup(`<p><b>${E(nome(x))}</b> · Código ${E(cod(x))}</p><p>Quantidade que levou: <b>${qtd(x)}</b></p><label>Quantidade utilizada</label><input id="cz245Usado" type="number" min="0" max="${qtd(x)}" step="1" value="${valor}" class="cz245Input"><p class="cz245Muted">Se informar menos do que levou, a diferença será devolvida ao estoque após confirmação oficial.</p><button class="cz245Btn" onclick="cz245BaixarCons()">Baixar</button><div id="cz245Aviso" role="status"></div>`);
+ }else if(modal.tipo==='consconfirmar'){
+  const n=modal.usado,devolver=qtd(x)-n;
+  popup(`<p><b>${E(nome(x))}</b> · Código ${E(cod(x))}</p><div class="cz245Stats"><div>Levou<b>${qtd(x)}</b></div><div>Utilizou<b>${n}</b></div><div>Devolver<b style="color:#8be9b1">${devolver}</b></div></div><p class="cz245Muted">${devolver>0?'Ao confirmar, '+devolver+' unidade(s) serão devolvidas ao estoque.':'Toda a quantidade foi utilizada. Não haverá devolução ao estoque.'}</p><div class="cz245Row"><button class="cz245Btn alt" id="cz245VoltarCons" onclick="cz245VoltarCons()">Voltar</button><button class="cz245Btn" id="cz245ConfirmarCons" onclick="cz245ConfirmarBaixaCons()">Confirmar baixa</button></div><div id="cz245Aviso" role="status" aria-live="polite"></div>`);
  }else if(modal.tipo==='extra'||modal.tipo==='ativo'){
   const lista=modal.tipo==='extra'?extras:ativos;const total=lista.reduce((s,x)=>s+qtd(x),0),voltou=lista.reduce((s,x)=>s+dev(x),0);
   popup(`<div class="cz245Stats"><div>Total<b>${total}</b></div><div>Bipado<b>${voltou}</b></div><div>Falta<b>${total-voltou}</b></div></div><p class="cz245Muted">Leia qualquer material ${modal.tipo==='extra'?'extra':'ativo'} da saída, sem selecionar o item.</p><input id="scanRetorno" class="cz245Input" autocomplete="off" placeholder="Bipe o código de barras..."><div id="retMsg" role="status" style="min-height:30px;color:#ffb4a3;margin:8px 0"></div><button class="cz245Btn alt" onclick="cz245Bipar()">Registrar leitura</button> <button class="cz245Btn" onclick="${modal.tipo==='extra'?'cz245Faltantes()':'cz245FaltantesAtivos()'}">${modal.tipo==='extra'?'Concluir Bipagem':'Faltantes'}</button><div style="margin-top:12px">${lista.map(x=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #35495b"><span>${E(nome(x))}</span><b>${dev(x)}/${qtd(x)}</b></div>`).join('')}</div>`);
@@ -7051,22 +7054,77 @@ window.cz245ConfirmarAcao=async()=>{
    await czAlert('Substituição registrada como ocorrência local. É necessário lançar e confirmar a despesa no Financeiro/DRE.','Substituição pendente');
  }
 };
-window.cz245BaixarCons=async()=>{
- const x=mat.find(x=>chave(x)===modal?.mid),n=Number(document.getElementById('cz245Usado')?.value),msg=document.getElementById('cz245Aviso');if(!x||!Number.isInteger(n)||n<0||n>qtd(x)){msg.textContent='Informe uma quantidade inteira válida.';return}
+// V246: confirmação em duas etapas na MESMA janela (sem czConfirm sobreposto).
+window.cz245BaixarCons=()=>{
+ if(ocupado)return;
+ const x=mat.find(x=>chave(x)===modal?.mid);
+ const campo=document.getElementById('cz245Usado');
+ const msg=document.getElementById('cz245Aviso');
+ const texto=campo?.value?.trim()??'';
+ const n=Number(texto);
+ if(!x||texto===''||!Number.isInteger(n)||n<0||n>qtd(x)){
+  if(msg)msg.textContent='Informe uma quantidade inteira entre 0 e '+(x?qtd(x):0)+'.';return;
+ }
+ modal={tipo:'consconfirmar',mid:chave(x),usado:n,titulo:'Confirmar baixa — '+nome(x)};
+ desenharModal();
+};
+window.cz245VoltarCons=()=>{
+ if(ocupado)return;
+ const x=mat.find(x=>chave(x)===modal?.mid);if(!x)return;
+ const usado=modal.usado;
+ modal={tipo:'cons',mid:chave(x),titulo:'Baixa — '+nome(x)};
+ desenharModal();
+ const campo=document.getElementById('cz245Usado');if(campo)campo.value=String(usado);
+};
+window.cz245ConfirmarBaixaCons=async()=>{
+ if(ocupado||modal?.tipo!=='consconfirmar')return;
+ const x=mat.find(x=>chave(x)===modal.mid);
+ const n=modal.usado;
+ const msg=document.getElementById('cz245Aviso');
+ if(!x||!Number.isInteger(n)||n<0||n>qtd(x)){
+  if(msg)msg.textContent='Quantidade inválida. Volte e confira.';return;
+ }
  const devolver=qtd(x)-n;
- if(!await czConfirm(`Utilizadas: ${n} unidade(s). Devolver ${devolver} unidade(s) ao estoque. Confirma a baixa?`,'Confirmar devolução','Confirmar'))return;
- if(ocupado)return;ocupado=true;
+ ocupado=true;
+ const btn=document.getElementById('cz245ConfirmarCons');
+ const voltar=document.getElementById('cz245VoltarCons');
+ if(btn){btn.disabled=true;btn.textContent='Registrando baixa...'}
+ if(voltar)voltar.disabled=true;
  try{
-  // Devoluções oficiais são feitas pela RPC existente, uma unidade por vez.
-  // Releitura de quantidade_devolvida impede créditos repetidos após interrupções.
   if(!evento.saida_baixada_em)throw Error('Saída ainda não confirmada no Supabase. Não é seguro movimentar estoque.');
-  let atual=dev(x);if(atual>devolver)throw Error('Já existem '+atual+' unidades devolvidas; não é possível reduzir a devolução registrada.');
-  if(devolver>atual){let ref=String(x.codigo||'').trim();if(!ref){ref='CZRET-'+String(x.id).replace(/[^a-zA-Z0-9-]/g,'');const r=await db.from('evento_materiais').update({codigo:ref}).eq('id',x.id).eq('evento_id',id).select('codigo').single();if(r.error)throw r.error;x.codigo=ref}
-   while(atual<devolver){const r=await db.rpc('cz_confirmar_retorno_evento',{p_evento_id:id,p_codigo:ref});if(r.error)throw r.error;const v=await db.from('evento_materiais').select('quantidade_devolvida').eq('id',x.id).single();if(v.error)throw v.error;const nova=Number(v.data?.quantidade_devolvida||0);if(nova<=atual)throw Error('O banco não confirmou a devolução. Confira antes de repetir.');atual=nova;}
+  let atual=dev(x);
+  if(atual>devolver)throw Error('Já existem '+atual+' unidades devolvidas; não é possível reduzir a devolução registrada.');
+  if(devolver>atual){
+   let ref=String(x.codigo||'').trim();
+   if(!ref){
+    ref='CZRET-'+String(x.id).replace(/[^a-zA-Z0-9-]/g,'');
+    const r=await db.from('evento_materiais').update({codigo:ref}).eq('id',x.id).eq('evento_id',id).select('codigo').single();
+    if(r.error)throw r.error;
+    x.codigo=ref;
+   }
+   while(atual<devolver){
+    const r=await db.rpc('cz_confirmar_retorno_evento',{p_evento_id:id,p_codigo:ref});
+    if(r.error)throw r.error;
+    const v=await db.from('evento_materiais').select('quantidade_devolvida').eq('id',x.id).single();
+    if(v.error)throw v.error;
+    const nova=Number(v.data?.quantidade_devolvida||0);
+    if(nova<=atual)throw Error('O banco não confirmou a devolução. Confira antes de repetir.');
+    atual=nova;
+   }
   }
-  const d=ler();d.consumo=d.consumo||{};d.uso=d.uso||{};d.consumo[chave(x)]=true;d.uso[chave(x)]=n;salvar(d);await carregar();window.cz245Fechar();render();
- }catch(e){if(msg)msg.textContent='Não foi possível confirmar a baixa: '+e.message}
- finally{ocupado=false}
+  // Marcar concluído apenas depois da confirmação do banco.
+  const d=ler();d.consumo=d.consumo||{};d.uso=d.uso||{};
+  d.consumo[chave(x)]=true;d.uso[chave(x)]=n;salvar(d);
+  await carregar();
+  window.cz245Fechar();
+  render();
+ }catch(e){
+  if(msg){msg.textContent='Não foi possível confirmar a baixa: '+e.message;msg.style.color='#ffb4a3'}
+ }finally{
+  ocupado=false;
+  const b=document.getElementById('cz245ConfirmarCons');if(b){b.disabled=false;b.textContent='Confirmar baixa'}
+  const v=document.getElementById('cz245VoltarCons');if(v)v.disabled=false;
+ }
 };
 window.cz245Bipar=async()=>{
  if(ocupado)return;const inp=document.getElementById('scanRetorno'),msg=document.getElementById('retMsg'),codigo=normalizarCodigoEvento(inp?.value);if(!codigo)return;
@@ -7081,7 +7139,7 @@ window.cz245Bipar=async()=>{
 window.cz245Perda=async mid=>{const x=mat.find(x=>chave(x)===mid);if(!x)return;await marcarPerdaRetorno(id,x.id,x.item_id||'');await carregar();window.cz245FaltantesAtivos()};
 window.cz245Aguardar=async mid=>{const x=mat.find(x=>chave(x)===mid);if(!x)return;const d=ler();d.aguardar=d.aguardar||{};d.aguardar[mid]=true;salvar(d);await czAlert('Ativo mantido como pendente de devolução. O retorno do evento NÃO poderá ser finalizado até resolução oficial.','Aguardando');};
 async function carregar(){const [er,ms]=await Promise.all([db.from('eventos_operacionais').select('*').eq('id',id).single(),sair221Materiais(id)]);if(er.error)throw er.error;evento=er.data;mat=ms.filter(x=>ret226Esperado(x,evento)>0);ret226Cache={e:evento,mats:mat}}
-window.cz245Abrir=async eventoId=>{id=String(eventoId);modal=null;document.getElementById('content').innerHTML='<div class="card">Carregando retorno...</div>';try{await carregar();render()}catch(e){document.getElementById('content').innerHTML='<div class="msg">Erro ao carregar retorno: '+E(e.message)+'</div>'}};
+window.cz245Abrir=async eventoId=>{window.cz245Fechar();id=String(eventoId);modal=null;document.getElementById('content').innerHTML='<div class="card">Carregando retorno...</div>';try{await carregar();render()}catch(e){document.getElementById('content').innerHTML='<div class="msg">Erro ao carregar retorno: '+E(e.message)+'</div>'}};
 window.cz245Finalizar=async()=>{
  const {cons,extras,ativos}=resumo(),c=cons.filter(x=>!confirmado(x)),e=extras.filter(x=>pendExtra(x)>0),a=ativos.filter(x=>dev(x)<qtd(x));
  if(c.length)return czAlert('Confirme a baixa dos consumíveis: '+c.map(nome).join(', '),'Retorno pendente');
