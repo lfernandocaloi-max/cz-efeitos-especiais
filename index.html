@@ -4411,7 +4411,7 @@ function cz212PagamentoContrato(p,movimentos){
  if(!valores.length)valores=[total];
  let saldoPago=recebido,quitadas=0;
  for(const valor of valores){if(saldoPago+0.009>=valor){quitadas++;saldoPago-=valor}else break}
- return `<span style="color:#ffcb76;font-weight:800" title="${quitadas} de ${valores.length} parcelas pagas; saldo ${money(Math.max(0,total-recebido))}">🟡 ${valores.length}/${quitadas} Parc.</span>`;
+ return `<span style="color:#111827;font-weight:800" title="${quitadas} de ${valores.length} parcelas pagas; saldo ${money(Math.max(0,total-recebido))}">${valores.length}/${quitadas} Parc.</span>`;
 }
 // V176 — situação de pagamento dos contratos, igual à tela Eventos.
 async function renderContratosOficialCZ(){
@@ -4807,7 +4807,7 @@ async function abrirMapaReservasV140(){
  $('#pageTitle').textContent='Reservas automáticas';
  try{
   const lista=await rv140Resumo();
-  $('#content').innerHTML=`<div class="sectionhead"><div><h2>Mapa de Reservas</h2><div class="muted">Consulta automática apenas de ativos e equipamentos. Produtos de consumo não entram em reservas; a saída física permanece na conferência.</div></div><button class="btn secondary" onclick="renderContratosOficialCZ()">Voltar</button></div>
+  $('#content').innerHTML=`<div class="sectionhead"><div><h2>Mapa de Reservas</h2><div class="muted">Consulta automática apenas de ativos e equipamentos. Produtos de consumo não entram em reservas; a saída física permanece na conferência.</div></div><button class="btn secondary" onclick="renderModule(11)">Voltar para Agenda</button></div>
   <div class="cards"><div class="card"><div class="muted">Eventos no fluxo</div><div class="n">${lista.length}</div></div><div class="card"><div class="muted">Com equipamentos reservados</div><div class="n">${lista.filter(e=>e.materiais.length).length}</div></div><div class="card"><div class="muted">Sem equipamentos reservados</div><div class="n">${lista.filter(e=>!e.materiais.length).length}</div></div></div>
   <div class="tablewrap"><table><thead><tr><th>Evento</th><th>Cliente</th><th>Período reservado</th><th>Ativos / Equipamentos</th><th>Situação</th></tr></thead><tbody>${lista.map(e=>`<tr><td><b>${coEsc(e.nome_evento||'Evento')}</b><br><span class="muted">${finDate(e.data_evento)}</span></td><td>${coEsc(e.cliente_nome||'')}</td><td>${finDate(e.periodo.saida)} → ${finDate(e.periodo.retorno)}</td><td>${e.materiais.length?e.materiais.map(m=>`${coEsc(m.nome_item||m.descricao||m.produto_nome||'Material')} × ${coEsc(m.quantidade_necessaria||m.quantidade||1)}`).join('<br>'):'<span class="muted">Nenhum material definido</span>'}</td><td>${e.materiais.length?'<span style="color:#45b879">Reservado automaticamente</span>':'<span style="color:#d7a73b">Aguardando definição</span>'}</td></tr>`).join('')}</tbody></table></div>`;
  }catch(e){$('#content').innerHTML=`<div class="msg">Erro ao carregar reservas: ${coEsc(e.message)}</div>`}
@@ -6332,7 +6332,7 @@ async function cz231Monitor(abertas=false){
   const linhas=abertas?propostas.map(o=>{
    const venc=String(o.validade_orcamento||o.dados?.validade_orcamento||'').slice(0,10);
    const vencida=!!venc&&venc<hoje;
-   return `<tr><td>${esc(o.numero||'—')}</td><td>${esc(o.cliente_nome||o.dados?.cliente||'—')}<small>${esc(o.evento_nome||o.dados?.evento||'')}</small></td><td>${finDate(venc)}</td><td style="color:${vencida?'#ff7474':'#65da91'};font-weight:800">${vencida?'Vencida':'Em aberto'}</td><td><button class="btn secondary cz231Btn" onclick="renderOrcamentos()">Ver proposta</button></td></tr>`;
+   return `<tr><td>${esc(o.numero||'—')}</td><td>${esc(o.cliente_nome||o.dados?.cliente||'—')}<small>${esc(o.evento_nome||o.dados?.evento||'')}</small></td><td>${finDate(venc)}</td><td style="color:${vencida?'#ff7474':'#65da91'};font-weight:800">${vencida?'Vencida':'Em aberto'}</td></tr>`;
   }):eventos.map(e=>{
    const o=om.get(String(e.origem_orcamento_id)),d=o?.dados||{};
    const pago=o?finPagoOrc(o.id):0,total=Number(o?.valor_total||0),pg=cz231Pagto(total,pago);
@@ -6340,13 +6340,13 @@ async function cz231Monitor(abertas=false){
    const retorno=e.status==='finalizado';
    const prep=!!e.anotacao_tecnica||!!e.observacao||!!prep217Local(e.id).ocorrencias||['pronto','material_pronto','aguardando_retorno','em_evento_divergencia'].includes(e.status);
    const contrato=!!e.origem_orcamento_id&&['Gerado','Enviado','Confirmado','Assinado'].includes(String(cz150ContratoLocal(e.origem_orcamento_id).status||''));
-   return `<tr><td class="cz231Data"><b>${finDate(e.data_evento)}</b><small>${cz231Dias(e.data_evento)}</small></td><td class="cz231Cliente"><b>${esc(e.cliente_nome||'—')}</b><small>${esc(e.nome_evento||'')}</small></td><td>${esc(o?.numero||'—')}</td><td>${esc(e.tecnico_responsavel||d.tecnico_responsavel||'—')}</td><td>${cz231Icon(true,e.id,'fechamento')}</td><td>${cz231Icon(contrato,e.id,'contrato')}</td><td>${cz231Icon(prep,e.id,'preparacao')}</td><td>${cz231Icon(saida,e.id,'saida')}</td><td>${cz231Icon(retorno,e.id,'retorno')}</td><td style="color:${pg==='Pago'?'#5cdb8d':pg==='Pendente'?'#ff7474':'#f9b55c'};font-weight:800">${pg}</td><td><div style="display:flex;gap:3px;justify-content:center"><button class="btn secondary cz231Btn" onclick="cz231Etapa('${e.id}','saida')" title="Saída do evento">Sai</button><button class="btn secondary cz231Btn" onclick="cz231Etapa('${e.id}','retorno')" title="Retorno do evento">Ret.</button></div></td></tr>`;
+   return `<tr><td class="cz231Data"><b>${finDate(e.data_evento)}</b><small>${cz231Dias(e.data_evento)}</small></td><td class="cz231Cliente"><b>${esc(e.cliente_nome||'—')}</b><small>${esc(e.nome_evento||'')}</small></td><td>${esc(o?.numero||'—')}</td><td>${esc(e.tecnico_responsavel||d.tecnico_responsavel||'—')}</td><td>${cz231Icon(true,e.id,'fechamento')}</td><td>${cz231Icon(contrato,e.id,'contrato')}</td><td>${cz231Icon(prep,e.id,'preparacao')}</td><td>${cz231Icon(saida,e.id,'saida')}</td><td>${cz231Icon(retorno,e.id,'retorno')}</td><td style="color:${pg==='Pago'?'#5cdb8d':pg==='Pendente'?'#ff7474':'#f9b55c'};font-weight:800">${pg}</td></tr>`;
   });
   $('#content').innerHTML=`<div class="sectionhead"><div><h2>📊 Monitoramento de Eventos</h2><div class="muted">${abertas?'Propostas ainda não vinculadas a um evento':'Somente eventos não concluídos • Clique nos quadradinhos para abrir cada etapa'}</div></div></div>
    <div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button class="btn secondary" onclick="cz231Monitor(${!abertas})">${abertas?'Voltar ao Monitoramento':'Propostas em aberto ('+propostas.length+')'}</button></div>
    <div class="field" style="margin-bottom:12px"><input id="cz231Busca" type="search" placeholder="Pesquisar cliente, evento, proposta ou técnico" oninput="cz231Filtrar()"></div>
-   <div class="tablewrap"><table class="cz231MonitorTable" id="cz231MonitorTabela"><thead>${abertas?'<tr><th>Prop.</th><th>Cliente</th><th>Validade</th><th>Status</th><th>Ação</th></tr>':'<tr><th>Data</th><th>Cliente</th><th>Prop.</th><th>Téc.</th><th>Fech.</th><th>Cont.</th><th>Prep.</th><th>Saída</th><th>Ret.</th><th>Pagto.</th><th>Ações</th></tr>'}</thead><tbody>${linhas.join('')||`<tr><td colspan="${abertas?5:11}">Nenhum registro encontrado.</td></tr>`}</tbody></table></div>
-   ${abertas?'':`<div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:12px;font-size:13px"><span style="color:#5cdb8d">☑ Etapa concluída</span><span style="color:#ff7474">☒ Etapa pendente</span><span>Sai = Saída do Evento</span><span>Ret. = Retorno do Evento</span><span>Parcial = Pagamento incompleto</span><span>Pago = Quitado</span></div>`}
+   <div class="tablewrap"><table class="cz231MonitorTable" id="cz231MonitorTabela"><thead>${abertas?'<tr><th>Prop.</th><th>Cliente</th><th>Validade</th><th>Status</th></tr>':'<tr><th>Data</th><th>Cliente</th><th>Prop.</th><th>Téc.</th><th>Fech.</th><th>Cont.</th><th>Prep.</th><th>Saída</th><th>Ret.</th><th>Pagto.</th></tr>'}</thead><tbody>${linhas.join('')||`<tr><td colspan="${abertas?4:10}">Nenhum registro encontrado.</td></tr>`}</tbody></table></div>
+   ${abertas?'':`<div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:12px;font-size:13px"><span style="color:#5cdb8d">☑ Etapa concluída</span><span style="color:#ff7474">☒ Etapa pendente</span><span>Parcial = Pagamento incompleto</span><span>Pago = Quitado</span></div>`}
    ${caixaErro?`<div class="msg">Pagamentos não atualizados: ${esc(caixaErro)}</div>`:''}`;
  }catch(err){$('#content').innerHTML=`<div class="msg">Não foi possível carregar o Monitoramento: ${esc(err.message||String(err))}</div>`}
 }
@@ -6641,8 +6641,9 @@ function czCentralLinha(e){
  const st=czCentralStatus(e),sel=String(e.id)===String(czCentralEstado.id);
  const aba=st==='Aguardando retorno'?'retorno':st==='Aguardando saída'?'saida':'preparo';
  const rotulo=aba==='retorno'?'Retorno do Evento':aba==='saida'?'Saída do Evento':'Preparação';
- const botao=`<button type="button" class="btn primary" style="padding:7px 12px;font-size:12px" onclick="czCentralEtapa('${e.id}','${aba}')">${rotulo}</button>`;
- return `<tr style="${sel?'background:#253442;':''}"><td><b>${finDate(e.data_evento)}</b></td><td style="white-space:normal"><b>${esc(e.nome_evento||'Evento')}</b><div class="muted">${esc(e.cliente_nome||'')}</div></td><td>${esc(e.cidade_evento||'—')}</td><td style="color:${st==='Aguardando retorno'?'#ff9e83':'#cdd6e0'}">${esc(st)}</td><td>${botao}</td></tr>`;
+ const cor=aba==='retorno'?'#B91C1C':aba==='saida'?'#4ADE80':'#60A5FA';
+ const botao=`<button type="button" class="btn primary cz250Etapa" style="background:${cor}!important;border-color:${cor}!important;color:#111111!important;padding:8px 14px;font-size:14px;font-weight:800" onclick="czCentralEtapa('${e.id}','${aba}')">${rotulo}</button>`;
+ return `<tr style="${sel?'background:#EAF2FF;':''}"><td><b>${finDate(e.data_evento)}</b></td><td style="white-space:normal"><b>${esc(e.nome_evento||'Evento')}</b><div class="muted">${esc(e.cliente_nome||'')}</div></td><td>${esc(e.cidade_evento||'—')}</td><td><span class="cz250Situacao" style="background:${cor};color:#111111">${esc(st)}</span></td><td>${botao}</td></tr>`;
 }
 function czCentralTabela(compacta=false){
  const lista=czCentralFiltros();
@@ -7255,6 +7256,17 @@ prep141Abrir=async function(eventoId){await prepAntiga(eventoId);const area=docu
   input[type="time"]::-webkit-calendar-picker-indicator {
     filter:brightness(0)!important; opacity:1!important; cursor:pointer;
   }
+}
+
+/* CZ V250 — ajustes solicitados, sem alterar lógica operacional */
+@media screen {
+  #content table th, #content table td {font-size:14px;line-height:1.45;}
+  #content table th {font-weight:800;}
+  #cz231MonitorTabela th, #cz231MonitorTabela td {font-size:15px!important;padding:12px 11px!important;}
+  #cz231MonitorTabela small {font-size:13px!important;}
+  .czCentralTabela th,.czCentralTabela td {font-size:15px!important;padding:12px 10px!important;}
+  .cz250Situacao {display:inline-block;border-radius:7px;padding:7px 10px;font-weight:800;white-space:nowrap;}
+  .czCentralTabela .cz250Etapa {min-width:145px;}
 }
 </style>
 </body></html>
