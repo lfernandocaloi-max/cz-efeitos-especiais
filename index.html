@@ -6701,7 +6701,7 @@ async function czCentralEtapa(id,aba){
 }
 
 
-/* CZ V239 — Central Operacional: conferência por seleção e lista de faltantes.
+/* CZ V240 — Central Operacional: conferência por seleção e lista de faltantes.
    Mantém as RPCs oficiais existentes. Resoluções sem integração persistente
    ficam em rascunho e NÃO autorizam finalizar o evento. */
 (function(){
@@ -6712,6 +6712,13 @@ async function czCentralEtapa(id,aba){
  .cz238Grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.cz238Stat{padding:13px 7px;background:#0c1721;border:1px solid #31475a;border-radius:9px;text-align:center}.cz238Stat b{font-size:28px;display:block}
  .cz238Btn{border:1px solid #526477;border-radius:8px;padding:8px 11px;background:#243546;color:white;cursor:pointer;margin:2px;font-weight:700}
  .cz238Btn:disabled{opacity:.45;cursor:not-allowed}.cz238Btn.cz238Primary{background:#e56819;border-color:#e56819}.cz238Btn.cz238Green{background:#1c6944;border-color:#359c67}
+ .cz239Overlay{position:fixed!important;inset:0!important;background:rgba(0,0,0,.78)!important;z-index:2147483000!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:16px!important;box-sizing:border-box!important}
+ .cz239Modal{box-sizing:border-box!important;position:relative!important;width:min(560px,100%)!important;max-height:calc(100vh - 32px)!important;overflow-y:auto!important;border:2px solid #f4772b!important;border-radius:17px!important;background:#152431!important;box-shadow:0 22px 90px #000b!important;padding:24px!important;color:white!important}
+ .cz239Close{position:absolute!important;right:13px;top:12px;background:#354758!important;color:white!important;border:0!important;border-radius:8px!important;font-size:23px!important;width:36px!important;height:36px!important;cursor:pointer!important}
+ .cz238Tbl tbody tr.cz238OK,.cz238Tbl tbody tr.cz238OK td{background:#176b40!important;color:white!important;border-color:#388d60!important}
+ .cz238Tbl tbody tr.cz238OK .cz238Muted{color:#d5ffe3!important}
+ .cz239Select{width:22px!important;height:22px!important;accent-color:#f4772b!important;cursor:pointer!important}
+ @media(max-width:550px){.cz239Modal{padding:17px!important}.cz239Overlay{padding:9px!important}}
  .cz238Muted{color:#b4c1cd;font-size:12px}.cz238Bad{color:#ff9999}.cz238Good{color:#8be9b1}.cz238Input{width:100%;padding:12px;font-size:20px;border-radius:8px;border:2px solid #e56819;background:#0c1620;color:white}
  @media(max-width:650px){.cz238Tbl{min-width:610px}.cz238Grid{gap:4px}.cz238Stat b{font-size:22px}}
  </style>`;
