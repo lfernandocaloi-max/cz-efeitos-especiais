@@ -564,12 +564,30 @@ async function carregarCaixa(){
       caixaImportado=true;
     }
     const todos=[];for(let inicio=0;;inicio+=1000){const {data,error}=await db.from('caixa_movimentacoes').select('*').order('data',{ascending:true}).order('criado_em',{ascending:true}).range(inicio,inicio+999);if(error)throw error;todos.push(...(data||[]));if((data||[]).length<1000)break}
-    caixaCache=todos;caixaErro='';return caixaCache;
-  }catch(err){caixaErro=err.message;caixaCache=finLoad(FIN_MOV_KEY).filter(x=>x.status==='pago'&&['entrada','saida'].includes(x.tipo)).map(movimentoCaixaLocal);return caixaCache}
+    caixaCache=todos;caixaErro='';
+    if(contaMaster()&&todos.length===0){
+      caixaErro='Nenhum lançamento foi retornado pelo Supabase para este usuário. Se outra conta Master possui movimentos, verifique as políticas RLS (SELECT) de caixa_movimentacoes para ambos os usuários.';
+    }
+    return caixaCache;
+  }catch(err){caixaErro=err.message;caixaCache=[];return caixaCache}
 }
 
 const CAIXA_CONTAS_KEY='cz_caixa_contas_recebimento_v1';
-function caixaContas(){try{return JSON.parse(localStorage.getItem(CAIXA_CONTAS_KEY)||'[]')}catch(_){return []}}
+function caixaContas(){
+ // Contas com lançamentos no Supabase são compartilhadas entre todos os Masters.
+ // Une os nomes históricos com os cadastros locais, sem criar movimentos ou saldos.
+ let locais=[];
+ try{locais=JSON.parse(localStorage.getItem(CAIXA_CONTAS_KEY)||'[]')}catch(_){locais=[]}
+ const lista=Array.isArray(locais)?[...locais]:[];
+ const nomes=new Set(lista.map(x=>String(x.nome||'').trim().toLocaleLowerCase('pt-BR')));
+ for(const mov of caixaCache||[]){
+  const nome=caixaContaMovimento(mov);
+  if(!nome||nome==='—'||nomes.has(nome.toLocaleLowerCase('pt-BR')))continue;
+  nomes.add(nome.toLocaleLowerCase('pt-BR'));
+  lista.push({id:'compartilhada:'+nome,nome,tipo:'Conta com movimentação',compartilhada:true});
+ }
+ return lista;
+}
 function salvarCaixaContas(v){localStorage.setItem(CAIXA_CONTAS_KEY,JSON.stringify(v))}
 function caixaConfirmado(x){
  // Só a baixa manual com conta selecionada confirma uma ENTRADA.
@@ -602,8 +620,8 @@ function renderCaixaContas(){
   const totalSaidas=saidas.reduce((s,x)=>s+Number(x.valor||0),0);
   const entradaConta=nome=>entradas.filter(x=>caixaContaMovimento(x)===nome).reduce((s,x)=>s+Number(x.valor||0),0);
   const saidaConta=nome=>saidas.filter(x=>caixaContaMovimento(x)===nome).reduce((s,x)=>s+Number(x.valor||0),0);
-  area.innerHTML=`<div class="card"><div class="sectionhead"><div><h3 style="margin:0">Contas</h3><div class="muted">Pagamento recebido entra na conta selecionada. Despesa paga sai da conta selecionada e reduz o saldo.</div></div><button class="btn primary" onclick="abrirCadastroContaCaixa()">+ Nova conta</button></div>
-  <div class="tablewrap">${lista.length?`<table><thead><tr><th>Conta</th><th>Tipo</th><th>Entrada</th><th>Saída</th><th>Saldo atual da conta</th><th>Ação</th></tr></thead><tbody>${lista.map(x=>{const e=entradaConta(x.nome),s=saidaConta(x.nome);return `<tr><td>${esc(x.nome)}</td><td>${esc(x.tipo)}</td><td style="color:#55d884;font-weight:900">${money(e)}</td><td style="color:#ff7474;font-weight:900">${money(s)}</td><td style="font-weight:900;color:${e-s<0?'#e75b5b':'#167e55'}">${money(e-s)}</td><td><button class="btn danger" onclick="excluirContaCaixa('${x.id}')">Excluir</button></td></tr>`}).join('')}</tbody><tfoot><tr style="font-weight:900"><td colspan="2">TOTAL DAS CONTAS</td><td>${money(totalEntradas)}</td><td>${money(totalSaidas)}</td><td>${money(totalEntradas-totalSaidas)}</td><td></td></tr></tfoot></table>`:'<div class="empty">Nenhuma conta cadastrada.</div>'}</div>
+  area.innerHTML=`${caixaErro?`<div class="msg" style="color:#ff8b78">${esc(caixaErro)}</div>`:''}<div class="card"><div class="sectionhead"><div><h3 style="margin:0">Contas</h3><div class="muted">Pagamento recebido entra na conta selecionada. Despesa paga sai da conta selecionada e reduz o saldo.</div></div><button class="btn primary" onclick="abrirCadastroContaCaixa()">+ Nova conta</button></div>
+  <div class="tablewrap">${lista.length?`<table><thead><tr><th>Conta</th><th>Tipo</th><th>Entrada</th><th>Saída</th><th>Saldo atual da conta</th><th>Ação</th></tr></thead><tbody>${lista.map(x=>{const e=entradaConta(x.nome),s=saidaConta(x.nome);return `<tr><td>${esc(x.nome)}</td><td>${esc(x.tipo)}</td><td style="color:#55d884;font-weight:900">${money(e)}</td><td style="color:#ff7474;font-weight:900">${money(s)}</td><td style="font-weight:900;color:${e-s<0?'#e75b5b':'#167e55'}">${money(e-s)}</td><td>${x.compartilhada?'<span class="muted">Vinculada a lançamentos</span>':`<button class="btn danger" onclick="excluirContaCaixa('${x.id}')">Excluir</button>`}</td></tr>`}).join('')}</tbody><tfoot><tr style="font-weight:900"><td colspan="2">TOTAL DAS CONTAS</td><td>${money(totalEntradas)}</td><td>${money(totalSaidas)}</td><td>${money(totalEntradas-totalSaidas)}</td><td></td></tr></tfoot></table>`:'<div class="empty">Nenhuma conta cadastrada.</div>'}</div>
   </div>`;
 }
 function czSelecionarAbaCaixa(aba='pendentes'){
@@ -1125,6 +1143,7 @@ async function renderRelatorios(){
   ['dre','📊','DRE','Resumo de receitas, despesas e resultado por período.'],
   ['estoque','📦','Estoque','Posição de estoque, custo dos produtos e itens abaixo do mínimo.'],
   ['ativos','🧰','Ativos / Equipamentos','Valor total investido em ativos, lista completa e impressão para conferência física.'],
+  ['rentabilidade_ativos','📟','Locações e faturamento dos ativos','Histórico por rastreio individual, código de cadastro e nome, com receita atribuída.'],
   ['vendas','🧾','Vendas','Propostas geradas, faturamento e valores recebidos.'],
   ['clientes','👥','Clientes','Clientes cadastrados, eventos e histórico comercial.'],
   ['despesas','💸','Despesas','Gastos por categoria, pagamentos realizados e contas em aberto.'],
@@ -1139,6 +1158,7 @@ async function abrirRelatorio(tipo){
  if(tipo==='dre')return relDRE();
  if(tipo==='estoque')return relEstoque();
  if(tipo==='ativos')return relAtivos();
+ if(tipo==='rentabilidade_ativos')return cz267RelatorioLocacoesAtivos();
  if(tipo==='vendas')return relVendas();
  if(tipo==='clientes')return relClientes();
  if(tipo==='despesas')return relDespesas();
@@ -1287,6 +1307,132 @@ function relImprimirEstoque(){
  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Conferência de Estoque - CZ Efeitos Especiais</title><style>body{font-family:Arial,sans-serif;color:#111;margin:28px}h1{margin:0 0 4px;font-size:22px}.sub{margin-bottom:18px;color:#444}.resumo{display:flex;gap:30px;margin:14px 0 20px;font-size:14px;flex-wrap:wrap}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #777;padding:7px;vertical-align:middle}th{background:#eee;text-align:left}.check{width:28px;text-align:center;font-size:20px}.num{text-align:center}.obs{width:190px;height:25px}.assinatura{margin-top:38px;display:flex;gap:50px}.linha{flex:1;border-top:1px solid #222;padding-top:6px;text-align:center;font-size:12px}@media print{button{display:none}body{margin:10mm}}</style></head><body><h1>CZ Efeitos Especiais — Conferência de Estoque</h1><div class="sub">Lista para conferência física dos produtos de consumo</div><div class="resumo"><b>Produtos: ${a.length}</b><b>Valor de custo em estoque: ${money(total)}</b><b>Data: ${new Date().toLocaleDateString('pt-BR')}</b></div><table><thead><tr><th>Conf.</th><th>Produto</th><th>Cód. barras</th><th>Unidade</th><th>Qtd. atual</th><th>Mínimo</th><th>Observação</th></tr></thead><tbody>${linhas}</tbody></table><div class="assinatura"><div class="linha">Responsável pela conferência</div><div class="linha">Data / assinatura</div></div><script>window.onload=()=>{window.print()}<\/script></body></html>`);
  w.document.close();
 }
+
+// V267: relatório analítico por rastreio; somente saída confirmada conta como locação.
+// Valores de itens são receita orçada atribuível, NÃO recebimento em caixa.
+let cz267LocDados=null;
+let cz267LocBusca='',cz267LocCadastro='',cz267LocInicio='',cz267LocFim='';
+function cz267LocNorm(v){return String(v??'').trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()}
+function cz267LocN(v){return Math.max(0,Number(v)||0)}
+async function cz267RelatorioLocacoesAtivos(recarregar=true){
+ if(!contaMaster())return czAlert('Este relatório financeiro é exclusivo dos usuários Master.','Acesso restrito');
+ $('#pageTitle').textContent='Relatórios';
+ if(recarregar||!cz267LocDados){
+  $('#content').innerHTML=relTopo('📟 Locações dos ativos')+'<div class="card">Consultando registros de saída no Supabase...</div>';
+  try{
+   const [ar,er,or,mr]=await Promise.all([
+    db.from('ativos').select('*').order('nome').limit(10000),
+    db.from('eventos_operacionais').select('id,origem_orcamento_id,data_evento,saida_baixada_em,status').limit(10000),
+    db.from('orcamentos').select('id,dados,valor_total').limit(10000),
+    db.from('evento_materiais').select('*').limit(10000)
+   ]);
+   for(const r of [ar,er,or,mr])if(r.error)throw r.error;
+   const ativos=ar.data||[], eventos=(er.data||[]).filter(e=>!!e.saida_baixada_em),
+         orcs=new Map((or.data||[]).map(o=>[String(o.id),o])),
+         materiais=mr.data||[];
+   const rastreios=new Map(), grupos=new Map(), porCadastro=new Map();
+   for(const a of ativos){
+    const id=String(a.id), cod=codigoCadastroAtivo(a)||'SEM CÓDIGO', nome=a.nome||'Ativo';
+    const codigos=unidadesAtivo(a);
+    const g={id,cod,nome,locacoes:0,receita:0,naoAtribuida:0};
+    grupos.set(id,g);
+    if(!porCadastro.has(cz267LocNorm(cod)))porCadastro.set(cz267LocNorm(cod),[]);
+    porCadastro.get(cz267LocNorm(cod)).push(g);
+    for(const c of codigos){
+     const key=cz267LocNorm(c);
+     if(!key)continue;
+     if(rastreios.has(key)){rastreios.get(key).duplicado=true;continue}
+     rastreios.set(key,{key,codigo:c,id,cadastro:cod,nome,locacoes:0,receita:0,eventos:new Set(),duplicado:false});
+    }
+   }
+   const linhasPorEvento=new Map();
+   for(const m of materiais){
+    const k=String(m.evento_id||'');
+    if(!linhasPorEvento.has(k))linhasPorEvento.set(k,[]);
+    linhasPorEvento.get(k).push(m);
+   }
+   const naoAtribuidos=[];
+   for(const e of eventos){
+    const orc=orcs.get(String(e.origem_orcamento_id||'')), equipamentos=orc?.dados?.equipamentos||[];
+    const itens=linhasPorEvento.get(String(e.id))||[];
+    const ativosUsados=new Map();
+    for(const m of itens){
+     if(!sair220Ativo(m))continue;
+     const id=String(m.item_id||'');
+     if(!grupos.has(id))continue;
+     const g=grupos.get(id);
+     const q=cz267LocN(m.quantidade_bipada);
+     if(q<=0)continue;
+     if(!ativosUsados.has(id))ativosUsados.set(id,{g,q:0,codigos:new Set()});
+     const z=ativosUsados.get(id);z.q+=q;
+     // Only accept explicitly recorded individual tracking codes.
+     const c=String(m.codigo_rastreio||'').trim();
+     if(c)z.codigos.add(c);
+    }
+    for(const [id,z] of ativosUsados){
+     const g=z.g;
+     const item=equipamentos.find(x=>String(x.id)===id);
+     const preco=item&&Number.isFinite(Number(item.preco))?Number(item.preco):null;
+     const totalEstimado=preco===null?0:preco*z.q;
+     g.locacoes+=z.q;g.receita+=totalEstimado;
+     const validos=[...z.codigos].map(c=>rastreios.get(cz267LocNorm(c))).filter(x=>x&&x.id===id&&!x.duplicado);
+     // Never assign a whole model's rental revenue to a unit without a confirmed unique tracking code.
+     if(validos.length===z.q){
+      for(const r of validos){
+       if(r.eventos.has(String(e.id)))continue;
+       r.eventos.add(String(e.id));r.locacoes++;r.receita+=preco===null?0:preco;
+      }
+     }else{
+      g.naoAtribuida+=totalEstimado;
+      naoAtribuidos.push({nome:g.nome,cod:g.cod,evento:e.id,q:z.q,valor:totalEstimado});
+     }
+    }
+   }
+   cz267LocDados={rastreios:[...rastreios.values()].sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR')||a.codigo.localeCompare(b.codigo)),
+    grupos:[...grupos.values()].sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR')),naoAtribuidos,
+    avisoLimite:[ar,er,or,mr].some(r=>(r.data||[]).length>=10000)};
+  }catch(err){
+   $('#content').innerHTML=relTopo('📟 Locações dos ativos')+`<div class="msg">Não foi possível consultar o Supabase: ${esc(err.message||String(err))}</div>`;
+   return;
+  }
+ }
+ cz267LocRender();
+}
+function cz267LocRender(){
+ const d=cz267LocDados;if(!d)return;
+ const busca=cz267LocNorm(cz267LocBusca),cad=cz267LocNorm(cz267LocCadastro);
+ const rows=d.rastreios.filter(r=>(!cad||cz267LocNorm(r.cadastro).includes(cad))&&(!busca||cz267LocNorm(r.codigo).includes(busca)||cz267LocNorm(r.nome).includes(busca)));
+ const gs=d.grupos.filter(g=>(!cad||cz267LocNorm(g.cod).includes(cad))&&(!busca||cz267LocNorm(g.nome).includes(busca)||cz267LocNorm(g.cod).includes(busca)||rows.some(r=>r.id===g.id)));
+ const qtd=gs.reduce((n,g)=>n+g.locacoes,0),receita=gs.reduce((n,g)=>n+g.receita,0);
+ const falta=gs.reduce((n,g)=>n+g.naoAtribuida,0);
+ const input=(id,label,value,placeholder)=>`<div class="field" style="min-width:190px;flex:1"><label for="${id}">${label}</label><input id="${id}" value="${esc(value)}" placeholder="${placeholder}"></div>`;
+ $('#content').innerHTML=relTopo('📟 Locações e faturamento dos ativos','Consulta de saídas confirmadas • por equipamento e código de cadastro')+
+ `<div class="card"><div class="row" style="display:flex;gap:12px;flex-wrap:wrap;align-items:end">
+ ${input('cz267LocBusca','Bipar rastreio ou buscar nome',cz267LocBusca,'Leia o código de rastreio')}
+ ${input('cz267LocCadastro','Filtrar código de cadastro / segmento',cz267LocCadastro,'Ex.: CO2-05')}
+ <button class="btn secondary" id="cz267LocLimpar">Limpar</button><button class="btn secondary" id="cz267LocAtualizar">Atualizar dados</button>
+ </div></div>
+ <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr));margin-bottom:16px">
+ <div class="card"><div class="muted">Locações (unidades por evento)</div><div class="n">${qtd}</div></div>
+ <div class="card"><div class="muted">Receita atribuída prevista</div><div class="n">${money(receita)}</div></div>
+ <div class="card"><div class="muted">Sem rastreio individual comprovado</div><div class="n">${money(falta)}</div></div>
+ </div>
+ <div class="card"><h3>Ativos — um por código de rastreio</h3><div class="tablewrap"><table><thead><tr><th>Ativo</th><th>Cód. cadastro</th><th>Rastreio individual</th><th>Locações identificadas</th><th>Receita atribuída</th></tr></thead><tbody>
+ ${rows.map(r=>`<tr><td>${esc(r.nome)}</td><td>${esc(r.cadastro)}</td><td><b>${esc(r.codigo)}</b>${r.duplicado?' ⚠ Duplicado':''}</td><td>${r.locacoes}</td><td>${money(r.receita)}</td></tr>`).join('')||'<tr><td colspan="5">Nenhum rastreio encontrado.</td></tr>'}
+ </tbody></table></div></div>
+ <div class="card"><h3>Totais por cadastro / segmento</h3><div class="tablewrap"><table><thead><tr><th>Ativo</th><th>Cód. cadastro</th><th>Locações</th><th>Receita prevista</th><th>Sem atribuição individual</th></tr></thead><tbody>
+ ${gs.map(g=>`<tr><td>${esc(g.nome)}</td><td>${esc(g.cod)}</td><td>${g.locacoes}</td><td>${money(g.receita)}</td><td>${money(g.naoAtribuida)}</td></tr>`).join('')||'<tr><td colspan="5">Nenhum cadastro encontrado.</td></tr>'}
+ </tbody></table></div></div>
+ <div class="card"><b>Critério de apuração:</b> conta materiais ativos com saída oficialmente confirmada e quantidade bipada. Receita = preço unitário do equipamento no orçamento × quantidade saída; não é comprovante de recebimento no Caixa. O rastreio individual só recebe receita quando a saída registra códigos suficientes e inequívocos. Sem essa comprovação, o valor permanece no total do cadastro, sem ser atribuído artificialmente a uma unidade. ${d.avisoLimite?'<b>Atenção: limite de 10.000 registros atingido; resultado pode estar incompleto.</b>':''}</div>`;
+ const b=document.getElementById('cz267LocBusca'),c=document.getElementById('cz267LocCadastro');
+ const apply=()=>{cz267LocBusca=b.value;cz267LocCadastro=c.value;cz267LocRender();};
+ b.addEventListener('change',apply);c.addEventListener('change',apply);
+ b.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();apply()}});
+ c.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();apply()}});
+ document.getElementById('cz267LocLimpar').onclick=()=>{cz267LocBusca='';cz267LocCadastro='';cz267LocRender()};
+ document.getElementById('cz267LocAtualizar').onclick=()=>cz267RelatorioLocacoesAtivos(true);
+}
+
 async function relAtivos(){
  const {data,error}=await db.from('ativos').select('*').order('nome');
  if(error){$('#content').innerHTML=relTopo('🧰 Relatório de Ativos')+`<div class="msg">${esc(error.message)}</div>`;return}
@@ -3996,7 +4142,7 @@ const CZ_ACOES=['ver','criar','editar','excluir'];
 let czPerfilUsuario=null;
 function czPermPadrao(){const p={};modules.forEach(m=>p[m]={ver:false,criar:false,editar:false,excluir:false});return p}
 function czPermTudo(){const p=czPermPadrao();Object.values(p).forEach(x=>CZ_ACOES.forEach(a=>x[a]=true));return p}
-function czPermFrente(){const p=czPermPadrao();['Eventos','Retorno de evento'].forEach(m=>{if(p[m])CZ_ACOES.forEach(a=>p[m][a]=true)});return p}
+function czPermFrente(){const p=czPermPadrao();['Dashboard','Agenda','Eventos','Retorno de evento','Sair pro Evento','Monitoramento de Eventos','Eventos Concluídos','Manutenção','Oficina'].forEach(m=>{if(p[m])CZ_ACOES.forEach(a=>p[m][a]=true)});return p}
 async function carregarPermissoesUsuario(){
  const email=String(currentAuthUser?.email||'').trim().toLowerCase();
  if(email===CZ_MASTER_EMAIL){czPerfilUsuario={email,nome:'Luiz Fernando Caloi',perfil:'master_principal',ativo:true,permissoes:czPermTudo()};return}
@@ -4353,7 +4499,19 @@ async function pdvFinalizar(orcamentoPdvId=null){
 // ======================= FIM PDV =======================
 
 function czPode(modulo,acao='ver'){if(contaMaster())return true;return !!czPerfilUsuario?.permissoes?.[modulo]?.[acao]}
-function reconstruirMenuPermissoes(){cz212MontarMenu();const b=document.querySelector('#nav button[data-i="0"]');document.querySelectorAll('#nav button').forEach(x=>x.classList.remove('active'));if(b)b.classList.add('active')}
+function reconstruirMenuPermissoes(){
+ cz212MontarMenu();
+ if(!contaMaster()){
+  document.querySelectorAll('#nav button[data-i]').forEach(b=>{
+   if(!czPode(modules[Number(b.dataset.i)],'ver'))b.remove();
+  });
+  document.querySelectorAll('#nav button[data-action]').forEach(b=>b.remove());
+  document.querySelectorAll('#nav button[data-grupo]').forEach(b=>{
+   const sub=document.querySelector('#nav [data-sub="'+b.dataset.grupo+'"]');
+   if(!sub?.querySelector('button')){b.remove();sub?.remove()}
+  });
+ }
+ const b=document.querySelector('#nav button[data-i="0"]');document.querySelectorAll('#nav button').forEach(x=>x.classList.remove('active'));if(b)b.classList.add('active')}
 const _renderModulePerm=renderModule;
 renderModule=async function(i){const mod=modules[i];if(!czPode(mod,'ver')){await czAlert('A Frente de separação não tem acesso a este módulo.','Acesso restrito');return}return _renderModulePerm(i)};
 function czPermCheck(mod,acao){if(czPode(mod,acao))return true;czAlert('A Frente de separação não tem permissão para esta ação.','Acesso restrito');return false}
