@@ -146,8 +146,11 @@ body .ret226Dialog button[aria-label="Fechar"]{color:#334155!important}
 #content:has(#orcClienteSelect) input[type=date],#content:has(#orcClienteSelect) input[type=time]{color:#182332!important;color-scheme:light!important;-webkit-text-fill-color:#182332!important}
 #content:has(#orcClienteSelect) input[type=date]::-webkit-calendar-picker-indicator,#content:has(#orcClienteSelect) input[type=time]::-webkit-calendar-picker-indicator{opacity:1;cursor:pointer}
 #content:has(#orcClienteSelect) #orcIntroducaoProposta,#content:has(#orcClienteSelect) #orcObservacoes{display:block;width:100%;min-height:120px;box-sizing:border-box;resize:vertical;padding:12px;line-height:1.5}
-#content:has(#orcClienteSelect) .orc-team-row{grid-template-columns:minmax(135px,1.6fr) 80px repeat(5,minmax(90px,1fr)) 110px!important;gap:7px!important;align-items:end}
+#content:has(#orcClienteSelect) .orc-team-row{grid-template-columns:minmax(170px,1.7fr) minmax(105px,1fr) minmax(105px,1fr) minmax(120px,1fr) minmax(110px,1fr) auto!important;gap:7px!important;align-items:end}
 #content:has(#orcClienteSelect) .orc-team-row .field{min-width:0}
+#content:has(#orcClienteSelect) .orc-team-row .cz267-equipe-par{display:flex;flex-direction:column;gap:8px;min-width:0;align-self:stretch}
+#content:has(#orcClienteSelect) .orc-team-row .cz267-equipe-par .field{margin:0}
+#content:has(#orcClienteSelect) .orc-team-row .cz267-equipe-par label{display:block;margin-bottom:5px}
 #content:has(#orcClienteSelect) .orc-team-row input,#content:has(#orcClienteSelect) .orc-team-row select{width:100%;min-width:0}
 #content:has(#orcClienteSelect) .cz231Resumo{background:#172332!important;color:#fff!important}
 #content:has(#orcClienteSelect) .cz231Resumo .field>label,#content:has(#orcClienteSelect) .cz231Resumo h3{color:#fff!important}
@@ -155,6 +158,18 @@ body .ret226Dialog button[aria-label="Fechar"]{color:#334155!important}
 #content:has(#orcClienteSelect) .orc-edit-item{min-width:72px;width:95px;max-width:100%;padding:6px!important}
 @media(max-width:1150px){#content:has(#orcClienteSelect) .orc-team-row{grid-template-columns:repeat(3,minmax(0,1fr))!important}}
 @media(max-width:600px){#content:has(#orcClienteSelect) .orc-team-row{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+
+/* V267-E1: Deslocamento e Equipe lado a lado, em quadros independentes. */
+#content:has(#orcClienteSelect) .cz267-logistica-lado-a-lado{display:grid;grid-template-columns:minmax(300px,36%) minmax(0,64%);gap:14px;align-items:stretch;margin-bottom:18px}
+#content:has(#orcClienteSelect) .cz267-logistica-lado-a-lado>.card{margin-bottom:0!important;min-width:0;overflow:hidden}
+#content:has(#orcClienteSelect) .cz267-deslocamento-card .orc-travel-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+#content:has(#orcClienteSelect) .cz267-deslocamento-card .orc-travel-grid .field:first-child{grid-column:1/-1}
+#content:has(#orcClienteSelect) .orc-team-card #orcEquipeLista{overflow-x:auto;padding-bottom:5px}
+#content:has(#orcClienteSelect) .orc-team-card .orc-team-row{grid-template-columns:minmax(130px,1.5fr) minmax(82px,1fr) minmax(82px,1fr) minmax(90px,1fr) minmax(95px,1fr) auto!important;min-width:570px;gap:6px!important;align-items:end}
+#content:has(#orcClienteSelect) .orc-team-card .orc-team-row .field label{font-size:12px!important;line-height:1.2;min-height:29px}
+#content:has(#orcClienteSelect) .orc-team-card .orc-team-row .cz267-equipe-par .field label{min-height:0}
+#content:has(#orcClienteSelect) .orc-team-card .orc-team-row input,#content:has(#orcClienteSelect) .orc-team-card .orc-team-row select{padding:6px!important;font-size:12px!important}
+@media(max-width:1180px){#content:has(#orcClienteSelect) .cz267-logistica-lado-a-lado{grid-template-columns:1fr}}
 </style></head><body>
 <section id="login" class="login"><div class="loginbox"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><h3>Acesso ao sistema</h3><div class="field"><label>E-mail</label><input id="email" type="email"></div><div class="field"><label>Senha</label><input id="password" type="password"></div><button id="loginBtn" class="btn primary full" style="margin-top:18px">ENTRAR</button><button type="button" class="btn secondary full" style="margin-top:8px" onclick="recuperarSenha()">Esqueci minha senha</button><div id="loginMsg" class="msg"></div></div></section>
 <div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><span id="czBuildTag" style="margin-left:10px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:900">V267-E1</span><div class="muted" style="font-size:12px">Sistema de gestão CZ · Atualização V267-E1</div></div><div><span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
@@ -1562,7 +1577,8 @@ async function renderOrcamentos(novo=false, dadosDuplicacao=null){
       <textarea id="orcIntroducaoProposta" rows="5" style="width:100%;box-sizing:border-box;min-height:125px">A CZ Efeitos Especiais apresenta esta proposta comercial para execução dos serviços e efeitos selecionados para o evento.</textarea>
     </div>
 
-    <div class="card" style="margin-bottom:18px">
+    <div class="cz267-logistica-lado-a-lado">
+    <div class="card cz267-deslocamento-card" style="margin-bottom:18px">
       <h3 style="margin:0 0 10px">Deslocamento</h3>
       <div class="orc-travel-grid">
         <div class="field"><label for="orcVeiculo">Veículo</label><select id="orcVeiculo"><option value="">Carregando veículos...</option></select></div>
@@ -1578,16 +1594,16 @@ async function renderOrcamentos(novo=false, dadosDuplicacao=null){
       <h3 style="margin:0 0 12px">👷 Equipe</h3>
       <div id="orcEquipeLista"><div class="orc-equipe-linha orc-team-row">
         <div class="field"><label>Nome do colaborador</label><select class="equipeNome"><option value="">Selecione</option>${opcoesEquipe}</select></div>
-        <div class="field"><label>Qtd. diária</label><input class="equipeDiarias" type="number" min="0" value="0"></div>
-        <div class="field"><label>Valor diária</label><input class="equipeValorDiaria" type="number" min="0" step="0.01" value="0"></div>
+        <div class="cz267-equipe-par"><div class="field"><label>Qtd. diária</label><input class="equipeDiarias" type="number" min="0" value="0"></div><div class="field"><label>Valor diária</label><input class="equipeValorDiaria" type="number" min="0" step="0.01" value="0"></div></div>
+        <div class="cz267-equipe-par"><div class="field"><label>Qtd. estadia</label><input class="equipeQtdEstadia" type="number" min="0" step="1" placeholder="= diárias"></div><div class="field"><label>Valor estadia</label><input class="equipeEstadia" type="number" min="0" step="0.01" value="0"></div></div>
         <div class="field"><label>Valor alimentação</label><input class="equipeAlimentacao" type="number" min="0" step="0.01" value="0"></div>
-        <div class="field"><label>Qtd. estadia</label><input class="equipeQtdEstadia" type="number" min="0" step="1" placeholder="= diárias"><label>Valor estadia</label><input class="equipeEstadia" type="number" min="0" step="0.01" value="0"></div>
         <div class="field"><label>Total</label><input class="equipeTotal" value="R$ 0,00" readonly></div>
       </div></div>
       <button type="button" id="btnAdicionarColaborador" class="btn secondary" style="padding:6px 10px;font-size:12px;margin-top:10px">+ Adicionar colaborador</button>
       ${erroNomes?`<div class="msg">Não foi possível carregar os colaboradores: ${esc(erroNomes.message)}. Execute o SQL de situação dos colaboradores.</div>`:''}
       <div class="orc-team-total"><strong>Total da Equipe: <span id="orcTotalEquipe">R$ 0,00</span></strong></div>
     </div>
+    </div><!-- /cz267-logistica-lado-a-lado -->
 
     <div class="card" style="margin-bottom:18px">
       <h3 style="margin:0 0 12px">📦 2. Produtos</h3><div class="muted" style="margin-bottom:10px">Adicione produtos e equipamentos do orçamento.</div>
@@ -1808,31 +1824,16 @@ $('#btnAdicionarColaborador').onclick = () => {
       <label>Nome do colaborador</label>
       <select class="equipeNome"><option value="">Selecione</option>${opcoesEquipe}</select>
 </div>
-      <div class="field">
-  <label>Qtd. diária</label>
-  <input class="equipeDiarias" type="number" min="0" value="0">
-</div>
-
-<div class="field">
-  <label>Valor diária</label>
-  <input class="equipeValorDiaria" type="number" min="0" step="0.01" value="0">
-</div>
-<div class="field">
-  <label>Valor alimentação</label>
-  <input class="equipeAlimentacao" type="number" min="0" step="0.01" value="0">
-</div>
-    <div class="field">
-      <label>Qtd. estadia</label>
-      <input class="equipeQtdEstadia" type="number" min="0" step="1" placeholder="= diárias">
-    </div>
-    <div class="field"><label>Valor estadia</label>
-      <input class="equipeEstadia" type="number" min="0" step="0.01" value="0">
-    </div>
-
-    <div class="field">
-      <label>Total</label>
-      <input class="equipeTotal" value="R$ 0,00" readonly>
-    </div>
+      <div class="cz267-equipe-par">
+        <div class="field"><label>Qtd. diária</label><input class="equipeDiarias" type="number" min="0" value="0"></div>
+        <div class="field"><label>Valor diária</label><input class="equipeValorDiaria" type="number" min="0" step="0.01" value="0"></div>
+      </div>
+      <div class="cz267-equipe-par">
+        <div class="field"><label>Qtd. estadia</label><input class="equipeQtdEstadia" type="number" min="0" step="1" placeholder="= diárias"></div>
+        <div class="field"><label>Valor estadia</label><input class="equipeEstadia" type="number" min="0" step="0.01" value="0"></div>
+      </div>
+      <div class="field"><label>Valor alimentação</label><input class="equipeAlimentacao" type="number" min="0" step="0.01" value="0"></div>
+      <div class="field"><label>Total</label><input class="equipeTotal" value="R$ 0,00" readonly></div>
 
     <button type="button" class="btn secondary removerColaborador"
       style="padding:6px 10px;font-size:12px;margin-bottom:2px">
