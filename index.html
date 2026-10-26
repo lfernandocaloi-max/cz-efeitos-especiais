@@ -7472,7 +7472,7 @@ renderContratosOficialCZ=async function(){
   const original=tr.querySelector('button[onclick^="abrirContratoOficialCZ"]');if(!original)return;
   const id=(original.getAttribute('onclick')||'').match(/\('([^']+)'\)/)?.[1];if(!id)return;
   const celula=tr.lastElementChild?.querySelector('div');if(!celula)return;
-  const edit=document.createElement('button');edit.className='btn secondary';edit.textContent='✎ Editar texto';edit.title='Editar cláusulas do contrato individual';edit.onclick=()=>cz256AbrirIndividual(id);
+  const edit=document.createElement('button');edit.className='btn secondary';edit.textContent='✎ EDT CONTRATO';edit.title='Editar cláusulas do contrato individual';edit.onclick=()=>cz256AbrirIndividual(id);
   const aditivo=document.createElement('button');aditivo.className='btn secondary';aditivo.textContent='+ Aditivo';aditivo.onclick=()=>cz256AbrirAditivos(id);
   celula.insertBefore(edit,celula.firstChild);celula.insertBefore(aditivo,edit.nextSibling);
  });
@@ -7480,7 +7480,7 @@ renderContratosOficialCZ=async function(){
 abrirContratoOficialCZ=async function(id){
  await cz256AbrirContratoOriginal(id);
  const area=$('#content .actions');if(!area||!document.getElementById('coNome'))return;
- const b=document.createElement('button');b.className='btn secondary';b.textContent='✎ Editar cláusulas';b.onclick=()=>cz256AbrirIndividual(id);area.appendChild(b);
+ const b=document.createElement('button');b.className='btn secondary';b.textContent='✎ EDT CONTRATO';b.onclick=()=>cz256AbrirIndividual(id);area.appendChild(b);
 };
 salvarContratoOficialCZ=async function(id,visualizar){
  const antigo=coGet(id)||{};
@@ -7550,6 +7550,72 @@ async function cz256PdfAditivo(id,index,usarEditor=false){
 }
 // Mostra versao correta no cabeçalho apos login sem alterar a autenticacao.
 const cz256ShowAppOriginal=showApp;
-showApp=async function(user){await cz256ShowAppOriginal(user);const el=$('#userName');if(el)el.textContent=el.textContent.replace(/V\d+\b/,'V257')};
+showApp=async function(user){await cz256ShowAppOriginal(user);const el=$('#userName');if(el)el.textContent=el.textContent.replace(/V\d+\b/,'V258')};
+</script>
+<script>
+/* V258: permite editar o texto antes de salvar o formulário do contrato. */
+const cz258Rascunhos = Object.create(null);
+const cz258Campos = ['coNome','coTel','coCpf','coRg','coEnd','coData','coHora','coLocal','coCidade','coServicos','coValor','coPagamento','coDataContrato'];
+function cz258CapturarCampos(){
+ const obj={};cz258Campos.forEach(k=>{const e=document.getElementById(k);if(e)obj[k]=e.value});return obj;
+}
+function cz258DadosCampos(v){return {nome:v.coNome||'',telefone:v.coTel||'',cpf:v.coCpf||'',rg:v.coRg||'',endereco:v.coEnd||'',data_evento:v.coData||'',horario:v.coHora||'',local:v.coLocal||'',cidade:v.coCidade||'',servicos:v.coServicos||'',valor:v.coValor||'',pagamento:v.coPagamento||'',data_contrato:v.coDataContrato||''}}
+const cz258AbrirFormularioAnterior=abrirContratoOficialCZ;
+abrirContratoOficialCZ=async function(id){
+ await cz258AbrirFormularioAnterior(id);
+ if(!document.getElementById('coNome'))return;
+ const r=cz258Rascunhos[String(id)];
+ if(r?.campos)cz258Campos.forEach(k=>{const e=document.getElementById(k);if(e&&Object.prototype.hasOwnProperty.call(r.campos,k))e.value=r.campos[k]});
+ const actions=document.querySelector('#content .actions');if(!actions)return;
+ actions.querySelectorAll('button').forEach(x=>{if(x.textContent.trim()==='✎ EDT CONTRATO')x.remove()});
+ const b=document.createElement('button');b.className='btn secondary';b.textContent='✎ EDT CONTRATO';b.title='Editar as cláusulas antes de salvar o contrato';b.onclick=()=>cz258AbrirEdicao(id);
+ actions.insertBefore(b,actions.firstChild);
+ if(r?.html){const aviso=document.createElement('div');aviso.className='msg';aviso.textContent='Texto editado em rascunho. Clique em SALVAR CONTRATO para gravar o documento e visualizar o PDF.';actions.parentNode.insertBefore(aviso,actions)}
+};
+async function cz258AbrirEdicao(id){
+ const campos=document.getElementById('coNome')?cz258CapturarCampos():cz258Rascunhos[String(id)]?.campos;
+ const existente=coGet(id)||{};
+ if(!campos){await abrirContratoOficialCZ(id);return}
+ let assinado;try{assinado=await cz256EstaAssinado(id)}catch(e){return czAlert(e.message)}
+ if(assinado)return czAlert('Contrato assinado: use um aditivo. O documento original não pode ser alterado.');
+ const p=(await coOrcs()).find(x=>String(x.id)===String(id));if(!p)return czAlert('Orçamento não encontrado.');
+ const chave=String(id),anterior=cz258Rascunhos[chave]||{};
+ cz258Rascunhos[chave]={...anterior,campos};
+ const html=anterior.html||existente.cz256_html||cz256ModeloAtual();
+ cz256EditorLayout('EDT CONTRATO — Antes de salvar',`<div class="cz256-help">Edite o contrato completo antes de salvá-lo. As mudanças ficarão em rascunho até clicar em SALVAR CONTRATO na tela de dados.</div><label>Texto do contrato</label>${cz257EditorHTML('cz258Editor')}<div class="cz256-bar"><button class="btn primary" onclick="cz258GuardarEdicao('${id}')">✓ Aplicar texto e voltar aos dados</button><button class="btn secondary" onclick="cz258Visualizar('${id}')">👁 Visualizar</button><button class="btn secondary" onclick="cz258Voltar('${id}')">← Voltar aos dados</button></div><iframe id="cz256Iframe" class="cz256-preview" title="Prévia do contrato"></iframe>`);
+ cz257Preencher('cz258Editor',html);cz258Visualizar(id);
+}
+async function cz258Visualizar(id){
+ const p=(await coOrcs()).find(x=>String(x.id)===String(id));if(!p)return;
+ const r=cz258Rascunhos[String(id)]||{};
+ const c={...(coGet(id)||{}),...cz258DadosCampos(r.campos||{})};
+ cz256Preview(cz256Tokens(cz257Valor('cz258Editor')||r.html||cz256ModeloAtual(),c,p),'Prévia contrato CZ');
+}
+function cz258GuardarEdicao(id){
+ const html=cz256LimparHTML(cz257Valor('cz258Editor'));
+ if(html.replace(/<[^>]*>/g,'').trim().length<80)return czAlert('O texto do contrato está muito curto. Confira antes de continuar.');
+ const chave=String(id);cz258Rascunhos[chave]={...(cz258Rascunhos[chave]||{}),html};
+ abrirContratoOficialCZ(id);
+}
+function cz258Voltar(id){
+ const html=cz257Valor('cz258Editor');const r=cz258Rascunhos[String(id)];
+ if(r&&html&&html!==r.html){if(!window.confirm('Voltar sem aplicar as últimas alterações do texto?'))return}
+ abrirContratoOficialCZ(id);
+}
+const cz258SalvarAnterior=salvarContratoOficialCZ;
+salvarContratoOficialCZ=async function(id,visualizar){
+ const r=cz258Rascunhos[String(id)];
+ if(!r?.html)return cz258SalvarAnterior(id,visualizar);
+ const obrigatorios=['coNome','coTel','coCpf','coEnd','coData','coLocal'];
+ if(obrigatorios.some(k=>!document.getElementById(k)?.value.trim()))return cz258SalvarAnterior(id,visualizar);
+ try{if(await cz256EstaAssinado(id))return czAlert('Contrato assinado: não é possível alterar o documento original.')}catch(e){return czAlert(e.message)}
+ // Preserva o texto no rascunho até que o formulário esteja completo.
+ // A versão do texto é gravada antes da prévia PDF, após a validação de assinatura.
+ const anterior=coGet(id)||{};
+ const hist=[...(anterior.cz256_historico||[]),{data:new Date().toISOString(),html:r.html}];
+ coSet(id,{cz256_html:r.html,cz256_historico:hist});
+ try{await cz258SalvarAnterior(id,visualizar);delete cz258Rascunhos[String(id)]}
+ catch(err){coSet(id,{cz256_html:anterior.cz256_html||null,cz256_historico:anterior.cz256_historico||[]});throw err}
+};
 </script>
 </body></html>
