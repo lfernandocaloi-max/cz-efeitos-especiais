@@ -362,10 +362,10 @@ const cz212MenuFechados=new Set();
 // Na primeira montagem do menu, a sessão ainda não foi inicializada.
 // Não chamar contaMaster() antes da criação de currentAuthUser e czPerfilUsuario.
 function cz212MasterPronto(){
- return typeof currentAuthUser!=='undefined'
-     && typeof czPerfilUsuario!=='undefined'
-     && !!currentAuthUser
-     && contaMaster();
+ // Durante o carregamento, as variáveis de autenticação ainda estão em TDZ.
+ // A área do sistema só é exibida após autenticação e carregamento das permissões.
+ if(document.getElementById('app')?.classList.contains('hidden'))return false;
+ return contaMaster();
 }
 function cz212MontarMenu(){
  $('#nav').innerHTML=cz212Menu.map(x=>{
