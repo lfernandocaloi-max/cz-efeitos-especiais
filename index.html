@@ -139,13 +139,13 @@ body .ret226Dialog button[aria-label="Fechar"]{color:#334155!important}
 </style>
 </head><body>
 <section id="login" class="login"><div class="loginbox"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><h3>Acesso ao sistema</h3><div class="field"><label>E-mail</label><input id="email" type="email"></div><div class="field"><label>Senha</label><input id="password" type="password"></div><button id="loginBtn" class="btn primary full" style="margin-top:18px">ENTRAR</button><button type="button" class="btn secondary full" style="margin-top:8px" onclick="recuperarSenha()">Esqueci minha senha</button><div id="loginMsg" class="msg"></div></div></section>
-<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><span id="czBuildTag" style="margin-left:10px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:900">V265-R2</span><div class="muted" style="font-size:12px">Sistema de gestão CZ · Atualização V265-R2</div></div><div><span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
+<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><span id="czBuildTag" style="margin-left:10px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:900">V267-E1</span><div class="muted" style="font-size:12px">Sistema de gestão CZ · Atualização V267-E1</div></div><div><span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
 <div id="clientModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="modalTitle">Novo cliente</h2><button class="btn secondary" onclick="closeClient()">Fechar</button></div>
   <input id="clientId" type="hidden"><div class="muted" id="clientOpenedAt" style="font-size:13px">Data de abertura: será definida ao salvar</div>
-  <div class="row"><div class="field"><label>Nome / Razão social *</label><input id="clientName" autocomplete="name"></div><div class="field"><label>Telefone *</label><input id="clientPhone" type="tel" inputmode="tel" autocomplete="tel"></div></div>
+  <div class="row"><div class="field"><label>Nome / Razão social *</label><input id="clientName" autocomplete="name"></div><div class="field"><label>Telefone *</label><input id="clientPhone" type="tel" inputmode="tel" autocomplete="tel"><div id="clientPhoneAviso" role="status" style="font-size:12px;margin-top:5px"></div></div></div>
   <div class="field"><label class="client-switch"><input id="clientIsCompany" type="checkbox"> CNPJ</label></div>
-  <div class="row" id="clientPfFields"><div class="field"><label>CPF</label><input id="clientCpf" inputmode="numeric"></div><div class="field"><label>RG</label><input id="clientRg"></div></div>
-  <div class="row hidden" id="clientPjFields"><div class="field"><label>CNPJ</label><input id="clientCnpj" inputmode="numeric"></div><div class="field"><label>IE (Inscrição Estadual)</label><input id="clientIe"></div></div>
+  <div class="row" id="clientPfFields"><div class="field"><label>CPF</label><input id="clientCpf" inputmode="numeric"><div id="clientCpfAviso" role="status" style="font-size:12px;margin-top:5px"></div></div><div class="field"><label>RG</label><input id="clientRg"><div id="clientRgAviso" role="status" style="font-size:12px;margin-top:5px"></div></div></div>
+  <div class="row hidden" id="clientPjFields"><div class="field"><label>CNPJ</label><input id="clientCnpj" inputmode="numeric"><div id="clientCnpjAviso" role="status" style="font-size:12px;margin-top:5px"></div></div><div class="field"><label>IE (Inscrição Estadual)</label><input id="clientIe"></div></div>
   <div class="row"><div class="field"><label>Endereço</label><input id="clientAddress" autocomplete="street-address"></div></div>
   <div class="row"><div class="field"><label>Cidade</label><input id="clientCity" autocomplete="address-level2"></div><div class="field"><label>CEP</label><input id="clientZip" inputmode="numeric" autocomplete="postal-code"></div></div>
   <div class="field"><label>Complemento</label><input id="clientComplement"></div>
@@ -2467,10 +2467,31 @@ Obrigado!`;
   };
 }
   
+  // CZ V267-E1 — conferência documental; não altera estrutura do banco.
+  function czDigitos(v){return String(v??'').replace(/\D/g,'')}
+  function czValidaTelefone(v){const d=czDigitos(v);return (d.length===10||d.length===11)&&Number(d.slice(0,2))>=11&&Number(d.slice(0,2))<=99}
+  function czValidaCpf(v){const d=czDigitos(v);if(d.length!==11||/^(\d)\1{10}$/.test(d))return false;const dig=n=>{let soma=0;for(let i=0;i<n;i++)soma+=Number(d[i])*(n+1-i);const r=(soma*10)%11;return r===10?0:r};return dig(9)===Number(d[9])&&dig(10)===Number(d[10])}
+  function czValidaCnpj(v){const d=czDigitos(v);if(d.length!==14||/^(\d)\1{13}$/.test(d))return false;const dig=(n,pesos)=>{let soma=0;for(let i=0;i<n;i++)soma+=Number(d[i])*pesos[i];const r=soma%11;return r<2?0:11-r};return dig(12,[5,4,3,2,9,8,7,6,5,4,3,2])===Number(d[12])&&dig(13,[6,5,4,3,2,9,8,7,6,5,4,3,2])===Number(d[13])}
+  // RG varia por estado; este teste identifica apenas formatos muito curtos/incomuns.
+  function czValidaRgFormato(v){const d=String(v??'').replace(/[^0-9a-z]/gi,'');return d.length>=5&&d.length<=14}
+  function czMensagemCampo(id,texto,ok=false){const el=document.getElementById(id),aviso=document.getElementById(id+'Aviso');if(!el||!aviso)return;aviso.textContent=texto;aviso.style.color=ok?'#38b86b':'#ff9999';el.style.borderColor=texto?(ok?'#38b86b':'#ef5350'):''}
+  function czValidarCamposCliente(){
+    const pj=$('#clientIsCompany').checked,telefone=$('#clientPhone').value,cpf=$('#clientCpf').value,rg=$('#clientRg').value,cnpj=$('#clientCnpj').value;
+    const t=czDigitos(telefone);
+    czMensagemCampo('clientPhone',!t.length?'Informe DDD + número.':czValidaTelefone(telefone)?'✓ DDD + número com quantidade correta.':`Telefone incompleto ou inválido: ${t.length} dígitos; use 10 (fixo) ou 11 (celular).`,czValidaTelefone(telefone));
+    czMensagemCampo('clientCpf',pj?'':!cpf.trim()?'CPF não informado.':czValidaCpf(cpf)?'✓ CPF válido.':'CPF inválido: confira os 11 dígitos.',czValidaCpf(cpf));
+    czMensagemCampo('clientRg',pj?'':!rg.trim()?'RG não informado.':czValidaRgFormato(rg)?'✓ RG preenchido; confira com o documento.':'RG com numeração incomum: confira com o documento.',czValidaRgFormato(rg));
+    czMensagemCampo('clientCnpj',!pj?'':!cnpj.trim()?'CNPJ não informado.':czValidaCnpj(cnpj)?'✓ CNPJ válido.':'CNPJ inválido: confira os 14 dígitos.',czValidaCnpj(cnpj));
+  }
+  ['clientPhone','clientCpf','clientRg','clientCnpj'].forEach(id=>document.getElementById(id)?.addEventListener('input',czValidarCamposCliente));
   function pendenciasCadastroCliente(c){
-    const campos={nome:'Nome',telefone:'Telefone',email:'E-mail',endereco:'Endereço',numero:'Número',complemento:'Complemento',cidade:'Cidade',cep:'CEP',profissao:'Profissão'};
+    const campos={nome:'Nome',telefone:'Telefone',email:'E-mail',endereco:'Endereço',complemento:'Complemento',cidade:'Cidade',cep:'CEP',profissao:'Profissão'};
     if(c.tipo_pessoa==='pj'||c.cnpj){campos.cnpj='CNPJ';campos.ie='IE'}else{campos.cpf='CPF';campos.rg='RG'}
-    return Object.entries(campos).filter(([chave])=>!String(c[chave]??'').trim()).map(([,rotulo])=>rotulo);
+    const faltas=Object.entries(campos).filter(([chave])=>!String(c[chave]??'').trim()).map(([,rotulo])=>rotulo);
+    if(c.telefone&&!czValidaTelefone(c.telefone))faltas.push('Telefone inválido (DDD + número)');
+    if(c.tipo_pessoa==='pj'||c.cnpj){if(c.cnpj&&!czValidaCnpj(c.cnpj))faltas.push('CNPJ inválido')}
+    else {if(c.cpf&&!czValidaCpf(c.cpf))faltas.push('CPF inválido');if(c.rg&&!czValidaRgFormato(c.rg))faltas.push('RG: conferir numeração')}
+    return faltas;
   }
   function indicadorCadastroCliente(c){const faltando=pendenciasCadastroCliente(c);return faltando.length
     ?`<span class="client-status client-status-incomplete" title="Faltam: ${esc(faltando.join(', '))}" aria-label="Cadastro incompleto: faltam ${esc(faltando.join(', '))}">■</span>`
@@ -2478,7 +2499,7 @@ Obrigado!`;
   function numeroCadastroCliente(c){return c.numero_cliente==null?'—':String(c.numero_cliente).padStart(3,'0')}
   async function renderClients(){const {data,error}=await db.from('clientes').select('*').order('criado_em',{ascending:false});if(error){$('#content').innerHTML=`<div class="msg">Erro ao carregar clientes: ${error.message}</div>`;return}clients=data||[];$('#content').innerHTML=`<div class="sectionhead"><div><h2>Clientes</h2><div class="muted">${clients.length} cliente(s) cadastrado(s)</div></div><button class="btn primary" onclick="openClient()">+ Novo cliente</button></div><div class="tablewrap">${clients.length?`<table class="client-table"><thead><tr><th>Nº</th><th>Nome</th><th>Telefone</th><th>Endereço</th><th>Cadastro</th><th>Ações</th></tr></thead><tbody>${clients.map(c=>`<tr><td><b>${numeroCadastroCliente(c)}</b></td><td>${esc(c.nome)}</td><td>${esc(c.telefone||'')}</td><td>${esc([c.endereco,c.numero,c.complemento,c.cidade,c.cep].filter(Boolean).join(', ')||'—')}</td><td>${indicadorCadastroCliente(c)}</td><td><div class="actions"><button class="btn secondary" onclick="editClient('${c.id}')">Editar</button><button class="btn secondary" onclick="historicoCliente('${c.id}')">Histórico</button></div></td></tr>`).join('')}</tbody></table>`:`<div class="empty">Nenhum cliente cadastrado.</div>`}</div>`}
 function esc(v){return String(v).replace(/[&<>'"]/g,a=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[a]))}
-function atualizarTipoCliente(){const pj=$('#clientIsCompany').checked;$('#clientPfFields').classList.toggle('hidden',pj);$('#clientPjFields').classList.toggle('hidden',!pj)}
+function atualizarTipoCliente(){const pj=$('#clientIsCompany').checked;$('#clientPfFields').classList.toggle('hidden',pj);$('#clientPjFields').classList.toggle('hidden',!pj);czValidarCamposCliente()}
 $('#clientIsCompany').onchange=atualizarTipoCliente;
 function openClient(c=null){
   $('#clientModal').classList.remove('hidden');$('#modalTitle').textContent=c?'Cliente Nº '+numeroCadastroCliente(c):'Novo cliente';
@@ -2498,6 +2519,10 @@ $('#saveClientBtn').onclick=async()=>{
   const val=x=>$('#'+x).value.trim()||null;
   const payload={nome:val('clientName'),telefone:val('clientPhone'),tipo_pessoa:pj?'pj':'pf',email:val('clientEmail'),endereco:val('clientAddress'),complemento:val('clientComplement'),cidade:val('clientCity'),cep:val('clientZip'),profissao:val('clientProfession'),cpf:pj?null:val('clientCpf'),rg:pj?null:val('clientRg'),cnpj:pj?val('clientCnpj'):null,ie:pj?val('clientIe'):null,origem:val('clientOrigin')||'manual',observacoes:val('clientNotes'),atualizado_em:new Date().toISOString()};
   if(!payload.nome||!payload.telefone){$('#clientMsg').textContent='Informe nome e telefone para cadastrar o cliente.';return}
+  if(!czValidaTelefone(payload.telefone)){$('#clientMsg').textContent='Telefone inválido: informe DDD + 8 dígitos (fixo) ou DDD + 9 dígitos (celular).';czValidarCamposCliente();return}
+  if(!pj&&payload.cpf&&!czValidaCpf(payload.cpf)){$('#clientMsg').textContent='CPF inválido. Confira os 11 dígitos antes de salvar.';czValidarCamposCliente();return}
+  if(pj&&payload.cnpj&&!czValidaCnpj(payload.cnpj)){$('#clientMsg').textContent='CNPJ inválido. Confira os 14 dígitos antes de salvar.';czValidarCamposCliente();return}
+  if(!pj&&payload.rg&&!czValidaRgFormato(payload.rg)){$('#clientMsg').textContent='Confira a numeração do RG antes de salvar.';czValidarCamposCliente();return}
   const botao=$('#saveClientBtn');botao.disabled=true;$('#clientMsg').textContent='Salvando...';
   const {error}=await(id?db.from('clientes').update(payload).eq('id',id):db.from('clientes').insert({...payload,criado_em:new Date().toISOString()}));
   botao.disabled=false;if(error){$('#clientMsg').textContent='Erro ao salvar: '+error.message;return}closeClient();renderClients()
