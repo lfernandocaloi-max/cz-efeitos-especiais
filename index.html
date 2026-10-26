@@ -76,6 +76,16 @@
 @media(max-width:900px){.orc-travel-grid{grid-template-columns:repeat(2,minmax(120px,180px))}.orc-team-row{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.orc-travel-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .nav .cz212-group{background:#17222d;color:#f6f7f9;font-weight:800;margin-top:8px;border-left:3px solid #ff641f}.nav .cz212-sub{padding-left:14px;border-left:1px solid #394757;margin-left:12px}.nav .cz212-sub[hidden]{display:none}.nav .cz212-sub button{font-size:13px;padding:9px 8px;margin:1px 0;white-space:normal}.nav .cz212-group:hover{background:#263341}
+
+/* CZ V267-E1 — filtros de datas legíveis no Caixa confirmado */
+#caixaAreaConfirmado #caixaDataDe,#caixaAreaConfirmado #caixaDataAte{
+ background:#0b1118!important;color:#fff!important;-webkit-text-fill-color:#fff!important;
+ color-scheme:dark!important;border:1px solid #718298!important;border-radius:9px;
+ min-height:43px;padding:10px 12px!important;
+}
+#caixaAreaConfirmado input[type="date"]::-webkit-calendar-picker-indicator{
+ filter:invert(1)!important;opacity:1!important;cursor:pointer!important;
+}
 </style>
 <style>
 /* CZ V231: orçamento legível e cabeçalhos compactos */
@@ -476,7 +486,11 @@ function movimentoCaixaLocal(x){let obs=x.observacao||null;if(x.conta&&!String(o
 async function carregarCaixa(){
   try{
     if(!caixaImportado){
-      const antigos=finLoad(FIN_MOV_KEY).filter(x=>x.id&&x.status==='pago'&&['entrada','saida'].includes(x.tipo)&&Number(x.valor)>0).map(movimentoCaixaLocal);
+      // V267-E1: nunca reimportar automaticamente entradas antigas de orçamentos.
+      // A cobrança do orçamento é criada em parcelas PENDENTES pelo fluxo de fechamento.
+      // Reimportar um lançamento legado marcado como pago duplicaria o recebimento e
+      // poderia quitar artificialmente o contrato. Mantém despesas legadas pagas.
+      const antigos=finLoad(FIN_MOV_KEY).filter(x=>x.id&&x.status==='pago'&&x.tipo==='saida'&&Number(x.valor)>0).map(movimentoCaixaLocal);
       for(let i=0;i<antigos.length;i+=100){const {error}=await db.from('caixa_movimentacoes').upsert(antigos.slice(i,i+100),{onConflict:'origem_id',ignoreDuplicates:true});if(error)throw error}
       caixaImportado=true;
     }
@@ -488,7 +502,13 @@ async function carregarCaixa(){
 const CAIXA_CONTAS_KEY='cz_caixa_contas_recebimento_v1';
 function caixaContas(){try{return JSON.parse(localStorage.getItem(CAIXA_CONTAS_KEY)||'[]')}catch(_){return []}}
 function salvarCaixaContas(v){localStorage.setItem(CAIXA_CONTAS_KEY,JSON.stringify(v))}
-function caixaConfirmado(x){return String(x?.observacao||'').includes('[CAIXA_CONFIRMADO]')}
+function caixaConfirmado(x){
+ // Só a baixa manual com conta selecionada confirma uma ENTRADA.
+ // Saídas seguem o marcador próprio do lançamento de despesa.
+ const obs=String(x?.observacao||'');
+ if(!obs.includes('[CAIXA_CONFIRMADO]'))return false;
+ return x?.tipo!=='entrada'||/\[CONTA:[^\]]+\]/.test(obs);
+}
 function caixaPrecisaConfirmar(x){return x?.tipo==='entrada'&&!caixaConfirmado(x)&&!cz180Cancelado(x)}
 function caixaContaMovimento(x){const m=String(x?.observacao||'').match(/\[CONTA:([^\]]+)\]/);return m?m[1].trim():'—'}
 function abrirCadastroContaCaixa(){
@@ -517,8 +537,18 @@ function renderCaixaContas(){
   <div class="tablewrap">${lista.length?`<table><thead><tr><th>Conta</th><th>Tipo</th><th>Entrada</th><th>Saída</th><th>Ação</th></tr></thead><tbody>${lista.map(x=>{const e=entradaConta(x.nome),s=saidaConta(x.nome);return `<tr><td>${esc(x.nome)}</td><td>${esc(x.tipo)}</td><td style="color:#55d884;font-weight:900">${money(e)}</td><td style="color:#ff7474;font-weight:900">${money(s)}</td><td><button class="btn danger" onclick="excluirContaCaixa('${x.id}')">Excluir</button></td></tr>`}).join('')}</tbody></table>`:'<div class="empty">Nenhuma conta cadastrada.</div>'}</div>
   </div>`;
 }
-function mostrarCaixaMovimentos(){ $('#caixaAreaMovimentos')?.classList.remove('hidden');$('#caixaAreaContas')?.classList.add('hidden'); }
-function mostrarCaixaContas(){ $('#caixaAreaMovimentos')?.classList.add('hidden');$('#caixaAreaContas')?.classList.remove('hidden');renderCaixaContas(); }
+function czSelecionarAbaCaixa(aba='pendentes'){
+ const areas={pendentes:'#caixaAreaMovimentos',contas:'#caixaAreaContas',confirmado:'#caixaAreaConfirmado'};
+ Object.entries(areas).forEach(([nome,seletor])=>document.querySelector(seletor)?.classList.toggle('hidden',nome!==aba));
+ document.querySelectorAll('[data-cz-aba-caixa]').forEach(b=>{
+  const ativo=b.dataset.czAbaCaixa===aba;
+  b.classList.toggle('primary',ativo);b.classList.toggle('secondary',!ativo);
+ });
+ if(aba==='contas')renderCaixaContas();
+}
+function mostrarCaixaMovimentos(){czSelecionarAbaCaixa('pendentes')}
+function mostrarCaixaContas(){czSelecionarAbaCaixa('contas')}
+function mostrarCaixaConfirmado(){czSelecionarAbaCaixa('confirmado')}
 // V170 — Janela de confirmação de recebimento integrada ao visual do sistema CZ.
 function czSelecionarContaRecebimento(movimento, contas, contaAtual=''){
  return new Promise(resolve=>{
@@ -573,8 +603,11 @@ async function confirmarEntradaCaixa(id){
  const limpo=String(x.observacao||'').replace(/\s*\[CAIXA_CONFIRMADO\]\s*/g,' ').replace(/\s*\[CONTA:[^\]]+\]\s*/g,' ').trim();
  const vencimento=czVencimentoRecebimento(x);
  const obs=(limpo+' [VENCIMENTO:'+vencimento+'] [CONTA:'+nomeConta+'] [CAIXA_CONFIRMADO]').trim();
- const {error}=await db.from('caixa_movimentacoes').update({observacao:obs,data:finISODate()}).eq('id',id);
- if(error)return czAlert('Erro ao confirmar: '+error.message,'Caixa');
+ const {data:gravados,error}=await db.from('caixa_movimentacoes')
+  .update({observacao:obs,data:finISODate()})
+  .eq('id',id).eq('tipo','entrada').eq('observacao',x.observacao)
+  .select('id');
+ if(error||!gravados?.length)return czAlert('Não foi possível confirmar esta parcela. Ela pode ter sido alterada em outra tela. Atualize o Caixa. '+(error?.message||''),'Caixa');
  await renderCaixa();
 }
 
@@ -747,11 +780,11 @@ let caixaFiltroDataDe='',caixaFiltroDataAte='';
 function aplicarFiltroDatasCaixa(){
  caixaFiltroDataDe=$('#caixaDataDe')?.value||'';
  caixaFiltroDataAte=$('#caixaDataAte')?.value||'';
- renderCaixa(caixaFiltroAtual||'todos');
+ renderCaixa(caixaFiltroAtual||'todos').then(()=>mostrarCaixaConfirmado());
 }
 function limparFiltroDatasCaixa(){
  caixaFiltroDataDe='';caixaFiltroDataAte='';
- renderCaixa(caixaFiltroAtual||'todos');
+ renderCaixa(caixaFiltroAtual||'todos').then(()=>mostrarCaixaConfirmado());
 }
 // V171: vencimentos organizados por mês, sem antecipar parcelas futuras.
 let czMesRecebimentos=finISODate().slice(0,7), czDiaRecebimentos='', cz189TodosPendentes=true;
@@ -775,7 +808,7 @@ function czFiltrarDiaRecebimentos(valor,destino='caixa'){
 function czVencimentoRecebimento(x){
  return String(x?.observacao||'').match(/\[VENCIMENTO:(\d{4}-\d{2}-\d{2})\]/)?.[1]||String(x?.data||'').slice(0,10);
 }
-function czParcelasDoMes(lista){return (lista||[]).filter(x=>caixaPrecisaConfirmar(x)&&(cz189TodosPendentes||(czVencimentoRecebimento(x).startsWith(czMesRecebimentos)&&(!czDiaRecebimentos||czVencimentoRecebimento(x)===czDiaRecebimentos)))).sort((a,b)=>czVencimentoRecebimento(a).localeCompare(czVencimentoRecebimento(b)))}
+function czParcelasDoMes(lista){return (lista||[]).filter(x=>caixaPrecisaConfirmar(x)&&(cz189TodosPendentes||(czVencimentoRecebimento(x).startsWith(czMesRecebimentos)))).sort((a,b)=>czVencimentoRecebimento(a).localeCompare(czVencimentoRecebimento(b)))}
 function cz189MostrarTodos(destino='caixa'){cz189TodosPendentes=true;czDiaRecebimentos='';return destino==='financeiro'?renderFinanceiro(finFiltroAtual):renderCaixa(caixaFiltroAtual)}
 function czControlesMesRecebimentos(destino='caixa'){
  const mes=new Date(czMesRecebimentos+'-01T12:00:00').toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
@@ -784,8 +817,6 @@ function czControlesMesRecebimentos(destino='caixa'){
  <button type="button" class="btn secondary" onclick="czMudarMesRecebimentos(-1,'${destino}')" title="Mês anterior">◀</button>
  <label style="font-size:13px">Mês / Ano<br><input aria-label="Mês e ano do vencimento" type="month" value="${esc(czMesRecebimentos)}" onchange="czFiltrarMesRecebimentos(this.value,'${destino}')" style="padding:9px;background:#0b1118;color:white;border:1px solid #425268;border-radius:8px"></label>
  <button type="button" class="btn secondary" onclick="czMudarMesRecebimentos(1,'${destino}')" title="Próximo mês">▶</button>
- <label style="font-size:13px">Dia do vencimento<br><input aria-label="Dia do vencimento" type="date" value="${esc(czDiaRecebimentos)}" onchange="czFiltrarDiaRecebimentos(this.value,'${destino}')" style="padding:9px;background:#0b1118;color:white;border:1px solid #425268;border-radius:8px"></label>
- <button type="button" class="btn secondary" onclick="czFiltrarDiaRecebimentos('','${destino}')">Todos os dias</button>
  <strong style="text-transform:capitalize;color:#cbd4dc">${esc(mes)}</strong></div>`;
 }
 let caixaFiltroAtual='todos';
@@ -807,18 +838,19 @@ async function renderCaixa(filtro='todos'){
   let saldo=0;const historico=confirmados.map(m=>({...m,saldo_acumulado:(saldo+=m.tipo==='entrada'?Number(m.valor||0):-Number(m.valor||0))}));
   const lista=historico.filter(x=>filtro==='todos'||x.tipo===filtro).reverse();
   $('#content').innerHTML=`<div class="sectionhead"><div><h2>💵 Caixa</h2><div class="muted">Primeiro confira os recebimentos; somente depois eles entram no Caixa geral.</div></div><button type="button" class="btn secondary" onclick="renderFinanceiro()">Voltar ao financeiro</button></div>
-    <div style="display:flex;gap:8px;margin-bottom:16px"><button class="btn primary" onclick="mostrarCaixaMovimentos()">Caixa</button><button class="btn secondary" onclick="mostrarCaixaContas()">Contas de recebimento</button></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px"><button type="button" data-cz-aba-caixa="pendentes" class="btn primary" onclick="mostrarCaixaMovimentos()">Recebimentos aguardando confirmação</button><button type="button" data-cz-aba-caixa="contas" class="btn secondary" onclick="mostrarCaixaContas()">Contas de recebimento</button><button type="button" data-cz-aba-caixa="confirmado" class="btn secondary" onclick="mostrarCaixaConfirmado()">Caixa geral confirmado</button></div>
     <div id="caixaAreaMovimentos">
-    <div class="card" style="margin-bottom:16px"><div class="sectionhead"><div><h3 style="margin:0">Filtro por data</h3><div class="muted">Filtre todas as movimentações do Caixa pelo período desejado.</div></div></div><div class="row"><div class="field"><label>Data de</label><input id="caixaDataDe" type="date" value="${esc(caixaFiltroDataDe)}"></div><div class="field"><label>Data até</label><input id="caixaDataAte" type="date" value="${esc(caixaFiltroDataAte)}"></div></div><div class="actions" style="justify-content:flex-start"><button type="button" class="btn primary" onclick="aplicarFiltroDatasCaixa()">Filtrar</button><button type="button" class="btn secondary" onclick="limparFiltroDatasCaixa()">Limpar filtro</button></div></div>
     ${caixaErro?`<div class="msg" style="color:#ff8b78">Não foi possível sincronizar o Caixa com o Supabase: ${esc(caixaErro)}.</div>`:''}
     <div class="cards" style="margin-bottom:16px"><div class="card"><div class="muted">A confirmar</div><div class="n">${money(totalPendente)}</div></div><div class="card"><div class="muted">Entradas confirmadas</div><div class="n" style="color:#55d884">${money(entradas)}</div></div><div class="card"><div class="muted">Saídas</div><div class="n" style="color:#ff7474">${money(saidas)}</div></div><div class="card"><div class="muted">Saldo real do Caixa</div><div class="n" style="color:${entradas-saidas>=0?'#55d884':'#ff7474'}">${money(entradas-saidas)}</div></div></div>
-    <div class="card" style="margin-bottom:16px"><div class="sectionhead"><div><h3 style="margin:0">Recebimentos aguardando confirmação (${pendentes.length}${cz189TodosPendentes?'':' neste filtro'})</h3><div class="muted">Por padrão, mostra todas as parcelas pendentes, inclusive futuras e vencidas. Use o filtro de mês/dia se desejar. Os valores só entram no saldo após confirmação.</div></div>${czControlesMesRecebimentos('caixa')}</div>
+    <div class="card" style="margin-bottom:16px"><div class="sectionhead"><div><h3 style="margin:0">Recebimentos aguardando confirmação (${pendentes.length}${cz189TodosPendentes?'':' neste filtro'})</h3><div class="muted">Por padrão, mostra todas as parcelas pendentes, inclusive futuras e vencidas. Use o filtro de Mês / Ano se desejar. Os valores só entram no saldo após confirmação.</div></div>${czControlesMesRecebimentos('caixa')}</div>
       <div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button type="button" class="btn secondary" onclick="cz189RecuperarRecebimentos()">Verificar recebimentos de orçamentos confirmados</button></div>
-      <div class="tablewrap">${pendentes.length?`<table><thead><tr><th>Vencimento</th><th>Situação</th><th>Cliente</th><th>Nº proposta</th><th>Descrição / Parcela</th><th>Forma</th><th>Conta</th><th>Valor</th><th>Ação</th></tr></thead><tbody>${pendentes.map(x=>`<tr><td>${finDate(czVencimentoRecebimento(x))}</td><td style="color:#2563eb;font-weight:800">Aguardando baixa</td><td>${esc(x.cliente_nome||'—')}</td><td>${esc(x.proposta_numero||'—')}</td><td>${esc(x.descricao||x.categoria||'Recebimento')}</td><td>${esc(x.forma||'—')}</td><td>${esc(caixaContaMovimento(x))}</td><td><b>${money(x.valor)}</b></td><td><div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="btn primary" onclick="confirmarEntradaCaixa('${x.id}')">Confirmar caixa</button><button type="button" class="btn secondary" onclick="cz177BaixaParcial('${x.id}')">Baixa parcial</button></div></td></tr>`).join('')}</tbody></table>`:`<div class="empty">${cz189TodosPendentes?'Nenhum recebimento aguardando confirmação.':'Nenhuma parcela neste mês/dia. Clique em Todos os pendentes para ver outras datas.'}</div>`}</div></div>
+      <div class="tablewrap">${pendentes.length?`<table><thead><tr><th>Vencimento</th><th>Situação</th><th>Cliente</th><th>Nº proposta</th><th>Descrição / Parcela</th><th>Forma</th><th>Conta</th><th>Valor</th><th>Ação</th></tr></thead><tbody>${pendentes.map(x=>`<tr><td>${finDate(czVencimentoRecebimento(x))}</td><td style="color:#2563eb;font-weight:800">Aguardando baixa</td><td>${esc(x.cliente_nome||'—')}</td><td>${esc(x.proposta_numero||'—')}</td><td>${esc(x.descricao||x.categoria||'Recebimento')}</td><td>${esc(x.forma||'—')}</td><td>${esc(caixaContaMovimento(x))}</td><td><b>${money(x.valor)}</b></td><td><div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="btn primary" onclick="confirmarEntradaCaixa('${x.id}')">Confirmar caixa</button><button type="button" class="btn secondary" onclick="cz177BaixaParcial('${x.id}')">Baixa parcial</button></div></td></tr>`).join('')}</tbody></table>`:`<div class="empty">${cz189TodosPendentes?'Nenhum recebimento aguardando confirmação.':'Nenhuma parcela neste mês. Clique em Todos os pendentes para ver outras datas.'}</div>`}</div></div>
+    </div><div id="caixaAreaConfirmado" class="hidden">
+    <div class="card" style="margin-bottom:16px"><div class="sectionhead"><div><h3 style="margin:0">Filtro por data</h3><div class="muted">Filtre todas as movimentações do Caixa pelo período desejado.</div></div></div><div class="row"><div class="field"><label>Data de</label><input id="caixaDataDe" type="date" value="${esc(caixaFiltroDataDe)}"></div><div class="field"><label>Data até</label><input id="caixaDataAte" type="date" value="${esc(caixaFiltroDataAte)}"></div></div><div class="actions" style="justify-content:flex-start"><button type="button" class="btn primary" onclick="aplicarFiltroDatasCaixa()">Filtrar</button><button type="button" class="btn secondary" onclick="limparFiltroDatasCaixa()">Limpar filtro</button></div></div>
     <div class="card"><div class="sectionhead"><h3 style="margin:0">Caixa geral confirmado</h3><div class="actions" style="margin:0"><button type="button" class="btn ${filtro==='todos'?'primary':'secondary'}" data-caixa-filtro="todos">Todos</button><button type="button" class="btn ${filtro==='entrada'?'primary':'secondary'}" data-caixa-filtro="entrada">Entradas</button><button type="button" class="btn ${filtro==='saida'?'primary':'secondary'}" data-caixa-filtro="saida">Saídas</button></div></div>
       <div class="tablewrap">${lista.length?`<table><thead><tr><th>Data</th><th>Movimento</th><th>Cliente</th><th>Nº proposta</th><th>Descrição</th><th>Categoria</th><th>Forma</th><th>Conta</th><th>Valor</th><th>Saldo</th></tr></thead><tbody>${lista.map(x=>`<tr><td>${finDate(x.data)}</td><td>${x.tipo==='entrada'?'Entrada':'Saída'}</td><td>${esc(x.cliente_nome||'—')}</td><td>${esc(x.proposta_numero||'—')}</td><td>${esc(x.descricao||'—')}</td><td>${esc(x.categoria||'—')}</td><td>${esc(x.forma||'—')}</td><td>${esc(caixaContaMovimento(x))}</td><td style="color:${x.tipo==='entrada'?'#55d884':'#ff7474'};font-weight:800">${x.tipo==='entrada'?'+':'−'} ${money(x.valor)}</td><td>${money(x.saldo_acumulado)}</td></tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhuma movimentação confirmada neste filtro.</div>'}</div></div>
     </div><div id="caixaAreaContas" class="hidden"></div>`;
-  document.querySelectorAll('[data-caixa-filtro]').forEach(b=>b.onclick=()=>renderCaixa(b.dataset.caixaFiltro));
+  document.querySelectorAll('[data-caixa-filtro]').forEach(b=>b.onclick=()=>renderCaixa(b.dataset.caixaFiltro).then(()=>mostrarCaixaConfirmado()));
 }
 let finFiltroAtual='todos',finDataInicio='',finDataFim='';
 function finAplicarData(){finDataInicio=$('#finDataInicio')?.value||'';finDataFim=$('#finDataFim')?.value||'';renderFinanceiro(finFiltroAtual)}
@@ -842,7 +874,7 @@ async function renderFinanceiro(filtro='todos'){
  if(filtro==='pagar_mes')listaP=listaP.filter(x=>x.vencimento>hoje&&String(x.vencimento||'').startsWith(ym));
  // V196 — o Financeiro aplica o mesmo filtro de pendentes do Caixa.
  // Mantém a conciliação de baixas parciais calculada por cz172ParcelasFinanceiras.
- const parcelasMes=(filtroReceber?listaR:listaR.filter(x=>cz189TodosPendentes||(String(x.vencimento||'').startsWith(czMesRecebimentos)&&(!czDiaRecebimentos||x.vencimento===czDiaRecebimentos)))).sort((a,b)=>String(a.vencimento||'').localeCompare(String(b.vencimento||'')));
+ const parcelasMes=(filtroReceber?listaR:listaR.filter(x=>cz189TodosPendentes||(String(x.vencimento||'').startsWith(czMesRecebimentos)))).sort((a,b)=>String(a.vencimento||'').localeCompare(String(b.vencimento||'')));
  const totalGeralPendente=cz172ParcelasFinanceiras(caixaCache||[]).parcelas.reduce((s,x)=>s+Number(x.saldo||0),0);
  const totalGeralPagar=desp.filter(x=>x.status!=='pago').reduce((s,x)=>s+Number(x.valor||0),0);
  $('#content').innerHTML=`<div class="sectionhead"><div><h2>💰 Financeiro</h2><div class="muted">Parcelas a receber, contas a pagar e caixa</div></div><div class="actions"><button class="btn secondary" onclick="renderCaixa()">Abrir Caixa</button><button class="btn secondary" onclick="novaMovimentacao('entrada')">+ Nova entrada</button><button class="btn primary" onclick="novaDespesa()">+ Nova despesa</button></div></div>
@@ -6065,6 +6097,7 @@ async function cz169RegistrarRecebimentosPendentes(p){
      proposta_numero:p.numero||null,orcamento_id:p.id,
      descricao:`Proposta ${p.numero||''} - ${item.rotulo} - ${p.evento_nome||'Evento'}`,
      categoria:'Recebimento de orçamento',forma:item.forma,
+     // Sem [CAIXA_CONFIRMADO] e sem conta: NÃO é pagamento recebido.
      observacao:'[AGUARDANDO_CONFIRMACAO] [VENCIMENTO:'+item.data+']'
    });
  }
