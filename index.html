@@ -180,7 +180,66 @@ body .ret226Dialog button[aria-label="Fechar"]{color:#334155!important}
 #content:has(#orcClienteSelect) .orc-team-card .orc-team-row .cz267-equipe-par .field label{min-height:0}
 #content:has(#orcClienteSelect) .orc-team-card .orc-team-row input,#content:has(#orcClienteSelect) .orc-team-card .orc-team-row select{padding:6px!important;font-size:12px!important}
 @media(max-width:1180px){#content:has(#orcClienteSelect) .cz267-logistica-lado-a-lado{grid-template-columns:1fr}}
-</style></head><body>
+</style>
+<style id="cz267-padrao-visual-global">
+/* CZ V267-E1 — padronização de filtros e campos, sem mudar regras de negócio. */
+:root{--cz-campo-fundo:#fff;--cz-campo-texto:#182332;--cz-campo-borda:#b8c6d5;--cz-filtro-fundo:#fff;--cz-filtro-borda:#d9e0e8}
+/* Barras de filtro padronizadas em todos os módulos. */
+#content .filters,
+#content [class~="filter-bar"],#content [class~="filterbar"],
+#content [class~="filtros"],#content [class~="filtro-barra"]{
+ background:var(--cz-filtro-fundo)!important;color:var(--cz-campo-texto)!important;
+ border:1px solid var(--cz-filtro-borda)!important;border-radius:12px;
+}
+#content .filters label,#content .filters .field>label,
+#content [class~="filter-bar"] label,#content [class~="filterbar"] label,
+#content [class~="filtros"] label,#content [class~="filtro-barra"] label{
+ color:var(--cz-campo-texto)!important;
+}
+#content .filters .muted,#content [class~="filtros"] .muted{color:#536477!important}
+/* Mesmo padrão de preenchimento em todas as telas, incluindo selects e calendários. */
+#content input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="hidden"]),
+#content select,#content textarea,
+.modalbox input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="hidden"]),
+.modalbox select,.modalbox textarea{
+ background:var(--cz-campo-fundo)!important;color:var(--cz-campo-texto)!important;
+ -webkit-text-fill-color:var(--cz-campo-texto)!important;
+ border:1px solid var(--cz-campo-borda)!important;border-radius:9px;
+ color-scheme:light!important;
+}
+#content input::placeholder,#content textarea::placeholder,.modalbox input::placeholder,.modalbox textarea::placeholder{
+ color:#718096!important;opacity:1;
+}
+#content input:focus-visible,#content select:focus-visible,#content textarea:focus-visible,
+.modalbox input:focus-visible,.modalbox select:focus-visible,.modalbox textarea:focus-visible{
+ outline:2px solid #ff641f!important;outline-offset:1px;
+}
+#content input:disabled,#content select:disabled,#content textarea:disabled,
+.modalbox input:disabled,.modalbox select:disabled,.modalbox textarea:disabled{
+ opacity:.7;cursor:not-allowed;
+}
+/* Datas e horas não podem ficar pretas/invisíveis em filtros ou no Caixa. */
+#content input[type="date"],#content input[type="time"],#content input[type="month"],
+.modalbox input[type="date"],.modalbox input[type="time"],.modalbox input[type="month"],
+#caixaAreaConfirmado #caixaDataDe,#caixaAreaConfirmado #caixaDataAte{
+ background:#fff!important;color:#182332!important;-webkit-text-fill-color:#182332!important;
+ color-scheme:light!important;border:1px solid #b8c6d5!important;
+}
+#content input[type="date"]::-webkit-calendar-picker-indicator,
+#content input[type="time"]::-webkit-calendar-picker-indicator,
+#content input[type="month"]::-webkit-calendar-picker-indicator,
+.modalbox input[type="date"]::-webkit-calendar-picker-indicator,
+.modalbox input[type="time"]::-webkit-calendar-picker-indicator,
+#caixaAreaConfirmado input[type="date"]::-webkit-calendar-picker-indicator{
+ filter:none!important;opacity:1!important;cursor:pointer;
+}
+/* Opções do seletor seguem o mesmo padrão, inclusive com tema escuro no Windows. */
+#content select option,.modalbox select option{background:#fff;color:#182332}
+/* Preservar controles e botões de opção com seu comportamento e indicação visual. */
+#content input[type="checkbox"],#content input[type="radio"],
+.modalbox input[type="checkbox"],.modalbox input[type="radio"]{accent-color:#ff641f}
+</style>
+</head><body>
 <section id="login" class="login"><div class="loginbox"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><h3>Acesso ao sistema</h3><div class="field"><label>E-mail</label><input id="email" type="email"></div><div class="field"><label>Senha</label><input id="password" type="password"></div><button id="loginBtn" class="btn primary full" style="margin-top:18px">ENTRAR</button><button type="button" class="btn secondary full" style="margin-top:8px" onclick="recuperarSenha()">Esqueci minha senha</button><div id="loginMsg" class="msg"></div></div></section>
 <script id="cz267-login-diagnostico">
 // Diagnóstico isolado: funciona mesmo se o script principal não inicializar.
