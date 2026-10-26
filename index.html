@@ -7368,6 +7368,7 @@ function cz253AbrirCaixaContrato(){document.getElementById('cz253FinanceiroDetal
 .cz256-help{font-size:12px;color:#53657b;margin:7px 0}
 .cz256-preview{width:100%;height:540px;border:1px solid #cad5e1;background:#fff;border-radius:8px}
 .cz256-history{border:1px solid #dbe2eb;border-radius:8px;padding:10px;margin:7px 0;background:#f8fafc}
+.cz259-contrato-botoes{display:flex;flex-direction:column;align-items:stretch;gap:6px;min-width:135px}.cz259-contrato-botoes .btn{white-space:nowrap;text-align:center}
 </style>
 <script>
 /* V257: editor visual de cláusulas, sem mostrar etiquetas HTML */
@@ -7472,9 +7473,9 @@ renderContratosOficialCZ=async function(){
   const original=tr.querySelector('button[onclick^="abrirContratoOficialCZ"]');if(!original)return;
   const id=(original.getAttribute('onclick')||'').match(/\('([^']+)'\)/)?.[1];if(!id)return;
   const celula=tr.lastElementChild?.querySelector('div');if(!celula)return;
-  const edit=document.createElement('button');edit.className='btn secondary';edit.textContent='✎ EDT CONTRATO';edit.title='Editar cláusulas do contrato individual';edit.onclick=()=>cz256AbrirIndividual(id);
+  const edit=document.createElement('button');edit.className='btn secondary';edit.textContent='✎ EDT CONTRATO';edit.title='Editar cláusulas do contrato individual';edit.onclick=()=>cz258AbrirEdicao(id);
   const aditivo=document.createElement('button');aditivo.className='btn secondary';aditivo.textContent='+ Aditivo';aditivo.onclick=()=>cz256AbrirAditivos(id);
-  celula.insertBefore(edit,celula.firstChild);celula.insertBefore(aditivo,edit.nextSibling);
+  const coluna=document.createElement('div');coluna.className='cz259-contrato-botoes';coluna.append(edit,aditivo);celula.insertBefore(coluna,celula.firstChild);
  });
 };
 abrirContratoOficialCZ=async function(id){
@@ -7506,7 +7507,7 @@ async function cz256EstaAssinado(id){
 async function cz256AbrirIndividual(id){
  const p=(await coOrcs()).find(x=>String(x.id)===String(id));if(!p)return czAlert('Orçamento confirmado não encontrado.');
  const c=coGet(id)||{};
- if(!c.nome||!c.servicos)return czAlert('Preencha e salve os dados do contrato antes de editar o texto.');
+ if(!c.nome||!c.servicos)return cz258AbrirEdicao(id);
  let assinado;try{assinado=await cz256EstaAssinado(id)}catch(e){return czAlert(e.message)}
  cz256EditorLayout('Editar contrato individual',`<div class="cz256-help">Proposta ${coEsc(p.numero)} • Cliente: ${coEsc(c.nome)} • ${assinado?'<b>Documento assinado: edição bloqueada.</b>':'Altera somente este contrato, sem modificar o modelo geral.'}</div>
  <label>Contrato do cliente — texto completo</label>${cz257EditorHTML("cz256TextoIndividual",assinado)}
@@ -7550,7 +7551,7 @@ async function cz256PdfAditivo(id,index,usarEditor=false){
 }
 // Mostra versao correta no cabeçalho apos login sem alterar a autenticacao.
 const cz256ShowAppOriginal=showApp;
-showApp=async function(user){await cz256ShowAppOriginal(user);const el=$('#userName');if(el)el.textContent=el.textContent.replace(/V\d+\b/,'V258')};
+showApp=async function(user){await cz256ShowAppOriginal(user);const el=$('#userName');if(el)el.textContent=el.textContent.replace(/V\d+\b/,'V259')};
 </script>
 <script>
 /* V258: permite editar o texto antes de salvar o formulário do contrato. */
@@ -7569,13 +7570,13 @@ abrirContratoOficialCZ=async function(id){
  const actions=document.querySelector('#content .actions');if(!actions)return;
  actions.querySelectorAll('button').forEach(x=>{if(x.textContent.trim()==='✎ EDT CONTRATO')x.remove()});
  const b=document.createElement('button');b.className='btn secondary';b.textContent='✎ EDT CONTRATO';b.title='Editar as cláusulas antes de salvar o contrato';b.onclick=()=>cz258AbrirEdicao(id);
- actions.insertBefore(b,actions.firstChild);
+ const coluna=document.createElement('div');coluna.className='cz259-contrato-botoes';coluna.appendChild(b);const aditivo=document.createElement('button');aditivo.type='button';aditivo.className='btn secondary';aditivo.textContent='+ ADITIVO';aditivo.onclick=()=>cz256AbrirAditivos(id);coluna.appendChild(aditivo);actions.insertBefore(coluna,actions.firstChild);
  if(r?.html){const aviso=document.createElement('div');aviso.className='msg';aviso.textContent='Texto editado em rascunho. Clique em SALVAR CONTRATO para gravar o documento e visualizar o PDF.';actions.parentNode.insertBefore(aviso,actions)}
 };
 async function cz258AbrirEdicao(id){
  const campos=document.getElementById('coNome')?cz258CapturarCampos():cz258Rascunhos[String(id)]?.campos;
  const existente=coGet(id)||{};
- if(!campos){await abrirContratoOficialCZ(id);return}
+ if(!campos){await abrirContratoOficialCZ(id);return cz258AbrirEdicao(id)}
  let assinado;try{assinado=await cz256EstaAssinado(id)}catch(e){return czAlert(e.message)}
  if(assinado)return czAlert('Contrato assinado: use um aditivo. O documento original não pode ser alterado.');
  const p=(await coOrcs()).find(x=>String(x.id)===String(id));if(!p)return czAlert('Orçamento não encontrado.');
