@@ -282,7 +282,7 @@ body .ret226Dialog button[aria-label="Fechar"]{color:#334155!important}
   },4000);
 })();
 </script>
-<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><span id="czBuildTag" style="margin-left:10px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:900">V267-E1</span><div class="muted" style="font-size:12px">Sistema de gestão CZ · Atualização V267-E1</div></div><div><span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
+<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><span id="czBuildTag" style="margin-left:10px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:900">V268-N1</span><div class="muted" style="font-size:12px">Sistema de gestão CZ · Atualização V268-N1</div></div><div><span id="czNuvemStatus" title="Sincronização de dados da empresa" style="font-size:12px;color:#86efac;margin-right:8px">☁ Aguardando login</span> <button id="czNuvemAtualizar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.atualizar()">Atualizar dados</button> <button id="czNuvemImportar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.importarLegado()">Importar dados antigos</button> <span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
 <div id="clientModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="modalTitle">Novo cliente</h2><button class="btn secondary" onclick="closeClient()">Fechar</button></div>
   <input id="clientId" type="hidden"><div class="muted" id="clientOpenedAt" style="font-size:13px">Data de abertura: será definida ao salvar</div>
   <div class="row"><div class="field"><label>Nome / Razão social *</label><input id="clientName" autocomplete="name"></div><div class="field"><label>Telefone *</label><input id="clientPhone" type="tel" inputmode="tel" autocomplete="tel"><div id="clientPhoneAviso" role="status" style="font-size:12px;margin-top:5px"></div></div></div>
@@ -321,6 +321,100 @@ body .ret226Dialog button[aria-label="Fechar"]{color:#334155!important}
 <div class="row"><div class="field"><label>Locação tabela 1</label><input id="assetRent1" type="number" step="0.01"></div><div class="field"><label>Locação tabela 2</label><input id="assetRent2" type="number" step="0.01"></div></div>
 <div class="row"><div class="field"><label>Peso (kg)</label><input id="assetWeight" type="number" step="0.01"></div><div class="field"><label>Possui case?</label><select id="assetCase"><option value="false">Não</option><option value="true">Sim</option></select></div></div>
 <div class="field"><label>Foto do ativo (máx. 5 MB)</label><input id="assetPhoto" type="file" accept="image/*"><img id="assetPreview" class="preview hidden"></div><div class="field"><label class="client-switch"><input id="assetMontagem" type="checkbox"> Material de montagem / uso técnico</label></div><div class="field"><label>Observações</label><textarea id="assetNotes"></textarea></div><div class="actions"><button class="btn secondary" onclick="closeAsset()">Cancelar</button><button id="saveAssetBtn" class="btn primary">Salvar ativo</button></div><div id="assetMsg" class="msg"></div></div></div>
+<script id="cz268-nuvem-compartilhada">
+/* CZ V268-N1: dados de módulos legados no Supabase, não no armazenamento do navegador.
+   Requer SQL CZ_V268_N1_estado_compartilhado.sql executado ANTES de publicar.
+   Cache somente em memória; gravação assíncrona confirmada pelo banco.
+   A importação local é opcional e nunca sobrescreve chaves já existentes na nuvem. */
+const czSharedStorage=(()=>{
+ const tabela='cz_estado_compartilhado';
+ const cache=new Map(), pendentes=new Map();
+ let iniciado=false, iniciando=null, salvando=false, falha='', interval=null;
+ function status(){
+  const el=document.getElementById('czNuvemStatus');if(!el)return;
+  const n=pendentes.size;
+  el.textContent=falha?'☁ ERRO — '+n+' alteração(ões) pendente(s)':n?'☁ Salvando '+n+' alteração(ões)...':'☁ Dados sincronizados';
+  el.style.color=falha?'#ff8585':n?'#fcd34d':'#86efac';
+  el.title=falha||'Os dados empresariais são mantidos no Supabase';
+  const imp=document.getElementById('czNuvemImportar');if(imp)imp.style.display=(typeof contaMaster==='function'&&contaMaster())?'':'none';
+ }
+ async function lerNuvem(){
+  const novo=new Map();
+  for(let offset=0;offset<100000;offset+=1000){
+   const {data,error}=await db.from(tabela).select('chave,valor').order('chave').range(offset,offset+999);
+   if(error)throw new Error('Não foi possível consultar o armazenamento compartilhado: '+error.message);
+   for(const r of data||[])novo.set(r.chave,r.valor);
+   if((data||[]).length<1000)break;
+  }
+  for(const [k,v] of novo)if(!pendentes.has(k))cache.set(k,v);
+  for(const k of [...cache.keys()])if(!novo.has(k)&&!pendentes.has(k))cache.delete(k);
+ }
+ async function init(){
+  if(iniciado)return;
+  if(iniciando)return iniciando;
+  iniciando=(async()=>{
+   try{await lerNuvem();iniciado=true;falha='';status();
+    if(!interval)interval=setInterval(()=>{if(iniciado&&!pendentes.size)lerNuvem().then(status).catch(e=>{falha=e.message;status()})},15000);
+   }catch(e){falha=e.message;status();throw e}
+  })();
+  try{await iniciando}finally{iniciando=null}
+ }
+ function getItem(k){return cache.has(String(k))?cache.get(String(k)):null}
+ function setItem(k,v){
+  if(!iniciado){falha='A nuvem ainda não carregou; alteração não permitida.';status();throw new Error(falha)}
+  k=String(k);v=String(v);cache.set(k,v);pendentes.set(k,v);status();void descarregar();
+ }
+ function removeItem(k){
+  if(!iniciado)throw new Error('A nuvem ainda não carregou.');
+  k=String(k);cache.delete(k);pendentes.set(k,null);status();void descarregar();
+ }
+ async function descarregar(){
+  if(salvando||!pendentes.size)return;
+  salvando=true;
+  try{
+   while(pendentes.size){
+    const [k,v]=pendentes.entries().next().value;
+    const req=v===null?db.from(tabela).delete().eq('chave',k):db.from(tabela).upsert({chave:k,valor:v},{onConflict:'chave'});
+    const {error}=await req;
+    if(error)throw new Error('Falha ao salvar '+k+': '+error.message);
+    if(pendentes.get(k)===v)pendentes.delete(k);
+   }
+   falha='';
+  }catch(e){falha=e.message;console.error('[CZ Nuvem]',e)}
+  finally{salvando=false;status()}
+ }
+ async function atualizar(){
+  if(pendentes.size){await descarregar();if(pendentes.size){await czAlert('Existem alterações ainda não confirmadas na nuvem. Verifique a conexão antes de atualizar.\n'+falha,'Sincronização pendente');return}}
+  try{await lerNuvem();falha='';status();window.location.reload()}
+  catch(e){falha=e.message;status();await czAlert(falha,'Erro de sincronização')}
+ }
+ function chavesLegadas(){
+  return Object.keys(window.localStorage).filter(k=>k.startsWith('cz_')&&k!=='cz_auth_email');
+ }
+ async function importarLegado(){
+  if(!iniciado)return czAlert('Aguarde a nuvem carregar.');
+  if(typeof contaMaster!=='function'||!contaMaster())return czAlert('Importação permitida apenas aos Masters.');
+  const chaves=chavesLegadas();
+  if(!chaves.length)return czAlert('Não existem registros antigos da CZ neste navegador.');
+  const novas=chaves.filter(k=>!cache.has(k));
+  const mensagem='Encontradas '+chaves.length+' chaves antigas neste computador.\n'+novas.length+' ainda não existem no Supabase.\n\nSomente as ausentes serão importadas. Nada será apagado do navegador e nenhuma chave da nuvem será sobrescrita.\n\nIMPORTANTE: antes de importar, confira se esses registros são reais e não simulações ou lançamentos já existentes no banco. Dados de Caixa/estoque/PDV podem exigir reconciliação para não duplicar movimentos.\n\nDeseja importar somente os registros não financeiros e não operacionais críticos?';
+  if(!await czConfirm(mensagem,'Importação cautelosa','Importar selecionados'))return;
+  // Não importar automaticamente movimentos financeiros, PDV, estoque ou execução de eventos.
+  const bloqueadas=/^cz_(fin_|pdv_|ordens_|v135_|v142_|184_|185_|conf_|saida_|retorno_|217_|226_|237_|239_|campo_|231_ocorrencias|contratos_|contrato_|155_)/;
+  const permitidas=novas.filter(k=>!bloqueadas.test(k));
+  let ok=0,erros=[];
+  for(const k of permitidas){
+   const v=window.localStorage.getItem(k);if(v===null)continue;
+   const {error}=await db.from(tabela).insert({chave:k,valor:v});
+   if(error){if(error.code==='23505')continue;erros.push(k+': '+error.message)}else ok++;
+  }
+  await lerNuvem();status();
+  await czAlert('Importadas '+ok+' chaves não críticas. '+(erros.length?'Falhas: '+erros.join('; '):'Sem erros.')+'\n\nRegistros financeiros, contratos, PDV, manutenção, bipagem e retorno NÃO foram importados automaticamente por segurança. Precisam de reconciliação individual.','Resultado da importação');
+ }
+ window.addEventListener('beforeunload',e=>{if(pendentes.size){e.preventDefault();e.returnValue='Há alterações da CZ aguardando confirmação no Supabase.'}});
+ return {init,getItem,setItem,removeItem,atualizar,importarLegado,descarregar,pendentes};
+})();
+</script>
 <script>
 const SUPABASE_URL='https://locvpksjntwnlqrytqqx.supabase.co';
 const SUPABASE_KEY='sb_publishable_UN34ALY6Oxc1_V863pgq3Q_hNj7tuIQ';
@@ -487,7 +581,7 @@ function contaMaster(){
  const perfil=String(czPerfilUsuario?.perfil||'').trim().toLowerCase();
  return email===CZ_MASTER_EMAIL || perfil==='master' || perfil==='master_principal' || perfil==='master_autorizado';
 }
-async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#login').style.display='none';$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V267-E1';reconstruirMenuPermissoes();await cz267CarregarPreparacoes();renderModule(0)}
+async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();await czSharedStorage.init();$('#login').classList.add('hidden');$('#login').style.display='none';$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V267-E1';reconstruirMenuPermissoes();await cz267CarregarPreparacoes();renderModule(0)}
 async function entrarSistemaCZ(){
  const email=$('#email')?.value.trim()||'',password=$('#password')?.value||'',msg=$('#loginMsg');
  if(!email||!password){if(msg)msg.textContent='Informe seu e-mail e sua senha.';return}
@@ -545,8 +639,8 @@ async function count(table){const {count,error}=await db.from(table).select('*',
 
 const CZ_MASTER_EMAIL='lfernando.caloi@gmail.com';
 const FIN_MOV_KEY='cz_fin_mov_v1', FIN_COB_KEY='cz_fin_cob_v1', FIN_CAT_KEY='cz_fin_categorias_v1';
-function finLoad(k){try{return JSON.parse(localStorage.getItem(k)||'[]')}catch(_){return []}}
-function finSave(k,v){localStorage.setItem(k,JSON.stringify(v))}
+function finLoad(k){try{return JSON.parse(czSharedStorage.getItem(k)||'[]')}catch(_){return []}}
+function finSave(k,v){czSharedStorage.setItem(k,JSON.stringify(v))}
 function finDate(d){return d?new Date(d+'T12:00:00').toLocaleDateString('pt-BR'):'—'}
 function finISODate(dt=new Date()){const y=dt.getFullYear(),m=String(dt.getMonth()+1).padStart(2,'0'),d=String(dt.getDate()).padStart(2,'0');return `${y}-${m}-${d}`}
 function finAddDays(date,n){const d=new Date(date+'T12:00:00');d.setDate(d.getDate()+n);return finISODate(d)}
@@ -577,7 +671,7 @@ function caixaContas(){
  // Contas com lançamentos no Supabase são compartilhadas entre todos os Masters.
  // Une os nomes históricos com os cadastros locais, sem criar movimentos ou saldos.
  let locais=[];
- try{locais=JSON.parse(localStorage.getItem(CAIXA_CONTAS_KEY)||'[]')}catch(_){locais=[]}
+ try{locais=JSON.parse(czSharedStorage.getItem(CAIXA_CONTAS_KEY)||'[]')}catch(_){locais=[]}
  const lista=Array.isArray(locais)?[...locais]:[];
  const nomes=new Set(lista.map(x=>String(x.nome||'').trim().toLocaleLowerCase('pt-BR')));
  for(const mov of caixaCache||[]){
@@ -588,7 +682,7 @@ function caixaContas(){
  }
  return lista;
 }
-function salvarCaixaContas(v){localStorage.setItem(CAIXA_CONTAS_KEY,JSON.stringify(v))}
+function salvarCaixaContas(v){czSharedStorage.setItem(CAIXA_CONTAS_KEY,JSON.stringify(v))}
 function caixaConfirmado(x){
  // Só a baixa manual com conta selecionada confirma uma ENTRADA.
  // Saídas seguem o marcador próprio do lançamento de despesa.
@@ -1757,8 +1851,8 @@ async function cz193AbrirLimpezaTestes(){
    const exatas=new Set(['cz_contratos_oficial_v137','cz_fin_mov_v1','cz_fin_cob_v1','cz_v135_operacao','cz_v142_saida_eventos']);
    const prefixos=['cz184_rastreios_saida_','cz185_rastreios_retorno_','cz_conf_','cz_saida_','cz_saida_evento_','cz_retorno_'];
    let falhas=[];
-   for(const k of Object.keys(localStorage)){
-    if(exatas.has(k)||prefixos.some(p=>k.startsWith(p))){try{localStorage.removeItem(k)}catch(e){falhas.push(k)}}
+   for(const k of Object.keys(window.localStorage)){
+    if(exatas.has(k)||prefixos.some(p=>k.startsWith(p))){try{window.localStorage.removeItem(k)}catch(e){falhas.push(k)}}
    }
    caixaCache=[];caixaImportado=false;
    msg.style.color='#79e5a4';
@@ -3047,8 +3141,8 @@ async function addPurchaseItem(id,btn){
 }
 /* CZ V253: lista de compras com comparação, condições e listas novas. */
 const cz253Key='cz253_compras_opcoes_v1',cz253NovosKey='cz253_listas_novos_v1';
-function cz253Ler(chave,padrao){try{return JSON.parse(localStorage.getItem(chave))||padrao}catch{return padrao}}
-function cz253Guardar(chave,obj){localStorage.setItem(chave,JSON.stringify(obj))}
+function cz253Ler(chave,padrao){try{return JSON.parse(czSharedStorage.getItem(chave))||padrao}catch{return padrao}}
+function cz253Guardar(chave,obj){czSharedStorage.setItem(chave,JSON.stringify(obj))}
 let cz253Opcao=cz253Ler(cz253Key,{tipo:'vista',desconto:0,formaVista:'PIX',formaPrazo:'Boleto',formas:['PIX','Dinheiro','Transferência','Boleto','Cartão'],parcelas:3,prazo:30,fornecedor:'',telefone:''});
 let cz253ComprasDados=[],cz253ComprasPendentes=new Set(),cz253NovosEditando=null;
 function cz253Escape(v){return esc(String(v??''))}
@@ -3158,7 +3252,7 @@ function cz181MontarNotas(texto,codigos,baixas=[]){
  base+='\n'+CZ181_TAG+JSON.stringify(codigos.map(x=>String(x).trim()).filter(Boolean));
  return base;
 }
-function cz155Load(){try{return JSON.parse(localStorage.getItem('cz155_codigos_unidades')||'{}')}catch(e){return {}}}
+function cz155Load(){try{return JSON.parse(czSharedStorage.getItem('cz155_codigos_unidades')||'{}')}catch(e){return {}}}
 function unidadesAtivo(a){
  const info=cz181ExtrairNotas(a?.observacoes);
  if(info.temRastreio)return info.codigos;
@@ -3366,7 +3460,7 @@ async function atualizarContaMaster(){
    const {data}=await db.auth.getUser();
    if(data?.user){
      currentAuthUser=data.user;
-     if(data.user.email)localStorage.setItem('cz_auth_email',String(data.user.email).trim().toLowerCase());
+     if(data.user.email)czSharedStorage.setItem('cz_auth_email',String(data.user.email).trim().toLowerCase());
    }
  }catch(_){}
  return contaMaster();
@@ -3610,7 +3704,7 @@ async function novoEventoManual(){
   <div class="card"><div class="row"><div class="field"><label>Cliente *</label><select id="evCliente"><option value="">Selecione</option>${(cs||[]).map(c=>`<option value="${esc(c.id)}" data-nome="${esc(c.nome)}" data-tel="${esc(c.telefone||'')}">${esc(c.nome)}</option>`).join('')}</select></div><div class="field"><label>Evento *</label><input id="evNome"></div></div><div class="row"><div class="field"><label>Data *</label><input id="evData" type="date"></div><div class="field"><label>Local</label><input id="evLocal"></div></div><div class="row"><div class="field"><label>Horário</label><input id="evHora" type="time"></div><div class="field"><label>Horário de montagem</label><input id="evMontagem" type="time"></div></div><div class="row"><div class="field"><label>Início da montagem</label><input id="evInicioMontagem" type="date"></div><div class="field"><label>Término da montagem</label><input id="evTerminoMontagem" type="date"></div></div><div class="field"><label>Técnico responsável</label><input id="evTecnico"></div><div class="actions"><button class="btn primary" id="salvarEvento">Criar evento</button></div><div id="evMsg" class="msg"></div></div>`;
   $('#salvarEvento').onclick=async()=>{const sel=$('#evCliente'),opt=sel.options[sel.selectedIndex];if(!sel.value||!$('#evNome').value.trim()||!$('#evData').value){$('#evMsg').textContent='Informe cliente, evento e data.';return}const payload={cliente_id:sel.value,cliente_nome:opt.dataset.nome,cliente_telefone:opt.dataset.tel||null,nome_evento:$('#evNome').value.trim(),data_evento:$('#evData').value,local_evento:$('#evLocal').value.trim()||null,horario_evento:$('#evHora').value||null,data_inicio_montagem:$('#evInicioMontagem').value||null,data_termino_montagem:$('#evTerminoMontagem').value||null,horario_montagem:$('#evMontagem').value||null,tecnico_responsavel:$('#evTecnico').value.trim()||null,status:'aguardando_separacao'};if(!validarDatasMontagem(payload.data_inicio_montagem,payload.data_termino_montagem,$('#evMsg')))return;const {data,error}=await db.from('eventos_operacionais').insert(payload).select().single();if(error){$('#evMsg').textContent='Erro: '+error.message;return}abrirEvento(data.id)};
 }
-function registroConferencia(mid){try{const v=localStorage.getItem('cz_conf_'+mid)||localStorage.getItem('cz_saida_'+mid);if(!v)return '—';return new Date(v).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})}catch(_){return '—'}}
+function registroConferencia(mid){try{const v=czSharedStorage.getItem('cz_conf_'+mid)||czSharedStorage.getItem('cz_saida_'+mid);if(!v)return '—';return new Date(v).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})}catch(_){return '—'}}
 async function iniciarEvento(id){
   const {data:e,error}=await db.from('eventos_operacionais').select('status').eq('id',id).single();
   if(error){alert(error.message);return}
@@ -3705,7 +3799,7 @@ async function biparEvento(eventoId){
    const rastreioLido=!!ativoEncontrado;
    const chaveLeituras='cz184_rastreios_saida_'+String(eventoId);
    let leituras=[];
-   try{leituras=JSON.parse(localStorage.getItem(chaveLeituras)||'[]')}catch(_){}
+   try{leituras=JSON.parse(czSharedStorage.getItem(chaveLeituras)||'[]')}catch(_){}
    if(rastreioLido&&leituras.includes(codigoLido)){
     if(msg){msg.style.color='#ffb0b0';msg.textContent='Este rastreio já foi bipado na saída deste evento.'}
     campo?.select();campo?.focus();return;
@@ -3721,8 +3815,8 @@ async function biparEvento(eventoId){
    if(!salvo)throw new Error('O banco não autorizou a atualização deste material. Verifique as permissões da tabela evento_materiais.');
    if(Number(salvo.quantidade_bipada)!==novo)throw new Error('A quantidade não foi gravada corretamente no banco.');
    try{
-    localStorage.setItem('cz_conf_'+item.id,new Date().toISOString());
-    if(rastreioLido)localStorage.setItem(chaveLeituras,JSON.stringify([...leituras,codigoLido]));
+    czSharedStorage.setItem('cz_conf_'+item.id,new Date().toISOString());
+    if(rastreioLido)czSharedStorage.setItem(chaveLeituras,JSON.stringify([...leituras,codigoLido]));
    }catch(_){}
    if(campo)campo.value='';
    await abrirEvento(eventoId);
@@ -3781,11 +3875,11 @@ async function cz235LiberarSaidaLegada(id){
 async function liberarSaidaEvento(id){
  const {error}=await db.rpc('cz_liberar_saida_evento',{p_evento_id:id});
  if(error){alert('Não foi possível liberar a saída: '+error.message);return}
- try{localStorage.setItem('cz_saida_evento_'+id,new Date().toISOString())}catch(_){}renderRetornoEventos()
+ try{czSharedStorage.setItem('cz_saida_evento_'+id,new Date().toISOString())}catch(_){}renderRetornoEventos()
 }
 function retornoKey(mid){return 'cz_retorno_'+mid}
-function retornoInfo(mid){try{return JSON.parse(localStorage.getItem(retornoKey(mid))||'{"qtd":0,"registros":[],"status":""}')}catch(_){return {qtd:0,registros:[],status:''}}}
-function salvarRetorno(mid,obj){try{localStorage.setItem(retornoKey(mid),JSON.stringify(obj))}catch(_){}}
+function retornoInfo(mid){try{return JSON.parse(czSharedStorage.getItem(retornoKey(mid))||'{"qtd":0,"registros":[],"status":""}')}catch(_){return {qtd:0,registros:[],status:''}}}
+function salvarRetorno(mid,obj){try{czSharedStorage.setItem(retornoKey(mid),JSON.stringify(obj))}catch(_){}}
 function dataUltimoRetorno(mid){const r=retornoInfo(mid),v=r.registros?.[r.registros.length-1];return v?new Date(v).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}):'—'}
 function retornoInfoMaterial(m,e){return e.saida_baixada_em?{qtd:Number(m.quantidade_devolvida||0),status:m.ocorrencia_retorno||''}:retornoInfo(m.id)}
 function dataUltimoRetornoMaterial(m,e){return e.saida_baixada_em?(m.ultima_devolucao_em?new Date(m.ultima_devolucao_em).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}):'—'):dataUltimoRetorno(m.id)}
@@ -3894,14 +3988,14 @@ let cz185RetornoEmAndamento=false;
 function cz185Lidos(eventoId,etapa){
  try{
   const chave=etapa==='saida'?'cz184_rastreios_saida_':'cz185_rastreios_retorno_';
-  const arr=JSON.parse(localStorage.getItem(chave+String(eventoId))||'[]');
+  const arr=JSON.parse(czSharedStorage.getItem(chave+String(eventoId))||'[]');
   return Array.isArray(arr)?arr.map(normalizarCodigoEvento):[];
  }catch(_){return []}
 }
 function cz185GravarRetorno(eventoId,rastreio){
  const chave='cz185_rastreios_retorno_'+String(eventoId);
  const lista=cz185Lidos(eventoId,'retorno');
- if(!lista.includes(rastreio))localStorage.setItem(chave,JSON.stringify([...lista,rastreio]));
+ if(!lista.includes(rastreio))czSharedStorage.setItem(chave,JSON.stringify([...lista,rastreio]));
 }
 async function biparRetornoEvento(eventoId,materialSelecionadoId=null){
  const campo=$('#scanRetorno'),msg=$('#retMsg');
@@ -4079,8 +4173,8 @@ async function mudarStatusEvento(id,status){const {error}=await db.from('eventos
 
 // ===== CZ v83 — MANUTENÇÃO COMPLETA =====
 const CZ_OS_KEY='cz_ordens_manutencao_v83';
-function czOsLoad(){try{return JSON.parse(localStorage.getItem(CZ_OS_KEY)||'[]')}catch(_){return []}}
-function czOsSave(a){localStorage.setItem(CZ_OS_KEY,JSON.stringify(a))}
+function czOsLoad(){try{return JSON.parse(czSharedStorage.getItem(CZ_OS_KEY)||'[]')}catch(_){return []}}
+function czOsSave(a){czSharedStorage.setItem(CZ_OS_KEY,JSON.stringify(a))}
 function czOsNumero(){const a=czOsLoad(),n=a.reduce((m,x)=>Math.max(m,Number(String(x.numero||'').replace(/\D/g,''))||0),0)+1;return 'OS '+String(n).padStart(3,'0')}
 function czQtdOcorrencia(mid,tipo){const r=retornoInfo(mid);return Number(tipo==='perda'?r.qtd_perda||0:r.qtd_manutencao||0)}
 async function czAjustarQuantidadeAtivo(ativoId,delta,status){if(!ativoId)return true;const {data:a,error}=await db.from('ativos').select('*').eq('id',ativoId).single();if(error){alert(error.message);return false}const atual=Number(a.quantidade||0),nova=Math.max(0,atual+Number(delta||0));const patch={quantidade:nova};if('status' in a)patch.status=nova>0?'disponivel':status;const u=await db.from('ativos').update(patch).eq('id',ativoId);if(u.error){alert(u.error.message);return false}return true}
@@ -4257,8 +4351,8 @@ function pdvAtualizarLinhaProduto(){
 
 
 const PDV_ORC_KEY='cz_pdv_orcamentos_v1';
-function pdvOrcamentos(){try{return JSON.parse(localStorage.getItem(PDV_ORC_KEY)||'[]')}catch(_){return []}}
-function pdvSalvarOrcamentos(lista){localStorage.setItem(PDV_ORC_KEY,JSON.stringify(lista))}
+function pdvOrcamentos(){try{return JSON.parse(czSharedStorage.getItem(PDV_ORC_KEY)||'[]')}catch(_){return []}}
+function pdvSalvarOrcamentos(lista){czSharedStorage.setItem(PDV_ORC_KEY,JSON.stringify(lista))}
 function pdvProximoNumero(){
   const nums=pdvOrcamentos().map(o=>{
     const m=String(o.numero||'').match(/^PDV\s*0*(\d+)$/i);
@@ -4561,8 +4655,8 @@ function isMaster(){return contaMaster();}
    Camada segura sobre a V134: não altera autenticação e não exige migração SQL.
    Metadados novos ficam locais até serem consolidados no banco. */
 const CZ135_KEY='cz_v135_operacao';
-function cz135Load(){try{return JSON.parse(localStorage.getItem(CZ135_KEY)||'{}')}catch(_){return {}}}
-function cz135Save(s){localStorage.setItem(CZ135_KEY,JSON.stringify(s||{}))}
+function cz135Load(){try{return JSON.parse(czSharedStorage.getItem(CZ135_KEY)||'{}')}catch(_){return {}}}
+function cz135Save(s){czSharedStorage.setItem(CZ135_KEY,JSON.stringify(s||{}))}
 function cz135Evento(id){const s=cz135Load();s.eventos=s.eventos||{};s.eventos[id]=s.eventos[id]||{docs:{alvara:'Pendente',croqui:'Pendente'},historico:[],saida_bipada:[]};cz135Save(s);return s.eventos[id]}
 function cz135Patch(id,p){const s=cz135Load();s.eventos=s.eventos||{};s.eventos[id]={...(s.eventos[id]||{}),...p};cz135Save(s);return s.eventos[id]}
 function cz135Hist(id,acao){const s=cz135Load();s.eventos=s.eventos||{};const e=s.eventos[id]||{};e.historico=e.historico||[];e.historico.unshift({acao,quando:new Date().toISOString()});s.eventos[id]=e;cz135Save(s)}
@@ -4690,8 +4784,8 @@ async function relatorioCampoV135(id){
 
 /* ===== V137 — CONTRATO OFICIAL CZ (base V136 estável) ===== */
 const CZ_CONTRATOS_OFICIAL_KEY='cz_contratos_oficial_v137';
-function coLoad(){try{return JSON.parse(localStorage.getItem(CZ_CONTRATOS_OFICIAL_KEY)||'{}')}catch(_){return {}}}
-function coSave(v){localStorage.setItem(CZ_CONTRATOS_OFICIAL_KEY,JSON.stringify(v||{}))}
+function coLoad(){try{return JSON.parse(czSharedStorage.getItem(CZ_CONTRATOS_OFICIAL_KEY)||'{}')}catch(_){return {}}}
+function coSave(v){czSharedStorage.setItem(CZ_CONTRATOS_OFICIAL_KEY,JSON.stringify(v||{}))}
 function cz173ContratoPendente(c){
  if(!c)return false;
  return c.origem==='orcamento_confirmado'
@@ -5461,8 +5555,8 @@ async function sair221Materiais(eventoId){
 }
 /* ===== V220 — SAIR PRO EVENTO: BIPAGEM AUTOMÁTICA E CONFERÊNCIA POR QUANTIDADE ===== */
 const SAIR142_KEY='cz_v142_saida_eventos';
-function sair142Load(){try{return JSON.parse(localStorage.getItem(SAIR142_KEY)||'{}')}catch(_){return {}}}
-function sair142Save(v){localStorage.setItem(SAIR142_KEY,JSON.stringify(v||{}))}
+function sair142Load(){try{return JSON.parse(czSharedStorage.getItem(SAIR142_KEY)||'{}')}catch(_){return {}}}
+function sair142Save(v){czSharedStorage.setItem(SAIR142_KEY,JSON.stringify(v||{}))}
 function sair142State(id){const a=sair142Load();return a[String(id)]||{responsavel:'',bipados:[],historico:[]}}
 function sair142Set(id,v){const a=sair142Load();a[String(id)]={...sair142State(id),...v};sair142Save(a);return a[String(id)]}
 function sair220Cod(x){return String(x.codigo_rastreio||x.rastreio||x.codigo_barras||x.codigo||'').trim()}
@@ -5649,7 +5743,7 @@ async function sair142DarSaida(id){
    if(!String(motivo||'').trim())throw new Error('A saída com pendência exige um motivo.');
   }
   // A função oficial do banco usa evento_materiais.quantidade_bipada para calcular
-  // a baixa. As leituras desta tela eram guardadas apenas no localStorage.
+  // a baixa. As leituras desta tela eram guardadas apenas no czSharedStorage.
   // Atualizamos a conferência primeiro; a baixa em produtos acontece APENAS na RPC.
   const alterados=[];
   for(const m of mats){
@@ -5892,7 +5986,7 @@ function prep217Local(id){
  const x=cz267Preparacoes.get(String(id));
  if(x)return x.dados||{};
  // Compatibilidade para dados antigos, sem enviar automaticamente ao banco.
- try{return JSON.parse(localStorage.getItem('cz217_preparacao_'+id)||'{}')}catch(_){return {}}
+ try{return JSON.parse(czSharedStorage.getItem('cz217_preparacao_'+id)||'{}')}catch(_){return {}}
 }
 async function prep217Guardar(id){
  const extra={};document.querySelectorAll('[data-prep217-extra]').forEach(inp=>{extra[inp.dataset.prep217Extra]=inp.value.trim()});
@@ -6679,15 +6773,15 @@ document.addEventListener('DOMContentLoaded',cz156OcultarEtiquetas);
 const RET226_CONSUMO='cz226_consumo_',RET226_VENDIDO='cz226_extra_vendido_';
 let ret226Cache=null,ret226Selecionado=null,ret226Timer=null,ret226Lendo=false;
 function ret226Key(id,mid){return String(id)+':'+String(mid)}
-function ret226Consumos(id){try{return JSON.parse(localStorage.getItem(RET226_CONSUMO+id)||'{}')}catch(_){return {}}}
+function ret226Consumos(id){try{return JSON.parse(czSharedStorage.getItem(RET226_CONSUMO+id)||'{}')}catch(_){return {}}}
 function ret226ConfirmarConsumo(id,mid){
  const x=ret226Cache?.mats.find(m=>String(m.id)===String(mid));if(!x||x.tipo!=='produto'||x.origem==='extra')return;
  if(ret226Devolvido(x,ret226Cache.e)>=ret226Esperado(x,ret226Cache.e))return;
- const c=ret226Consumos(id);c[String(mid)]=!c[String(mid)];localStorage.setItem(RET226_CONSUMO+id,JSON.stringify(c));ret226Pintar(id);
+ const c=ret226Consumos(id);c[String(mid)]=!c[String(mid)];czSharedStorage.setItem(RET226_CONSUMO+id,JSON.stringify(c));ret226Pintar(id);
 }
-function ret226Vendidos(id){try{return JSON.parse(localStorage.getItem(RET226_VENDIDO+id)||'{}')}catch(_){return {}}}
+function ret226Vendidos(id){try{return JSON.parse(czSharedStorage.getItem(RET226_VENDIDO+id)||'{}')}catch(_){return {}}}
 function usedAlready226(id,mid){return !!ret226Vendidos(id)[String(mid)]}
-function markSold226(id,mid,q){const a=ret226Vendidos(id);a[String(mid)]={q:Number(q),data:new Date().toISOString()};localStorage.setItem(RET226_VENDIDO+id,JSON.stringify(a))}
+function markSold226(id,mid,q){const a=ret226Vendidos(id);a[String(mid)]={q:Number(q),data:new Date().toISOString()};czSharedStorage.setItem(RET226_VENDIDO+id,JSON.stringify(a))}
 function ret226Esperado(x,e){
  const real=Number(x.quantidade_bipada||0),local=sair220Contagens([x],sair142State(e.id));
  return Math.max(0,Math.floor(e.saida_baixada_em?real:(Number(local[x.id]||0)||real)));
@@ -6698,14 +6792,14 @@ function ret226Ativo(x){return sair220Ativo(x)}
 function ret226Fechar(){clearTimeout(ret226Timer);document.getElementById('ret226Modal')?.remove()}
 // V237: quantidade utilizada é apurada exclusivamente no retorno.
 const RET237_USO='cz237_uso_extra_';
-function ret237Usos(id){try{return JSON.parse(localStorage.getItem(RET237_USO+id)||'{}')}catch(_){return {}}}
+function ret237Usos(id){try{return JSON.parse(czSharedStorage.getItem(RET237_USO+id)||'{}')}catch(_){return {}}}
 function ret237Uso(id,x,e){const v=ret237Usos(id)[String(x.id)];return v===undefined?Math.max(0,ret226Esperado(x,e)-ret226Devolvido(x,e)):Number(v)}
 function ret237DefinirUso(id,mid,valor){
  const c=ret226Cache,x=c?.mats.find(m=>String(m.id)===String(mid));if(!x||!ret226Extra(x))return;
  const max=Math.max(0,ret226Esperado(x,c.e)-ret226Devolvido(x,c.e));
  const n=Number(valor);
  if(!Number.isInteger(n)||n<0||n>max){czAlert('Informe uma quantidade inteira entre 0 e '+max+'.','Quantidade utilizada');ret226Pintar(id);return}
- const usos=ret237Usos(id);usos[String(mid)]=n;localStorage.setItem(RET237_USO+id,JSON.stringify(usos));ret226Pintar(id);
+ const usos=ret237Usos(id);usos[String(mid)]=n;czSharedStorage.setItem(RET237_USO+id,JSON.stringify(usos));ret226Pintar(id);
 }
 function ret237Linha(id,x,e,finalizado,extra){
  const q=ret226Esperado(x,e),dev=ret226Devolvido(x,e),cons=x.tipo==='produto',ativo=ret226Ativo(x),cod=x._codigoExibicao||x.codigo||'—';
@@ -6906,8 +7000,8 @@ async function cz231Concluidos(){
 }
 // Ocorrências locais de substituição e perdas: registro informativo até integração transacional do banco.
 const CZ231_OC_KEY='cz231_ocorrencias';
-function cz231Ocorrencias(){try{return JSON.parse(localStorage.getItem(CZ231_OC_KEY)||'[]')}catch(_){return []}}
-function cz231GuardarOcorrencia(x){const a=cz231Ocorrencias();a.push({...x,id:crypto.randomUUID(),data:new Date().toISOString()});localStorage.setItem(CZ231_OC_KEY,JSON.stringify(a))}
+function cz231Ocorrencias(){try{return JSON.parse(czSharedStorage.getItem(CZ231_OC_KEY)||'[]')}catch(_){return []}}
+function cz231GuardarOcorrencia(x){const a=cz231Ocorrencias();a.push({...x,id:crypto.randomUUID(),data:new Date().toISOString()});czSharedStorage.setItem(CZ231_OC_KEY,JSON.stringify(a))}
 async function cz231Substituicao(eventoId){
  const c=ret226Cache;if(!c||String(c.e.id)!==String(eventoId))return;
  const materiais=c.mats.filter(x=>x.tipo==='produto'&&!ret226Extra(x));if(!materiais.length)return czAlert('Nenhum consumível contratado para substituir.','Substituição');
@@ -7060,14 +7154,14 @@ async function czNovoBiparRetorno(id){
 /* Relatório de utilização: classificação separada do que foi usado para cliente e CZ.
    Rascunho local; o faturamento continua sujeito à confirmação no PDV. */
 const CZ_NOVO_CAMPO_KEY='cz_campo_utilizacao_v1_';
-function czNovoCampo(id){try{return JSON.parse(localStorage.getItem(CZ_NOVO_CAMPO_KEY+id)||'{}')}catch(_){return {}}}
+function czNovoCampo(id){try{return JSON.parse(czSharedStorage.getItem(CZ_NOVO_CAMPO_KEY+id)||'{}')}catch(_){return {}}}
 function czNovoCampoSalvar(id,mid,tipo,valor){
  const c=ret226Cache,x=c?.mats.find(x=>String(x.id)===String(mid));if(!x)return;
  const n=Number(valor),max=Math.max(0,ret226Esperado(x,c.e)-ret226Devolvido(x,c.e));
  if(!Number.isInteger(n)||n<0||n>max){czAlert('Informe uma quantidade inteira entre 0 e '+max+'.');czNovoAtualizarClassificacao(id);return}
  const data=czNovoCampo(id),linha={...(data[mid]||{cliente:0,cz:0})};linha[tipo]=n;
  if(linha.cliente+linha.cz>max){czAlert('A soma de Cliente e CZ não pode ultrapassar o material não devolvido ('+max+').');czNovoAtualizarClassificacao(id);return}
- data[mid]=linha;localStorage.setItem(CZ_NOVO_CAMPO_KEY+id,JSON.stringify(data));czNovoAtualizarClassificacao(id);
+ data[mid]=linha;czSharedStorage.setItem(CZ_NOVO_CAMPO_KEY+id,JSON.stringify(data));czNovoAtualizarClassificacao(id);
 }
 function czNovoAtualizarClassificacao(id){
  const c=ret226Cache;if(!c||String(c.e.id)!==String(id))return;
@@ -7329,8 +7423,8 @@ async function czCentralEtapa(id,aba){
  </style>`;
  const K='cz238_retorno_resolucoes_';
  const CK='cz239_conferidos_';
- const checked=()=>{try{return JSON.parse(localStorage.getItem(CK+active)||'{}')}catch(e){return {}}};
- const markChecked=(key)=>{const o=checked();o[key]=true;localStorage.setItem(CK+active,JSON.stringify(o))};
+ const checked=()=>{try{return JSON.parse(czSharedStorage.getItem(CK+active)||'{}')}catch(e){return {}}};
+ const markChecked=(key)=>{const o=checked();o[key]=true;czSharedStorage.setItem(CK+active,JSON.stringify(o))};
  let active='',groups=[],selection='',busy=false,readTimer=null,modalOpen=false;
  const safe=x=>esc(String(x??''));
  const norm=x=>normalizarCodigoEvento(String(x??''));
@@ -7341,8 +7435,8 @@ async function czCentralEtapa(id,aba){
  const isAsset=x=>ret226Ativo(x);
  const total=xs=>xs.reduce((a,x)=>a+qty(x),0);
  const returned=xs=>xs.reduce((a,x)=>a+back(x),0);
- const store=()=>{try{return JSON.parse(localStorage.getItem(K+active)||'{}')}catch(e){return {}}};
- const save=o=>localStorage.setItem(K+active,JSON.stringify(o));
+ const store=()=>{try{return JSON.parse(czSharedStorage.getItem(K+active)||'{}')}catch(e){return {}}};
+ const save=o=>czSharedStorage.setItem(K+active,JSON.stringify(o));
  const summary=g=>{
   const contracted=total(g.lines.filter(x=>!isExtra(x))),extras=total(g.lines.filter(isExtra));
   const returnedAll=returned(g.lines);
@@ -7432,8 +7526,8 @@ async function czCentralEtapa(id,aba){
    // O PDV legado não suporta venda parcial com rateio entre contratado e extra.
    const extraLines=g.lines.filter(isExtra),legacySafe=extraLines.length===1&&qty(extraLines[0])-back(extraLines[0])===n&&n>0;
    if(!legacySafe)return czAlert('Esta diferença está distribuída entre linhas. A cobrança automática foi bloqueada para evitar valores errados. É necessário registrar a divisão antes do PDV.','PDV');
-   const mid=String(extraLines[0].id),data=czNovoCampo(active);data[mid]={cliente:n,cz:0};localStorage.setItem(CZ_NOVO_CAMPO_KEY+active,JSON.stringify(data));
-   const usos=ret237Usos(active);usos[mid]=n;localStorage.setItem(RET237_USO+active,JSON.stringify(usos));
+   const mid=String(extraLines[0].id),data=czNovoCampo(active);data[mid]={cliente:n,cz:0};czSharedStorage.setItem(CZ_NOVO_CAMPO_KEY+active,JSON.stringify(data));
+   const usos=ret237Usos(active);usos[mid]=n;czSharedStorage.setItem(RET237_USO+active,JSON.stringify(usos));
    // Só abrir PDV quando não existirem outros extras sem classificação.
    const outros=ret226Cache.mats.filter(x=>isExtra(x)&&!isAsset(x)&&String(x.id)!==mid&&qty(x)>back(x));
    if(outros.length)return czAlert('Existem outros extras pendentes. Resolva-os antes de abrir o PDV para não cobrar materiais indevidos.','PDV');
@@ -7583,8 +7677,8 @@ const ativo=x=>ret226Ativo(x);
 const nome=x=>sair222Nome(x);
 const cod=x=>String(x._codigoExibicao||x.codigo_barras||x.codigo||x._codigos?.[0]||'—');
 const chave=x=>String(x.id);
-const ler=()=>{try{return JSON.parse(localStorage.getItem(prefix+id)||'{}')}catch{return {}}};
-const salvar=d=>localStorage.setItem(prefix+id,JSON.stringify(d));
+const ler=()=>{try{return JSON.parse(czSharedStorage.getItem(prefix+id)||'{}')}catch{return {}}};
+const salvar=d=>czSharedStorage.setItem(prefix+id,JSON.stringify(d));
 const decisao=x=>ler().decisoes?.[chave(x)]||{pdv:0,sub:0};
 // CZ V267-E1: o consumo contratado e apurado pela diferenca entre saida e retorno.
 // Nao depende de confirmacao local nem provoca uma segunda baixa de estoque.
@@ -8084,8 +8178,8 @@ const cz256RenderContratosOriginal=renderContratosOficialCZ;
 const cz256AbrirContratoOriginal=abrirContratoOficialCZ;
 const cz256SalvarContratoOriginal=salvarContratoOficialCZ;
 const cz256PdfContratoOriginal=cz202ArquivoContrato;
-function cz256Ler(key,fallback){try{return JSON.parse(localStorage.getItem(key)||'null')||fallback}catch(_){return fallback}}
-function cz256Gravar(key,value){localStorage.setItem(key,JSON.stringify(value))}
+function cz256Ler(key,fallback){try{return JSON.parse(czSharedStorage.getItem(key)||'null')||fallback}catch(_){return fallback}}
+function cz256Gravar(key,value){czSharedStorage.setItem(key,JSON.stringify(value))}
 function cz256LimparHTML(html){
  const doc=new DOMParser().parseFromString('<body>'+String(html||'')+'</body>','text/html');
  doc.querySelectorAll('script,iframe,object,embed,form,svg,math,link,meta,style,base').forEach(x=>x.remove());
@@ -8343,7 +8437,7 @@ const errMsg=e=>String(e?.message||e||'Erro desconhecido');
 function check({error}){if(error)throw error}
 function dbError(e){return /relation .* does not exist|could not find the table|schema cache|bucket not found|not found/i.test(errMsg(e))?'Execute primeiro o arquivo SQL de instalação da V261 no Supabase. '+errMsg(e):errMsg(e)}
 function getArt(key){return ARTES.flatMap(a=>a.slice(2)).includes(key)}
-function saveLocalModel(v){if(v)localStorage.setItem(CZ256_MODELO_KEY,JSON.stringify(v));else localStorage.removeItem(CZ256_MODELO_KEY)}
+function saveLocalModel(v){if(v)czSharedStorage.setItem(CZ256_MODELO_KEY,JSON.stringify(v));else czSharedStorage.removeItem(CZ256_MODELO_KEY)}
 function dataURLToBlob(data){const [head,raw]=data.split(','),mime=head.match(/data:([^;]+)/)?.[1]||'image/jpeg',binary=atob(raw),arr=new Uint8Array(binary.length);for(let i=0;i<binary.length;i++)arr[i]=binary.charCodeAt(i);return new Blob([arr],{type:mime})}
 function blobToDataURL(blob){return new Promise((resolve,reject)=>{const fr=new FileReader();fr.onload=()=>resolve(fr.result);fr.onerror=()=>reject(fr.error);fr.readAsDataURL(blob)})}
 async function pdfToImage(file){
