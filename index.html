@@ -7189,16 +7189,41 @@ window.cz245Perda=async mid=>{const x=mat.find(x=>chave(x)===mid);if(!x)return;a
 window.cz245Aguardar=async mid=>{const x=mat.find(x=>chave(x)===mid);if(!x)return;const d=ler();d.aguardar=d.aguardar||{};d.aguardar[mid]=true;salvar(d);await czAlert('Ativo mantido como pendente de devolução. O retorno do evento NÃO poderá ser finalizado até resolução oficial.','Aguardando');};
 async function carregar(){const [er,ms]=await Promise.all([db.from('eventos_operacionais').select('*').eq('id',id).single(),sair221Materiais(id)]);if(er.error)throw er.error;evento=er.data;mat=ms.filter(x=>ret226Esperado(x,evento)>0);ret226Cache={e:evento,mats:mat}}
 window.cz245Abrir=async eventoId=>{window.cz245Fechar();id=String(eventoId);modal=null;document.getElementById('content').innerHTML='<div class="card">Carregando retorno...</div>';try{await carregar();render()}catch(e){document.getElementById('content').innerHTML='<div class="msg">Erro ao carregar retorno: '+E(e.message)+'</div>'}};
+let cz245Finalizando=false;
 window.cz245Finalizar=async()=>{
- const {cons,extras,ativos}=resumo(),c=cons.filter(x=>!confirmado(x)),e=extras.filter(x=>pendExtra(x)>0),a=ativos.filter(x=>dev(x)<qtd(x));
- if(c.length)return czAlert('Confirme a baixa dos consumíveis: '+c.map(nome).join(', '),'Retorno pendente');
- if(a.length)return czAlert('Ainda existem ativos sem devolução ou ocorrência oficial: '+a.map(nome).join(', '),'Retorno pendente');
- if(e.length)return czAlert('Há materiais extras não devolvidos. A classificação PDV/Substituição não confirma por si só a venda e a despesa no Supabase. Regularize os registros oficiais antes de finalizar.','Retorno pendente');
- if(!evento.saida_baixada_em)return czAlert('Saída não confirmada no Supabase. Finalização bloqueada.');
+ if(cz245Finalizando)return;
+ const {cons,extras,ativos}=resumo();
+ const consumiveisPendentes=cons.filter(x=>!confirmado(x));
+ const ativosPendentes=ativos.filter(x=>dev(x)<qtd(x));
+ const extrasPendentes=extras.filter(x=>pendExtra(x)>0);
+ const avisos=[];
+ if(consumiveisPendentes.length)avisos.push('CONSUMÍVEIS SEM BAIXA CONFIRMADA: '+consumiveisPendentes.map(x=>nome(x)+' ('+qtd(x)+' levado)').join('; '));
+ if(ativosPendentes.length)avisos.push('ATIVOS COM RETORNO PENDENTE: '+ativosPendentes.map(x=>nome(x)+' ('+(qtd(x)-dev(x))+' faltando)').join('; '));
+ if(extrasPendentes.length){
+  const naoClassificados=extrasPendentes.filter(x=>restante(x)>0);
+  const classificados=extrasPendentes.filter(x=>restante(x)===0);
+  if(naoClassificados.length)avisos.push('EXTRAS SEM DEVOLUÇÃO OU DESTINO: '+naoClassificados.map(x=>nome(x)+' ('+restante(x)+' sem destino)').join('; '));
+  if(classificados.length)avisos.push('EXTRAS CLASSIFICADOS, MAS SEM CONFIRMAÇÃO OFICIAL NO BANCO: '+classificados.map(x=>nome(x)+' ('+pendExtra(x)+' unidade(s); PDV '+(decisao(x).pdv||0)+'; substituição '+(decisao(x).sub||0)+')').join('; '));
+ }
+ if(!evento.saida_baixada_em)avisos.push('SAÍDA DO EVENTO AINDA NÃO CONFIRMADA NO SUPABASE.');
+ if(avisos.length)return czAlert('Não foi possível concluir o retorno.\n\n'+avisos.join('\n\n')+'\n\nRegularize os itens indicados antes de finalizar. Nenhuma movimentação foi alterada.','Pendências do retorno');
  if(!await czConfirm('Concluir o retorno e mover o evento para Eventos Concluídos?','Concluir retorno','Finalizar evento'))return;
- const r=await db.rpc('cz_concluir_retorno_evento',{p_evento_id:id});if(r.error)return czAlert('O banco não autorizou a conclusão: '+r.error.message);
- const check=await db.from('eventos_operacionais').select('status').eq('id',id).single();if(check.error||check.data?.status!=='finalizado')return czAlert('O banco ainda não confirmou o status Finalizado. Atualize antes de repetir.');
- window.cz245Fechar();await czCentralAbrir();await czAlert('Retorno concluído. O evento saiu da Central Operacional e agora aparece em Eventos Concluídos.','Evento finalizado');
+ cz245Finalizando=true;
+ const botao=document.querySelector('button[onclick="cz245Finalizar()"]');
+ if(botao){botao.disabled=true;botao.textContent='Concluindo retorno...'}
+ try{
+  const r=await db.rpc('cz_concluir_retorno_evento',{p_evento_id:id});
+  if(r.error){
+   const msg=String(r.error.message||'Erro desconhecido');
+   const faltaRpc=/could not find the function|function .* does not exist|pgrst202/i.test(msg);
+   return czAlert((faltaRpc?'A função de conclusão não foi encontrada no Supabase. É necessário conferir a instalação da função cz_concluir_retorno_evento.\n\n':'O Supabase recusou a conclusão do retorno.\n\n')+'Detalhe: '+msg,'Erro ao concluir retorno');
+  }
+  const check=await db.from('eventos_operacionais').select('status').eq('id',id).single();
+  if(check.error)return czAlert('Não foi possível verificar o status no Supabase: '+check.error.message,'Verificação do retorno');
+  if(check.data?.status!=='finalizado')return czAlert('O banco ainda não confirmou o status Finalizado (status atual: '+String(check.data?.status||'não informado')+'). Atualize os dados antes de repetir.','Retorno não concluído');
+  window.cz245Fechar();await czCentralAbrir();await czAlert('Retorno concluído. O evento saiu da Central Operacional e agora aparece em Eventos Concluídos.','Evento finalizado');
+ }catch(err){await czAlert('Erro inesperado ao concluir retorno: '+String(err?.message||err),'Erro no retorno')}
+ finally{cz245Finalizando=false;if(botao&&botao.isConnected){botao.disabled=false;botao.textContent='✓ Concluir Retorno de Evento'}}
 };
 window.cz245Imprimir=()=>{
  const {cons,extras,ativos}=resumo(),escp=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
