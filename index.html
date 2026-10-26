@@ -2594,7 +2594,59 @@ Obrigado!`;
       mostrarTecnicaEvento(p,info);
     };
   }
-  async function carregarPropostasSalvas(){
+  
+// CZ V267 — Simulação interna de resultado a partir do orçamento salvo.
+// Não movimenta estoque, não cria recebimento e não altera a proposta.
+async function cz267ResumoPrevistoOrcamento(o){
+ const d=o.dados||{};
+ const total=Number(o.valor_total??d.total??0)||0;
+ const produtos=Array.isArray(d.produtos)?d.produtos:[];
+ const ids=[...new Set(produtos.map(x=>x.id).filter(Boolean))];
+ const custos={};
+ if(ids.length){
+  const r=await db.from('produtos').select('id,nome,valor_custo').in('id',ids);
+  if(r.error)throw r.error;
+  (r.data||[]).forEach(x=>custos[String(x.id)]=x);
+ }
+ const mats=produtos.map(x=>{
+  const cadastro=custos[String(x.id)];
+  const q=Number(x.quantidade||0)||0;
+  const unit=Number(cadastro?.valor_custo??x.valor_custo??0)||0;
+  return {nome:x.nome||cadastro?.nome||'Produto',q,unit,semCusto:!cadastro&&x.valor_custo==null};
+ });
+ const material=mats.reduce((a,x)=>a+x.q*x.unit,0);
+ const equipeItens=Array.isArray(d.equipe)?d.equipe:[];
+ const equipe=equipeItens.reduce((a,x)=>a+(Number(x.valor_diaria||0)*Number(x.diarias||0))+(Number(x.alimentacao||0)*Number(x.diarias||0))+(Number(x.estadia||0)*Number(x.qtd_estadia??x.diarias??0)),0);
+ const desloc=(Number(d.deslocamento?.km||0)*Number(d.deslocamento?.valor_km||0))+Number(d.deslocamento?.pedagio||0);
+ const custosTotais=material+equipe+desloc;
+ const lucro=total-custosTotais;
+ const margem=total>0?100*lucro/total:0;
+ const linha=(nome,valor,negrito=false)=>`<tr><td>${esc(nome)}</td><td style="text-align:right;${negrito?'font-weight:900;':''}">${money(valor)}</td></tr>`;
+ const pendentes=mats.filter(x=>x.semCusto);
+ $('#content').innerHTML=`
+ <div class="sectionhead"><div><h2>📊 Resumo de custos e lucro previsto</h2><div class="muted">Simulação interna da proposta — antes da realização do evento</div></div>
+ <button type="button" class="btn secondary" onclick="renderOrcamentos(false)">← Voltar aos orçamentos</button></div>
+ <div class="card"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
+ <div><b>Cliente</b><div>${esc(o.cliente_nome||'—')}</div></div><div><b>Evento</b><div>${esc(o.evento_nome||'—')}</div></div>
+ <div><b>Nº da proposta</b><div>${esc(o.numero||'—')}</div></div>
+ <div><b>Data</b><div>${o.data_evento?finDate(o.data_evento):'—'}</div></div></div></div>
+ <div class="card"><h3>Resultado previsto</h3><div class="tablewrap"><table><tbody>
+ ${linha('Faturamento previsto (valor do orçamento)',total,true)}
+ ${linha('Materiais / consumíveis (custo)',material)}
+ ${linha('Mão de obra / equipe',equipe)}
+ ${linha('Deslocamento',desloc)}
+ ${linha('Total de custos previstos',custosTotais,true)}
+ ${linha('Mão de obra CZ cobrada (informativa)',Number(d.mao_obra_cz||0))}
+ ${linha('Lucro previsto',lucro,true)}
+ <tr><td><b>Margem de lucro prevista</b></td><td style="text-align:right;font-weight:900">${margem.toFixed(2).replace('.',',')}%</td></tr>
+ </tbody></table></div></div>
+ <div class="card"><h3>Detalhamento dos consumíveis</h3><div class="tablewrap">${mats.length?`<table><thead><tr><th>Produto</th><th>Qtd.</th><th>Custo un.</th><th>Custo total</th></tr></thead><tbody>${mats.map(x=>`<tr><td>${esc(x.nome)}</td><td>${x.q}</td><td>${money(x.unit)}</td><td>${money(x.q*x.unit)}</td></tr>`).join('')}</tbody></table>`:'<div class="muted">Nenhum consumível informado.</div>'}</div></div>
+ ${pendentes.length?`<div class="card"><b>Atenção:</b> ${pendentes.length} item(ns) sem custo cadastrado encontrado(s). O lucro pode estar superestimado.</div>`:''}
+ <div class="card"><div class="muted">Este resumo utiliza os custos cadastrados atualmente e os dados salvos no orçamento. Não inclui despesas extras futuras, substituições, vendas PDV ou outros gastos não informados. Equipamentos próprios não são tratados como consumo; a depreciação não está calculada. Nenhum lançamento financeiro ou de estoque é realizado.</div></div>
+ <div class="actions"><button type="button" class="btn secondary" onclick="renderOrcamentos(false)">Voltar</button></div>`;
+}
+
+async function carregarPropostasSalvas(){
     const box=$('#orcPropostasSalvas');if(!box)return;
     const {data,error}=await db.from('orcamentos').select('id,numero,status,cliente_nome,cliente_telefone,evento_nome,data_evento,valor_total,criado_em,dados').order('criado_em',{ascending:false}).limit(100);
     if(error){box.innerHTML='<div class="muted">Erro ao carregar propostas: '+esc(error.message)+'</div>';return}
@@ -2608,7 +2660,15 @@ Obrigado!`;
     const origensComEvento=new Set(eventosVinculados.filter(x=>x.status!=='pendente').map(x=>String(x.origem_orcamento_id)).filter(Boolean));
     const eventosExistentes=new Set(eventosVinculados.filter(x=>x.status!=='pendente').map(x=>String(x.id)));
     const propostasExibidas=(data||[]).filter(x=>{const fechado=origensComEvento.has(String(x.id))||eventosExistentes.has(String(x.dados?.evento_operacional_id||''));return orcamentosFechadosModo?(fechado||String(x.status||'').toLowerCase()==='cancelado'):(!fechado&&String(x.status||'').toLowerCase()!=='cancelado')});
-    box.innerHTML=propostasExibidas.length?`<div class="tablewrap"><table class="orcamentos-lista"><thead><tr><th>Cliente</th><th>Data</th><th>Evento</th><th>Valor</th><th>Status</th><th>Nº Proposta</th><th style="min-width:190px">Fechamento</th><th>Ações</th></tr></thead><tbody>${propostasExibidas.map(x=>`<tr><td>${esc(x.cliente_nome||'')}</td><td>${x.data_evento?new Date(x.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${esc(x.evento_nome||'')}</td><td>${money(x.valor_total)}</td><td>${esc(x.status||'')}</td><td><b>${esc(x.numero||'')}</b></td><td>${String(x.status||'').toLowerCase()==='cancelado'?'<span style="display:inline-flex;padding:8px 12px;border:1px solid #b85050;border-radius:999px;font-size:11px;font-weight:900;color:#ff8989">CANCELADO</span>':(origensComEvento.has(String(x.id))||eventosExistentes.has(String(x.dados?.evento_operacional_id||'')))?'<span style="display:inline-flex;padding:8px 12px;border:1px solid #2f9e63;border-radius:999px;font-size:11px;font-weight:900">FECHADO</span>':`<button type="button" class="btn primary btnConfirmarOrcamentoV156" data-id="${esc(x.id)}" style="font-weight:900;white-space:nowrap;padding:9px 12px">CONFIRMAR ORÇAMENTO</button>`}</td><td><div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap"><button type="button" class="btn secondary btnVisualizarProposta" data-id="${esc(x.id)}" title="Visualizar proposta" aria-label="Visualizar proposta" style="padding:5px 7px;min-height:auto">${iconeOlho()}</button><button type="button" class="btn secondary btnVerPdfProposta" data-id="${esc(x.id)}" title="Visualizar PDF da proposta" aria-label="Visualizar PDF da proposta" style="padding:6px 9px;min-height:auto;font-weight:800;white-space:nowrap">Ver PDF</button><button type="button" class="btn secondary btnEnviarProposta" data-id="${esc(x.id)}" title="Enviar proposta pelo WhatsApp" aria-label="Enviar proposta pelo WhatsApp" style="padding:5px 7px;min-height:auto">${iconeEnviarProposta()}</button><button type="button" class="btn secondary btnWhatsProposta" data-id="${esc(x.id)}" title="Enviar preenchimento pelo WhatsApp" aria-label="Enviar preenchimento pelo WhatsApp" style="padding:5px 7px;min-height:auto">${iconeWhats()}</button>${String(x.status||'').toLowerCase()!=='cancelado'&&(origensComEvento.has(String(x.id))||eventosExistentes.has(String(x.dados?.evento_operacional_id||'')))?`<button type="button" class="btn danger" onclick="cz180CancelarOrcamento('${esc(x.id)}')" style="padding:5px 9px;min-height:auto">Cancelar</button>`:''}<button type="button" class="btn danger btnExcluirProposta" data-id="${esc(x.id)}" title="Excluir proposta" aria-label="Excluir proposta" style="font-size:14px;padding:4px 8px;min-height:auto">×</button></div></td></tr>`).join('')}</tbody></table></div>`:'<div class="muted">Nenhuma proposta gerada ainda.</div>';
+    box.innerHTML=propostasExibidas.length?`<div class="tablewrap"><table class="orcamentos-lista"><thead><tr><th>Cliente</th><th>Data</th><th>Evento</th><th>Valor</th><th>Status</th><th>Nº Proposta</th><th style="min-width:190px">Fechamento</th><th>Ações</th></tr></thead><tbody>${propostasExibidas.map(x=>`<tr><td>${esc(x.cliente_nome||'')}</td><td>${x.data_evento?new Date(x.data_evento+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td>${esc(x.evento_nome||'')}</td><td>${money(x.valor_total)}</td><td>${esc(x.status||'')}</td><td><b>${esc(x.numero||'')}</b></td><td>${String(x.status||'').toLowerCase()==='cancelado'?'<span style="display:inline-flex;padding:8px 12px;border:1px solid #b85050;border-radius:999px;font-size:11px;font-weight:900;color:#ff8989">CANCELADO</span>':(origensComEvento.has(String(x.id))||eventosExistentes.has(String(x.dados?.evento_operacional_id||'')))?'<span style="display:inline-flex;padding:8px 12px;border:1px solid #2f9e63;border-radius:999px;font-size:11px;font-weight:900">FECHADO</span>':`<button type="button" class="btn primary btnConfirmarOrcamentoV156" data-id="${esc(x.id)}" style="font-weight:900;white-space:nowrap;padding:9px 12px">CONFIRMAR ORÇAMENTO</button>`}</td><td><div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap"><button type="button" class="btn secondary btnVisualizarProposta" data-id="${esc(x.id)}" title="Visualizar proposta" aria-label="Visualizar proposta" style="padding:5px 7px;min-height:auto">${iconeOlho()}</button><button type="button" class="btn secondary btnResumoCustoProposta" data-id="${esc(x.id)}" title="Resumo interno de custos e lucro previsto" style="padding:6px 9px;min-height:auto;font-weight:800;white-space:nowrap">📊 Custos / Lucro</button><button type="button" class="btn secondary btnVerPdfProposta" data-id="${esc(x.id)}" title="Visualizar PDF da proposta" aria-label="Visualizar PDF da proposta" style="padding:6px 9px;min-height:auto;font-weight:800;white-space:nowrap">Ver PDF</button><button type="button" class="btn secondary btnEnviarProposta" data-id="${esc(x.id)}" title="Enviar proposta pelo WhatsApp" aria-label="Enviar proposta pelo WhatsApp" style="padding:5px 7px;min-height:auto">${iconeEnviarProposta()}</button><button type="button" class="btn secondary btnWhatsProposta" data-id="${esc(x.id)}" title="Enviar preenchimento pelo WhatsApp" aria-label="Enviar preenchimento pelo WhatsApp" style="padding:5px 7px;min-height:auto">${iconeWhats()}</button>${String(x.status||'').toLowerCase()!=='cancelado'&&(origensComEvento.has(String(x.id))||eventosExistentes.has(String(x.dados?.evento_operacional_id||'')))?`<button type="button" class="btn danger" onclick="cz180CancelarOrcamento('${esc(x.id)}')" style="padding:5px 9px;min-height:auto">Cancelar</button>`:''}<button type="button" class="btn danger btnExcluirProposta" data-id="${esc(x.id)}" title="Excluir proposta" aria-label="Excluir proposta" style="font-size:14px;padding:4px 8px;min-height:auto">×</button></div></td></tr>`).join('')}</tbody></table></div>`:'<div class="muted">Nenhuma proposta gerada ainda.</div>';
+    box.querySelectorAll('.btnResumoCustoProposta').forEach(btn=>{
+      btn.onclick=async()=>{
+        const p=propostasExibidas.find(x=>String(x.id)===String(btn.dataset.id));
+        if(!p)return;
+        try{await cz267ResumoPrevistoOrcamento(p)}
+        catch(err){console.error('Resumo previsto CZ',err);await czAlert('Não foi possível calcular o resumo: '+(err?.message||String(err)),'Custos / Lucro')}
+      };
+    });
     box.querySelectorAll('.btnConfirmarOrcamentoV156').forEach(btn=>{btn.onclick=async()=>{btn.disabled=true;const anterior=btn.textContent;btn.textContent='PROCESSANDO...';try{await cz151ConfirmarOrcamento(btn.dataset.id)}catch(e){console.error('CZ confirmar orçamento',e);await czAlert('Erro ao iniciar confirmação: '+(e?.message||String(e)),'Confirmar orçamento')}finally{if(btn.isConnected){btn.disabled=false;btn.textContent=anterior}}}});
     box.querySelectorAll('.btnVerPdfProposta').forEach(btn=>{btn.onclick=async()=>{
       const p=propostasExibidas.find(x=>String(x.id)===String(btn.dataset.id));
