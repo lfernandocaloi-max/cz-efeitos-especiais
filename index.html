@@ -334,7 +334,7 @@ function contaMaster(){
  const perfil=String(czPerfilUsuario?.perfil||'').trim().toLowerCase();
  return email===CZ_MASTER_EMAIL || perfil==='master' || perfil==='master_principal' || perfil==='master_autorizado';
 }
-async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#login').style.display='none';$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V265-R';reconstruirMenuPermissoes();renderModule(0)}
+async function showApp(user){currentAuthUser=user;await carregarPermissoesUsuario();$('#login').classList.add('hidden');$('#login').style.display='none';$('#app').classList.remove('hidden');$('#userName').textContent=(user.email||'')+(contaMaster()?' • Master':' • Frente de separação')+' • V267-E1';reconstruirMenuPermissoes();await cz267CarregarPreparacoes();renderModule(0)}
 async function entrarSistemaCZ(){
  const email=$('#email')?.value.trim()||'',password=$('#password')?.value||'',msg=$('#loginMsg');
  if(!email||!password){if(msg)msg.textContent='Informe seu e-mail e sua senha.';return}
@@ -5401,21 +5401,55 @@ async function prep141Abrir(eventoId){
 }
 async function prep145Salvar(id){
  const msg=$('#prep145Msg');if(msg)msg.textContent='Salvando...';
- prep217Guardar(id);
+ if(!await prep217Guardar(id))return;
  try{await cz236SalvarPreparacao(id,{anotacao_tecnica:$('#prep145Anotacao')?.value.trim()||null})}
  catch(error){if(msg)msg.textContent='Erro ao salvar: '+error.message;return}
  await czAlert('Preparação salva. Evento disponível na Saída.','Evento');renderSairEventoV221();
 }
-/* V217 — informações operacionais adicionais mantidas neste navegador (sem alteração SQL). */
-function prep217Local(id){try{return JSON.parse(localStorage.getItem('cz217_preparacao_'+id)||'{}')}catch(_){return {}}}
-function prep217Guardar(id){
+/* V267-E1: preparação compartilhada no Supabase; não migra nem exclui dados locais automaticamente. */
+const cz267Preparacoes = new Map();
+let cz267PreparacoesAtivas = false;
+let cz267ErroSincronia = '';
+let cz267Canal = null;
+async function cz267CarregarPreparacoes(){
+ cz267Preparacoes.clear();cz267PreparacoesAtivas=false;cz267ErroSincronia='';
+ const r=await db.from('cz_preparacoes_compartilhadas').select('evento_id,dados,revisao');
+ if(r.error){cz267ErroSincronia=r.error.message;console.warn('CZ: preparação compartilhada indisponível',r.error.message);return}
+ for(const x of (r.data||[]))cz267Preparacoes.set(String(x.evento_id),x);
+ cz267PreparacoesAtivas=true;
+ if(cz267Canal)await db.removeChannel(cz267Canal);
+ cz267Canal=db.channel('cz-preparacoes-v267')
+  .on('postgres_changes',{event:'*',schema:'public',table:'cz_preparacoes_compartilhadas'},payload=>{
+    const registro=payload.new;
+    if(registro?.evento_id)cz267Preparacoes.set(String(registro.evento_id),registro);
+    if(payload.eventType==='DELETE'&&payload.old?.evento_id)cz267Preparacoes.delete(String(payload.old.evento_id));
+  }).subscribe();
+}
+function prep217Local(id){
+ const x=cz267Preparacoes.get(String(id));
+ if(x)return x.dados||{};
+ // Compatibilidade para dados antigos, sem enviar automaticamente ao banco.
+ try{return JSON.parse(localStorage.getItem('cz217_preparacao_'+id)||'{}')}catch(_){return {}}
+}
+async function prep217Guardar(id){
  const extra={};document.querySelectorAll('[data-prep217-extra]').forEach(inp=>{extra[inp.dataset.prep217Extra]=inp.value.trim()});
  const dados={ocorrencias:document.getElementById('prep217Ocorrencias')?.value||'',extra};
- localStorage.setItem('cz217_preparacao_'+id,JSON.stringify(dados));
+ if(!cz267PreparacoesAtivas){
+  await czAlert('A sincronização do Supabase ainda não está disponível. Execute o SQL V267-E1 e entre novamente. A preparação NÃO foi confirmada como salva.\n'+cz267ErroSincronia,'Sincronização necessária');
+  return false;
+ }
+ const atual=cz267Preparacoes.get(String(id));
+ const r=await db.rpc('cz_salvar_preparacao_compartilhada',{p_evento_id:id,p_dados:dados,p_revisao_esperada:atual?.revisao||0});
+ if(r.error){
+  await czAlert('Não foi possível salvar a preparação. Nenhum dado foi sobrescrito.\n'+r.error.message,'Erro de sincronização');
+  return false;
+ }
+ cz267Preparacoes.set(String(id),r.data);
+ return true;
 }
 function prep217Escapar(v){return esc(String(v??'—'))}
 async function prep217Imprimir(id){
- if(document.getElementById('prep217Ocorrencias'))prep217Guardar(id);
+ // A impressão usa a última versão salva. Salve a preparação antes de imprimir.
  // Open synchronously to avoid popup blockers after awaited database requests.
  const w=window.open('','_blank');if(!w)return czAlert('Permita janelas pop-up para imprimir o projeto.','Impressão');
  w.document.write('<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>Preparando projeto</title><body>Carregando informações...</body></html>');w.document.close();
@@ -6646,7 +6680,7 @@ async function czNovoSalvarRascunho(id){
   if(ev.saida_baixada_em)throw new Error('A saída já foi confirmada. Não é possível alterar o planejamento por esta tela.');
   const {data,error}=await db.from('eventos_operacionais').update({anotacao_tecnica:anotacao,atualizado_em:new Date().toISOString()}).eq('id',id).eq('status',ev.status).is('saida_baixada_em',null).select('id').maybeSingle();
   if(error||!data)throw error||new Error('Outro usuário alterou o evento. Atualize a preparação.');
-  prep217Guardar(id);
+  if(!await prep217Guardar(id))return;
   await czAlert('Rascunho salvo. A saída ainda não foi liberada.','Preparação');
  }catch(err){await czAlert('Não foi possível salvar o rascunho: '+err.message,'Preparação')}
 }
