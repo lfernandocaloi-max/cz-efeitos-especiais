@@ -358,17 +358,19 @@ const cz212Menu=[
 ];
 // A página Eventos continua no menu principal; Sair pro Evento também permanece acessível.
 const cz212MenuAbertos=new Set();
+const cz212MenuFechados=new Set();
 function cz212MontarMenu(){
  $('#nav').innerHTML=cz212Menu.map(x=>{
   if(x.i!==undefined)return `<button type="button" data-i="${x.i}" class="${x.i===0?'active':''}">${x.label||modules[x.i]}</button>`;
-  const aberto=cz212MenuAbertos.has(x.g);
-  return `<button type="button" class="cz212-group" data-grupo="${x.g}" aria-expanded="${aberto}">${x.g} <span style="float:right">${aberto?'▾':'▸'}</span></button><div class="cz212-sub" data-sub="${x.g}" ${aberto?'':'hidden'}>${x.items.filter(item=>!item.masterOnly||(!document.getElementById('app')?.classList.contains('hidden')&&contaMaster())).map(item=>`<button type="button" ${item.i!==undefined?`data-i="${item.i}"`:`data-action="${item.action}"`}>${item.label||modules[item.i]}</button>`).join('')}</div>`;
+  // V267-E1: Financeiro aberto automaticamente para contas Master, mostrando Caixa.
+  const aberto=cz212MenuAbertos.has(x.g) || (x.g==='Financeiro' && typeof contaMaster==='function' && contaMaster() && !cz212MenuFechados.has(x.g));
+  return `<button type="button" class="cz212-group" data-grupo="${x.g}" aria-expanded="${aberto}">${x.g} <span style="float:right">${aberto?'▾':'▸'}</span></button><div class="cz212-sub" data-sub="${x.g}" ${aberto?'':'hidden'}>${x.items.filter(item=>(!item.masterOnly||(!document.getElementById('app')?.classList.contains('hidden')&&contaMaster()))&&(item.i!==16||contaMaster())).map(item=>`<button type="button" ${item.i!==undefined?`data-i="${item.i}"`:`data-action="${item.action}"`}>${item.label||modules[item.i]}</button>`).join('')}</div>`;
  }).join('');
 }
 cz212MontarMenu();
 $('#nav').onclick=e=>{
  const b=e.target.closest('button');if(!b)return;
- if(b.dataset.grupo){const g=b.dataset.grupo;cz212MenuAbertos.has(g)?cz212MenuAbertos.delete(g):cz212MenuAbertos.add(g);cz212MontarMenu();return}
+ if(b.dataset.grupo){const g=b.dataset.grupo;const aberto=cz212MenuAbertos.has(g)||(g==='Financeiro'&&contaMaster()&&!cz212MenuFechados.has(g));if(aberto){cz212MenuAbertos.delete(g);cz212MenuFechados.add(g)}else{cz212MenuFechados.delete(g);cz212MenuAbertos.add(g)}cz212MontarMenu();return}
  if(b.dataset.action==='novaDespesa'){document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');$('.side').classList.remove('mobile-open');novaDespesa();return}
  if(b.dataset.i===undefined)return;
  document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');$('.side').classList.remove('mobile-open');renderModule(Number(b.dataset.i));
