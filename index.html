@@ -93,6 +93,13 @@
 .cz231MonitorTable .cz231Btn{padding:5px 7px;font-size:11px;min-height:0}
 .cz231MonitorTable small{display:block;color:#b3bdc8;font-size:11px}
 @media(max-width:1150px){.cz231MonitorTable th,.cz231MonitorTable td{padding:6px 2px!important;font-size:12px}.cz231MonitorTable th{font-size:12px}}
+</style><style>
+.cz257-toolbar{display:flex;flex-wrap:wrap;gap:6px;padding:10px;background:#e8edf4;border:1px solid #bfcbd9;border-radius:10px 10px 0 0}
+.cz257-toolbar .btn{padding:6px 10px;font-size:12px;background:#fff;color:#263445;border:1px solid #c6d1dd}
+.cz257-paper{min-height:490px;max-height:70vh;overflow:auto;background:#fff!important;color:#1c2734!important;border:1px solid #bfcbd9;border-radius:0 0 10px 10px;padding:28px 35px;outline:none;font:14px/1.7 Arial,sans-serif;white-space:normal;overflow-wrap:anywhere}
+.cz257-paper:focus{border-color:#3b82f6;box-shadow:0 0 0 2px #3b82f620}
+.cz257-paper h1,.cz257-paper h2,.cz257-paper h3,.cz257-paper p,.cz257-paper li,.cz257-paper strong,.cz257-paper span{color:#1c2734!important}
+.cz257-paper h1{text-align:center;font-size:20px}.cz257-paper h2{font-size:16px;margin:16px 0 8px}.cz257-paper p{margin:9px 0}.cz257-paper[contenteditable="false"]{background:#f5f6f8!important}
 </style></head><body>
 <section id="login" class="login"><div class="loginbox"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><h3>Acesso ao sistema</h3><div class="field"><label>E-mail</label><input id="email" type="email"></div><div class="field"><label>Senha</label><input id="password" type="password"></div><button id="loginBtn" class="btn primary full" style="margin-top:18px">ENTRAR</button><button type="button" class="btn secondary full" style="margin-top:8px" onclick="recuperarSenha()">Esqueci minha senha</button><div id="loginMsg" class="msg"></div></div></section>
 <div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><span id="czBuildTag" style="margin-left:10px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:900">V254</span><div class="muted" style="font-size:12px">Sistema de gestão CZ · Atualização V254</div></div><div><span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
@@ -7363,6 +7370,23 @@ function cz253AbrirCaixaContrato(){document.getElementById('cz253FinanceiroDetal
 .cz256-history{border:1px solid #dbe2eb;border-radius:8px;padding:10px;margin:7px 0;background:#f8fafc}
 </style>
 <script>
+/* V257: editor visual de cláusulas, sem mostrar etiquetas HTML */
+function cz257EditorHTML(id,desabilitado=false){
+ return `<div class="cz257-toolbar" ${desabilitado?'hidden':''}>
+ <button type="button" class="btn secondary" onclick="cz257Format('${id}','bold')" title="Negrito"><b>N</b></button>
+ <button type="button" class="btn secondary" onclick="cz257Format('${id}','italic')" title="Itálico"><i>I</i></button>
+ <button type="button" class="btn secondary" onclick="cz257Format('${id}','underline')" title="Sublinhado"><u>S</u></button>
+ <button type="button" class="btn secondary" onclick="cz257Format('${id}','formatBlock','p')">Parágrafo</button>
+ <button type="button" class="btn secondary" onclick="cz257Format('${id}','formatBlock','h2')">Título / cláusula</button>
+ <button type="button" class="btn secondary" onclick="cz257Format('${id}','insertOrderedList')">1. Lista</button>
+ <button type="button" class="btn secondary" onclick="cz257Format('${id}','justifyLeft')">Esquerda</button>
+ <button type="button" class="btn secondary" onclick="cz257Format('${id}','justifyCenter')">Centralizar</button>
+ </div><div id="${id}" class="cz257-paper" contenteditable="${!desabilitado}" role="textbox" aria-multiline="true" spellcheck="true"></div>`;
+}
+function cz257Format(id,cmd,arg){const el=document.getElementById(id);if(!el||el.contentEditable==='false')return;el.focus();document.execCommand(cmd,false,arg||null)}
+function cz257Valor(id){return document.getElementById(id)?.innerHTML||''}
+function cz257Preencher(id,html){const el=document.getElementById(id);if(el)el.innerHTML=cz256LimparHTML(html)}
+
 /* CZ V256 - Editor de contrato geral, contrato individual e termos aditivos.
    Persistencia local: requer tabela e RLS no Supabase para sincronizar entre dispositivos. */
 const CZ256_MODELO_KEY='cz_contrato_modelo_geral_v256';
@@ -7417,23 +7441,23 @@ function cz256AbrirModeloGeral(){
  const m=cz256Modelo(),atual=m?.html||cz256ModeloInicial();
  cz256EditorLayout('Editar Contrato Geral CZ',`<div class="cz256-help"><b>Modelo padrão:</b> alterações valem para contratos gerados daqui em diante. Contratos antigos preservam seu documento. Salvo neste navegador até configurar sincronização com Supabase.</div>
  <div class="cz256-bar"><button class="btn secondary" onclick="cz256MostrarAba('editar')">✎ Editar</button><button class="btn secondary" onclick="cz256MostrarAba('visualizar')">👁 Visualizar</button><button class="btn secondary" onclick="cz256MostrarAba('historico')">↺ Histórico</button></div>
- <div id="cz256AbaEditar"><label>Texto integral do contrato (HTML editável)</label><textarea id="cz256Texto" spellcheck="false"></textarea><div class="cz256-help">Pode modificar, excluir ou acrescentar qualquer cláusula. Use tags &lt;h2&gt;, &lt;p&gt; e &lt;strong&gt; para títulos, parágrafos e negrito. Campos automáticos: {{CLIENTE}}, {{CPF_CNPJ}}, {{EVENTO}}, {{DATA_EVENTO}}, {{VALOR}}, {{SERVICOS}}, {{PAGAMENTO}}.</div><div class="cz256-bar"><button class="btn primary" onclick="cz256SalvarModelo()">💾 Salvar contrato geral</button><button class="btn secondary" onclick="cz256MostrarAba('visualizar')">👁 Pré-visualizar</button></div></div>
+ <div id="cz256AbaEditar"><label>Contrato geral — texto completo para edição</label>${cz257EditorHTML("cz256Texto")}<div class="cz256-help">Edite diretamente o texto do documento, como em um editor de textos. Selecione uma frase para aplicar negrito ou formatação. Os campos automáticos são preenchidos nos contratos dos clientes. Campos automáticos: {{CLIENTE}}, {{CPF_CNPJ}}, {{EVENTO}}, {{DATA_EVENTO}}, {{VALOR}}, {{SERVICOS}}, {{PAGAMENTO}}.</div><div class="cz256-bar"><button class="btn primary" onclick="cz256SalvarModelo()">💾 Salvar contrato geral</button><button class="btn secondary" onclick="cz256MostrarAba('visualizar')">👁 Pré-visualizar</button></div></div>
  <div id="cz256AbaVisualizar" class="hidden"><p class="cz256-help">Os campos automáticos aparecem como marcadores na visualização do modelo.</p><iframe id="cz256Iframe" class="cz256-preview" title="Visualização do contrato geral"></iframe></div>
  <div id="cz256AbaHistorico" class="hidden"><h3>Histórico de versões do modelo geral</h3><div id="cz256Historico"></div></div>`);
- $('#cz256Texto').value=atual;cz256MostrarAba('editar');
+ cz257Preencher('cz256Texto',atual);cz256MostrarAba('editar');
 }
 function cz256MostrarAba(aba){
  ['Editar','Visualizar','Historico'].forEach(x=>document.getElementById('cz256Aba'+x)?.classList.toggle('hidden',x.toLowerCase()!==aba));
- if(aba==='visualizar')cz256Preview($('#cz256Texto')?.value||cz256ModeloAtual(),'Modelo Geral CZ');
+ if(aba==='visualizar')cz256Preview(cz257Valor('cz256Texto')||cz256ModeloAtual(),'Modelo Geral CZ');
  if(aba==='historico'){
   const m=cz256Modelo(),hist=m?.historico||[];
   $('#cz256Historico').innerHTML=hist.length?hist.slice().reverse().map((x,i)=>`<div class="cz256-history"><b>Versão ${x.versao}</b> — ${coEsc(new Date(x.data).toLocaleString('pt-BR'))} <button class="btn secondary" style="padding:5px 8px;margin-left:10px" onclick="cz256RestaurarModelo(${hist.length-1-i})">Restaurar no editor</button></div>`).join(''):'<div class="cz256-help">Ainda não há versões salvas.</div>';
  }
 }
-function cz256RestaurarModelo(indice){const h=cz256Modelo()?.historico?.[indice];if(!h)return;$('#cz256Texto').value=h.html;cz256MostrarAba('editar');czAlert('Versão carregada no editor. Clique em Salvar contrato geral para aplicar.');}
+function cz256RestaurarModelo(indice){const h=cz256Modelo()?.historico?.[indice];if(!h)return;cz257Preencher('cz256Texto',h.html);cz256MostrarAba('editar');czAlert('Versão carregada no editor. Clique em Salvar contrato geral para aplicar.');}
 async function cz256SalvarModelo(){
  if(!contaMaster())return czAlert('Apenas a conta Master pode salvar o contrato geral.');
- const html=cz256LimparHTML($('#cz256Texto')?.value||'');if(html.replace(/<[^>]*>/g,'').trim().length<80)return czAlert('O texto do contrato está muito curto. Confira antes de salvar.');
+ const html=cz256LimparHTML(cz257Valor('cz256Texto'));if(html.replace(/<[^>]*>/g,'').trim().length<80)return czAlert('O texto do contrato está muito curto. Confira antes de salvar.');
  if(!await czConfirm('Atualizar o contrato geral para os próximos contratos? Os contratos já salvos não serão alterados.','Salvar modelo geral'))return;
  const atual=cz256Modelo()||{historico:[],versao:0};const versao=(atual.versao||0)+1;const historico=[...(atual.historico||[]),{versao,data:new Date().toISOString(),html}];
  try{cz256Gravar(CZ256_MODELO_KEY,{versao,html,historico});await czAlert('Modelo geral salvo! Versão '+versao+'. Esta gravação é local neste navegador; ainda não sincroniza entre computadores.');}catch(e){czAlert('Não foi possível salvar: '+e.message)}
@@ -7485,16 +7509,16 @@ async function cz256AbrirIndividual(id){
  if(!c.nome||!c.servicos)return czAlert('Preencha e salve os dados do contrato antes de editar o texto.');
  let assinado;try{assinado=await cz256EstaAssinado(id)}catch(e){return czAlert(e.message)}
  cz256EditorLayout('Editar contrato individual',`<div class="cz256-help">Proposta ${coEsc(p.numero)} • Cliente: ${coEsc(c.nome)} • ${assinado?'<b>Documento assinado: edição bloqueada.</b>':'Altera somente este contrato, sem modificar o modelo geral.'}</div>
- <label>Texto integral do contrato</label><textarea id="cz256TextoIndividual" spellcheck="false" ${assinado?'disabled':''}></textarea>
+ <label>Contrato do cliente — texto completo</label>${cz257EditorHTML("cz256TextoIndividual",assinado)}
  <div class="cz256-help">Os campos {{CLIENTE}}, {{DATA_EVENTO}}, {{VALOR}} etc. são preenchidos na geração do PDF. Os documentos assinados não podem ser sobrescritos.</div>
  <div class="cz256-bar">${assinado?'':`<button class="btn primary" onclick="cz256SalvarIndividual('${id}')">💾 Salvar alterações</button>`}<button class="btn secondary" onclick="cz256PreviewIndividual('${id}')">👁 Visualizar</button><button class="btn secondary" onclick="cz256AbrirAditivos('${id}')">+ Gerar aditivo</button><button class="btn secondary" onclick="abrirContratoOficialCZ('${id}')">← Dados do contrato</button></div><iframe id="cz256Iframe" class="cz256-preview" title="Prévia individual"></iframe>`);
- $('#cz256TextoIndividual').value=c.cz256_html||cz256ModeloInicial();cz256PreviewIndividual(id);
+ cz257Preencher('cz256TextoIndividual',cz256Tokens(c.cz256_html||cz256ModeloInicial(),c,p));cz256PreviewIndividual(id);
 }
-async function cz256PreviewIndividual(id){const p=(await coOrcs()).find(x=>String(x.id)===String(id)),c=coGet(id);if(!p||!c)return;const html=$('#cz256TextoIndividual')?.value||c.cz256_html||cz256ModeloInicial();cz256Preview(cz256Tokens(html,c,p),'Contrato CZ '+(p.numero||''));}
+async function cz256PreviewIndividual(id){const p=(await coOrcs()).find(x=>String(x.id)===String(id)),c=coGet(id);if(!p||!c)return;const html=cz257Valor('cz256TextoIndividual')||c.cz256_html||cz256ModeloInicial();cz256Preview(cz256Tokens(html,c,p),'Contrato CZ '+(p.numero||''));}
 async function cz256SalvarIndividual(id){
  const c=coGet(id);if(!c)return;
  try{if(await cz256EstaAssinado(id))return czAlert('Documento assinado: edição bloqueada.')}catch(e){return czAlert(e.message)}
- const html=cz256LimparHTML($('#cz256TextoIndividual')?.value||'');if(html.replace(/<[^>]*>/g,'').trim().length<80)return czAlert('O contrato está muito curto. Confira o conteúdo.');
+ const html=cz256LimparHTML(cz257Valor('cz256TextoIndividual'));if(html.replace(/<[^>]*>/g,'').trim().length<80)return czAlert('O contrato está muito curto. Confira o conteúdo.');
  if(!await czConfirm('Salvar esta versão do contrato individual?','Salvar contrato'))return;
  const hist=[...(c.cz256_historico||[]),{data:new Date().toISOString(),html}];
  coSet(id,{cz256_html:html,cz256_historico:hist});await czAlert('Texto individual salvo. O PDF gerado a partir de agora usará estas cláusulas.');cz256PreviewIndividual(id);
@@ -7509,12 +7533,12 @@ function cz256TextoAditivo(c,p,n){
  return `<h1>${n}º TERMO ADITIVO AO CONTRATO DE PRESTAÇÃO DE SERVIÇOS TÉCNICOS PARA EFEITOS ESPECIAIS</h1><p><strong>Contrato original:</strong> ${coEsc(p.numero||'—')}</p><p><strong>CONTRATANTE:</strong> ${coEsc(c.nome)}, CPF/CNPJ: ${coEsc(c.cpf)}, endereço: ${coEsc(c.endereco)}.</p><p><strong>CONTRATADA:</strong> CZ Efeitos Especiais, conforme qualificação constante do contrato original.</p><p><strong>Evento:</strong> ${coEsc(p.evento_nome||'—')}, em ${coEsc(coBrDate(c.data_evento))}, no local ${coEsc(c.local)}.</p><h2>CLÁUSULA 1 — DAS ALTERAÇÕES</h2><p>Descrever aqui a alteração contratual acordada entre as partes.</p><h2>CLÁUSULA 2 — DA RATIFICAÇÃO</h2><p>Permanecem inalteradas as demais disposições do contrato original que não conflitarem com este termo aditivo.</p><h2>ASSINATURAS</h2><p>CONTRATANTE: ${coEsc(c.nome)}</p><p>CONTRATADA: CZ Efeitos Especiais</p>`;
 }
 async function cz256NovoAditivo(id){const p=(await coOrcs()).find(x=>String(x.id)===String(id)),c=coGet(id);if(!p||!c)return;const todos=cz256Aditivos(),itens=todos[String(id)]||[];const novo={criado_em:new Date().toISOString(),status:'Rascunho',html:cz256TextoAditivo(c,p,itens.length+1)};itens.push(novo);todos[String(id)]=itens;cz256Gravar(CZ256_ADITIVOS_KEY,todos);cz256EditarAditivo(id,itens.length-1);}
-function cz256EditarAditivo(id,index){const item=cz256Aditivos()[String(id)]?.[index];if(!item)return;cz256EditorLayout('Editar termo aditivo',`<div class="cz256-help">${index+1}º aditivo • Vinculado ao contrato original • Situação: ${coEsc(item.status||'Rascunho')}</div><label>Texto integral do aditivo</label><textarea id="cz256TextoAditivo" spellcheck="false" ${item.status==='Assinado'?'disabled':''}></textarea><div class="cz256-bar">${item.status==='Assinado'?'':`<button class="btn primary" onclick="cz256SalvarAditivo('${id}',${index})">💾 Salvar aditivo</button>`}<button class="btn secondary" onclick="cz256PreviewAditivo()">👁 Visualizar</button><button class="btn secondary" onclick="cz256PdfAditivo('${id}',${index},true)">📄 Gerar PDF</button><button class="btn secondary" onclick="cz256AbrirAditivos('${id}')">← Histórico</button></div><iframe id="cz256Iframe" class="cz256-preview" title="Prévia do aditivo"></iframe><p class="cz256-help">A assinatura eletrônica do aditivo ainda requer integração com o serviço de assinatura. Gerar PDF não significa que o aditivo foi assinado.</p>`);$('#cz256TextoAditivo').value=item.html;cz256PreviewAditivo();}
-function cz256PreviewAditivo(){cz256Preview($('#cz256TextoAditivo')?.value||'','Termo aditivo CZ')}
-function cz256SalvarAditivo(id,index){const all=cz256Aditivos(),a=all[String(id)]?.[index];if(!a||a.status==='Assinado')return;const html=cz256LimparHTML($('#cz256TextoAditivo')?.value||'');if(html.replace(/<[^>]*>/g,'').trim().length<80)return czAlert('Revise o texto do aditivo antes de salvar.');a.html=html;a.atualizado_em=new Date().toISOString();cz256Gravar(CZ256_ADITIVOS_KEY,all);czAlert('Aditivo salvo neste navegador.');cz256PreviewAditivo();}
+function cz256EditarAditivo(id,index){const item=cz256Aditivos()[String(id)]?.[index];if(!item)return;cz256EditorLayout('Editar termo aditivo',`<div class="cz256-help">${index+1}º aditivo • Vinculado ao contrato original • Situação: ${coEsc(item.status||'Rascunho')}</div><label>Texto do aditivo</label>${cz257EditorHTML("cz256TextoAditivo",item.status==='Assinado')}<div class="cz256-bar">${item.status==='Assinado'?'':`<button class="btn primary" onclick="cz256SalvarAditivo('${id}',${index})">💾 Salvar aditivo</button>`}<button class="btn secondary" onclick="cz256PreviewAditivo()">👁 Visualizar</button><button class="btn secondary" onclick="cz256PdfAditivo('${id}',${index},true)">📄 Gerar PDF</button><button class="btn secondary" onclick="cz256AbrirAditivos('${id}')">← Histórico</button></div><iframe id="cz256Iframe" class="cz256-preview" title="Prévia do aditivo"></iframe><p class="cz256-help">A assinatura eletrônica do aditivo ainda requer integração com o serviço de assinatura. Gerar PDF não significa que o aditivo foi assinado.</p>`);cz257Preencher('cz256TextoAditivo',item.html);cz256PreviewAditivo();}
+function cz256PreviewAditivo(){cz256Preview(cz257Valor('cz256TextoAditivo'),'Termo aditivo CZ')}
+function cz256SalvarAditivo(id,index){const all=cz256Aditivos(),a=all[String(id)]?.[index];if(!a||a.status==='Assinado')return;const html=cz256LimparHTML(cz257Valor('cz256TextoAditivo'));if(html.replace(/<[^>]*>/g,'').trim().length<80)return czAlert('Revise o texto do aditivo antes de salvar.');a.html=html;a.atualizado_em=new Date().toISOString();cz256Gravar(CZ256_ADITIVOS_KEY,all);czAlert('Aditivo salvo neste navegador.');cz256PreviewAditivo();}
 async function cz256PdfAditivo(id,index,usarEditor=false){
  const a=cz256Aditivos()[String(id)]?.[index];if(!a)return;
- const html=usarEditor?$('#cz256TextoAditivo')?.value||a.html:a.html;
+ const html=usarEditor?cz257Valor('cz256TextoAditivo')||a.html:a.html;
  if(!window.jspdf?.jsPDF)return czAlert('Biblioteca PDF indisponível.');
  const pdf=new window.jspdf.jsPDF({unit:'mm',format:'a4'});let y=20;
  const doc=new DOMParser().parseFromString(cz256LimparHTML(html),'text/html');
@@ -7526,6 +7550,6 @@ async function cz256PdfAditivo(id,index,usarEditor=false){
 }
 // Mostra versao correta no cabeçalho apos login sem alterar a autenticacao.
 const cz256ShowAppOriginal=showApp;
-showApp=async function(user){await cz256ShowAppOriginal(user);const el=$('#userName');if(el)el.textContent=el.textContent.replace(/V\d+\b/,'V256')};
+showApp=async function(user){await cz256ShowAppOriginal(user);const el=$('#userName');if(el)el.textContent=el.textContent.replace(/V\d+\b/,'V257')};
 </script>
 </body></html>
