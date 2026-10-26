@@ -282,7 +282,7 @@ body .ret226Dialog button[aria-label="Fechar"]{color:#334155!important}
   },4000);
 })();
 </script>
-<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><span id="czBuildTag" style="margin-left:10px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:900">V268-N2</span><div class="muted" style="font-size:12px">Sistema de gestão CZ · Atualização V268-N2</div></div><div><span id="czNuvemStatus" title="Sincronização de dados da empresa" style="font-size:12px;color:#86efac;margin-right:8px">☁ Aguardando login</span> <button id="czNuvemAtualizar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.atualizar()">Atualizar dados</button> <button id="czNuvemImportar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.importarLegado()">Importar dados antigos</button> <span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
+<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><span id="czBuildTag" style="margin-left:10px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:900">V269-M1</span><div class="muted" style="font-size:12px">Sistema de gestão CZ · Atualização V269-M1</div></div><div><span id="czNuvemStatus" title="Sincronização de dados da empresa" style="font-size:12px;color:#86efac;margin-right:8px">☁ Aguardando login</span> <button id="czNuvemAtualizar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.atualizar()">Atualizar dados</button> <button id="czNuvemImportar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.importarLegado()">Importar dados antigos</button> <span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
 <div id="clientModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="modalTitle">Novo cliente</h2><button class="btn secondary" onclick="closeClient()">Fechar</button></div>
   <input id="clientId" type="hidden"><div class="muted" id="clientOpenedAt" style="font-size:13px">Data de abertura: será definida ao salvar</div>
   <div class="row"><div class="field"><label>Nome / Razão social *</label><input id="clientName" autocomplete="name"></div><div class="field"><label>Telefone *</label><input id="clientPhone" type="tel" inputmode="tel" autocomplete="tel"><div id="clientPhoneAviso" role="status" style="font-size:12px;margin-top:5px"></div></div></div>
@@ -4217,19 +4217,42 @@ function imprimirOSManutencao(id){const os=czOsLoad().find(x=>x.id===id);if(!os)
 function renderManutencao(modo='abertas'){window.czManModo=modo;const todas=czOsLoad().sort((x,y)=>String(y.criado_em).localeCompare(String(x.criado_em))),a=todas.filter(x=>modo==='historico'?x.status==='concluida':x.status!=='concluida');$('#content').innerHTML=`<div class="sectionhead"><div><h2>🛠️ Manutenção</h2><div class="muted">${modo==='historico'?'Histórico das ordens já concluídas':'Somente ordens que ainda estão em aberto'}</div></div><div class="actions" style="margin-top:0"><button class="btn primary" onclick="abrirNovaOSManual()">+ NOVA ORDEM</button><button class="btn ${modo==='abertas'?'primary':'secondary'}" onclick="renderManutencao('abertas')">EM ABERTO</button><button class="btn ${modo==='historico'?'primary':'secondary'}" onclick="renderManutencao('historico')">HISTÓRICO</button></div></div>${modo==='historico'?`<div class="card" style="margin-bottom:14px"><div class="row"><div class="field"><label>Data inicial</label><input id="manHistIni" type="date" onchange="filtrarHistoricoManutencao()"></div><div class="field"><label>Data final</label><input id="manHistFim" type="date" onchange="filtrarHistoricoManutencao()"></div></div><div class="row"><div class="field"><label>Ativo / equipamento</label><input id="manHistAtivo" placeholder="Pesquisar nome" oninput="filtrarHistoricoManutencao()"></div><div class="field"><label>Nº OS ou código</label><input id="manHistBusca" placeholder="OS 001 ou código" oninput="filtrarHistoricoManutencao()"></div></div></div>`:''}<div class="tablewrap"><table><thead><tr><th>OS</th><th>Data</th><th>Equipamento</th><th>Código</th><th>Qtd.</th><th>Ocorrência</th><th>Status</th><th>Custo</th><th>Ações</th></tr></thead><tbody id="manTabelaBody">${linhasManutencao(a,modo)}</tbody></table></div>`}
 // CZ V268-N2 — abertura manual de OS diretamente na tela de Manutenção.
 async function abrirNovaOSManual(){
- const {data,error}=await db.from('ativos').select('id,nome,codigo_interno,codigo_barras,quantidade,status').order('nome').limit(10000);
+ const {data,error}=await db.from('ativos').select('*').order('nome').limit(10000);
  if(error)return czAlert('Não foi possível carregar os equipamentos: '+error.message,'Nova ordem');
  const lista=(data||[]).filter(a=>Number(a.quantidade||0)>0);
  if(!lista.length)return czAlert('Não há equipamentos com quantidade disponível no cadastro de Ativos.','Nova ordem');
  document.getElementById('czNovaOSModal')?.remove();
  const modal=document.createElement('div');modal.id='czNovaOSModal';modal.className='modal';
  modal.innerHTML=`<div class="modalbox" style="width:min(650px,100%)"><div class="sectionhead"><h2>🛠️ Nova ordem de manutenção</h2><button class="btn secondary" type="button" onclick="document.getElementById('czNovaOSModal')?.remove()">Fechar</button></div>
+ <div class="field"><label>📷 Bipar código do material / rastreio</label><input id="czNovaOSBip" type="text" autocomplete="off" placeholder="Bipe ou digite o código e pressione Enter"><div id="czNovaOSBipMsg" class="muted" style="margin-top:6px">Use o leitor de código de barras ou digite manualmente.</div></div>
  <div class="field"><label>Equipamento *</label><select id="czNovaOSAtivo"><option value="">Selecione o equipamento</option>${lista.map(a=>`<option value="${esc(a.id)}">${esc(a.nome||'Ativo')} — ${esc(a.codigo_interno||a.codigo_barras||'Sem código')} (disponível: ${Number(a.quantidade||0)})</option>`).join('')}</select></div>
  <div class="row"><div class="field"><label>Quantidade *</label><input id="czNovaOSQtd" type="number" min="1" step="1" value="1"></div><div class="field"><label>Data de abertura</label><input value="${new Date().toLocaleDateString('pt-BR')}" disabled></div></div>
  <div class="field"><label>Ocorrência / defeito *</label><textarea id="czNovaOSOcorrencia" placeholder="Descreva o problema e o motivo da manutenção"></textarea></div>
- <div class="muted" style="margin-top:12px">Ao abrir a ordem, a quantidade informada é retirada da disponibilidade do ativo. Na conclusão, ela volta ao estoque.</div>
+ <div class="muted" style="margin-top:12px">A ordem registra a manutenção sem bloquear o equipamento nem alterar sua quantidade no estoque.</div>
  <div class="actions"><button class="btn secondary" type="button" onclick="document.getElementById('czNovaOSModal')?.remove()">Cancelar</button><button class="btn primary" id="czNovaOSSalvar" type="button" onclick="salvarNovaOSManual()">ABRIR ORDEM</button></div><div class="msg" id="czNovaOSErro"></div></div>`;
- document.body.appendChild(modal);document.getElementById('czNovaOSAtivo')?.focus();
+ document.body.appendChild(modal);
+ const campo=document.getElementById('czNovaOSBip'),seletor=document.getElementById('czNovaOSAtivo'),aviso=document.getElementById('czNovaOSBipMsg');
+ const normalizar=v=>String(v||'').trim().toLocaleUpperCase('pt-BR');
+ const codigos=new Map();
+ for(const a of lista){
+  for(const c of [a.codigo_interno,a.codigo_barras])if(normalizar(c)){
+   const k=normalizar(c);codigos.set(k,[...(codigos.get(k)||[]),a]);
+  }
+  // Os rastreios individuais ficam nas observações do cadastro de ativos.
+  const completo=a;
+  if(completo&&typeof unidadesAtivo==='function')for(const c of unidadesAtivo(completo))if(normalizar(c)){
+   const k=normalizar(c);codigos.set(k,[...(codigos.get(k)||[]),a]);
+  }
+ }
+ campo.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();localizar()}});
+ function localizar(){
+  const codigo=normalizar(campo.value);if(!codigo)return;
+  const achados=[...new Map((codigos.get(codigo)||[]).map(a=>[a.id,a])).values()];
+  if(achados.length===1){seletor.value=String(achados[0].id);aviso.textContent='✓ Encontrado: '+achados[0].nome+' — '+campo.value.trim();aviso.style.color='#38b86b';document.getElementById('czNovaOSOcorrencia')?.focus()}
+  else{aviso.textContent=achados.length?'Código vinculado a mais de um equipamento. Selecione o correto.':'Material não encontrado. Confira o código cadastrado.';aviso.style.color='#ef5350';seletor.value='';campo.select()}
+ }
+ campo.addEventListener('change',localizar);
+ campo.focus();
 }
 async function salvarNovaOSManual(){
  const btn=document.getElementById('czNovaOSSalvar'),msg=document.getElementById('czNovaOSErro');
@@ -4242,18 +4265,16 @@ async function salvarNovaOSManual(){
  try{
   const {data:a,error}=await db.from('ativos').select('*').eq('id',id).single();if(error)throw error;
   if(qtd>Number(a.quantidade||0))throw new Error('Quantidade maior que a disponível no estoque.');
-  const ordem={id:crypto.randomUUID(),numero:czOsNumero(),evento_id:'',material_id:'',ativo_id:id,equipamento:a.nome||'Ativo',codigo:a.codigo_interno||a.codigo_barras||'',fabricante:a.fabricante||'',marca:a.marca||'',quantidade:qtd,ocorrencia,criado_em:new Date().toISOString(),status:'aguardando',inicio_em:'',conclusao_em:'',pecas:[],servico:'',origem:'abertura_manual'};
+  const ordem={id:crypto.randomUUID(),numero:czOsNumero(),evento_id:'',material_id:'',ativo_id:id,equipamento:a.nome||'Ativo',codigo:document.getElementById('czNovaOSBip')?.value.trim()||a.codigo_interno||a.codigo_barras||'',fabricante:a.fabricante||'',marca:a.marca||'',quantidade:qtd,ocorrencia,criado_em:new Date().toISOString(),status:'aguardando',inicio_em:'',conclusao_em:'',pecas:[],servico:'',origem:'abertura_manual'};
   // Confirmar no Supabase antes de alterar o estoque, sem depender do navegador.
   const ordens=czOsLoad();ordens.push(ordem);
   const chave=CZ_OS_KEY,valor=JSON.stringify(ordens);
   const gravar=await db.from('cz_estado_compartilhado').upsert({chave,valor},{onConflict:'chave'});
   if(gravar.error)throw new Error('Não foi possível salvar a OS na nuvem: '+gravar.error.message);
   czOsSave(ordens);
-  // Quantidade indisponível enquanto a OS estiver aberta.
-  const ok=await czAjustarQuantidadeAtivo(id,-qtd,'manutencao');
+  // Ordem manual não bloqueia nem movimenta o estoque.
   document.getElementById('czNovaOSModal')?.remove();
   renderManutencao('abertas');
-  if(!ok){await czAlert('A ordem foi salva, mas o bloqueio de quantidade falhou. Confira o estoque antes de utilizar o equipamento.','Atenção');return}
   await czAlert(ordem.numero+' criada e compartilhada entre os logins.','Ordem aberta');
  }catch(e){if(msg)msg.textContent=e.message||String(e)}
  finally{if(document.getElementById('czNovaOSSalvar'))document.getElementById('czNovaOSSalvar').disabled=false}
@@ -4267,7 +4288,7 @@ function adicionarPecaOS(id){const os=czOsLoad().find(x=>x.id===id);if(!os)retur
 function aguardarMaterialOS(id){const a=czOsLoad(),os=a.find(x=>x.id===id);if(!os)return;os.servico=$('#osServico')?.value||os.servico||'';os.status='aguardando_material';os.aguardando_material_em=new Date().toISOString();czOsSave(a);abrirOSManutencao(id)}
 function continuarOSManutencao(id){const a=czOsLoad(),os=a.find(x=>x.id===id);if(!os)return;os.status='andamento';os.reinicio_em=new Date().toISOString();czOsSave(a);abrirOSManutencao(id)}
 function salvarServicoOS(id){const a=czOsLoad(),os=a.find(x=>x.id===id);if(!os)return;os.servico=$('#osServico')?.value||'';czOsSave(a);abrirOSManutencao(id)}
-async function concluirOSManutencao(id){const a=czOsLoad(),os=a.find(x=>x.id===id);if(!os||os.status==='concluida')return;if(!await czConfirm(`Concluir ${os.numero} e devolver ${os.quantidade} unidade(s) ao estoque disponível?`,'Concluir manutenção','Concluir'))return;os.servico=$('#osServico')?.value||os.servico||'';if(!(await czAjustarQuantidadeAtivo(os.ativo_id,Number(os.quantidade||0),'disponivel')))return;os.status='concluida';os.conclusao_em=new Date().toISOString();czOsSave(a);renderManutencao('historico')}
+async function concluirOSManutencao(id){const a=czOsLoad(),os=a.find(x=>x.id===id);if(!os||os.status==='concluida')return;if(!await czConfirm(`Concluir ${os.numero}?`,'Concluir manutenção','Concluir'))return;os.servico=$('#osServico')?.value||os.servico||'';if(os.origem!=='abertura_manual'&&!(await czAjustarQuantidadeAtivo(os.ativo_id,Number(os.quantidade||0),'disponivel')))return;os.status='concluida';os.conclusao_em=new Date().toISOString();czOsSave(a);renderManutencao('historico')}
 async function relCustosManutencao(){const a=czOsLoad().filter(x=>relNoPeriodo(String(x.criado_em||'').slice(0,10)));const nomes=[...new Set(czOsLoad().map(x=>x.equipamento).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));const atual=window.relManAtivo||'';const f=a.filter(x=>!atual||x.equipamento===atual),tot=f.reduce((s,x)=>s+czOsTotal(x),0);$('#content').innerHTML=relTopo('🛠️ Relatório de Custos de Manutenção','Custos técnicos das OS — não gera movimentação financeira')+relFiltroPeriodo('relCustosManutencao')+`<div class="card"><label style="display:block;margin-bottom:8px">Nome do ativo</label><select onchange="window.relManAtivo=this.value;relCustosManutencao()"><option value="">Todos</option>${nomes.map(n=>`<option ${atual===n?'selected':''}>${esc(n)}</option>`).join('')}</select></div><div class="card"><b>Total gasto em manutenção no período: ${money(tot)}</b><div class="muted">A compra/reposição das peças deve ser lançada separadamente em Financeiro → Nova despesa.</div></div><div class="tablewrap"><table><thead><tr><th>Data</th><th>OS</th><th>Ativo</th><th>Qtd.</th><th>Ocorrência</th><th>Status</th><th>Custo técnico</th></tr></thead><tbody>${f.map(x=>`<tr><td>${new Date(x.criado_em).toLocaleDateString('pt-BR')}</td><td>${esc(x.numero)}</td><td>${esc(x.equipamento)}</td><td>${x.quantidade}</td><td>${esc(x.ocorrencia)}</td><td>${x.status}</td><td>${money(czOsTotal(x))}</td></tr>`).join('')||'<tr><td colspan="7">Nenhuma manutenção no período.</td></tr>'}</tbody></table></div>`}
 
 
