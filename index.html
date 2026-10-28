@@ -324,6 +324,7 @@ body .ret226Dialog button[aria-label="Fechar"]{color:#334155!important}
  </div>
  <div class="muted" style="margin-top:6px">Ex.: CZ-FOGO-A01, CZ-FOGO-A02. Digite ou leia cada código. Não repita códigos entre equipamentos.</div>
  <button type="button" class="btn secondary" style="margin-top:10px" onclick="imprimirEtiquetasAtivoAtual()">Imprimir etiquetas de rastreio</button>
+ <button type="button" class="btn secondary" style="margin-top:10px;margin-left:8px" onclick="cz288ImprimirListaCodigos()">🖨️ Imprimir lista de códigos</button>
  </div>
  <div class="row"><div class="field"><label>Marca</label><input id="cz280AssetMarca"></div><div class="field"><label>Modelo</label><input id="cz280AssetModelo"></div></div><div class="row"><div class="field"><label>Voltagem</label><input id="cz280AssetVoltagem" placeholder="Ex.: 12 V, 110 V, 220 V"></div><div class="field"><label>Sistema de comando</label><input id="cz280AssetComando" placeholder="Ex.: DMX, rádio, manual"></div></div><div class="row"><div class="field"><label>Fornecedor</label><input id="assetSupplier"></div><div class="field"><label>Data da compra</label><input id="assetPurchaseDate" type="date"></div></div>
 <div class="row"><div class="field"><label>Valor da compra</label><input id="assetPurchaseValue" type="text" inputmode="decimal" placeholder="R$ 0,00"></div><div class="field"></div></div>
@@ -3601,6 +3602,35 @@ function editAsset(id){openAsset(assets.find(a=>String(a.id)===String(id)))}
 $('#assetPhoto').onchange=e=>{const f=e.target.files[0];if(f){$('#assetPreview').src=URL.createObjectURL(f);$('#assetPreview').classList.remove('hidden')}};
 // A quantidade não altera os rastreios.
 // Código do cadastro e códigos de rastreio são independentes.
+
+
+// CZ V288 — lista de todos os códigos do ativo, com cabeçalho e quantidade.
+function cz288ImprimirListaCodigos(){
+ const nome=String(document.getElementById('assetName')?.value||'').trim();
+ const qtdTexto=document.getElementById('assetQuantity')?.value||'0';
+ const quantidade=Number(qtdTexto);
+ const lote=document.getElementById('cz274Modo')?.value==='lote';
+ const codigos=lote
+   ? [String(document.getElementById('cz274CodigoLote')?.value||'').trim()].filter(Boolean)
+   : cz181LerRastreios();
+ if(!nome){czAlert('Informe o nome do equipamento antes de imprimir.','Impressão');return}
+ if(!codigos.length){czAlert('Nenhum código de rastreio informado para impressão.','Impressão');return}
+ const escapar=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const data=new Date().toLocaleDateString('pt-BR');
+ const linhas=codigos.map((c,i)=>'<tr><td>'+String(i+1).padStart(3,'0')+'</td><td>'+escapar(c)+'</td></tr>').join('');
+ const janela=window.open('','_blank','width=900,height=750');
+ if(!janela){czAlert('Libere as janelas pop-up para imprimir a lista.','Impressão');return}
+ const conteudo='<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Lista de códigos - '+escapar(nome)+'</title>'+
+ '<style>@page{size:A4;margin:15mm}body{font:14px Arial,sans-serif;color:#111}h1{font-size:20px;margin:0 0 18px}header{border-bottom:2px solid #222;padding-bottom:12px;margin-bottom:16px}.info{margin:6px 0}table{width:100%;border-collapse:collapse}th,td{border:1px solid #bbb;padding:8px 12px;text-align:left}th{background:#eee}td:first-child{width:70px}tr{break-inside:avoid}footer{margin-top:14px;font-size:11px;color:#555}.toolbar{margin-bottom:16px}@media print{.toolbar{display:none}}</style></head><body>'+
+ '<div class="toolbar"><button onclick="window.print()">Imprimir</button></div><header><h1>CZ Efeitos Especiais — Lista de códigos</h1>'+
+ '<div class="info"><b>Produto / equipamento:</b> '+escapar(nome)+'</div>'+
+ '<div class="info"><b>Quantidade:</b> '+escapar(Number.isFinite(quantidade)?quantidade:qtdTexto)+'</div>'+
+ '<div class="info"><b>Tipo de rastreio:</b> '+(lote?'Lote':'Individual')+'</div>'+
+ '<div class="info"><b>Data:</b> '+escapar(data)+'</div></header>'+
+ '<table><thead><tr><th>Nº</th><th>Código de rastreio</th></tr></thead><tbody>'+linhas+'</tbody></table>'+
+ '<footer>'+ (lote?'Código do lote: 1 código para '+escapar(quantidade)+' unidades.':'Total de códigos listados: '+codigos.length+'.') +'</footer></body></html>';
+ janela.document.open();janela.document.write(conteudo);janela.document.close();
+}
 
 function imprimirEtiquetasAtivo(a,codigos=null){
  if(!a)return;
