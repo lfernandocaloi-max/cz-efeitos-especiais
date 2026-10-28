@@ -442,10 +442,9 @@ window.alert=(m)=>{czAlert(m)};
 const modules=['Dashboard','Clientes','Orçamentos','Contratos','Eventos','Retorno de evento','Estoque','Ativos / Equipamentos','Colaboradores','Manutenção','Financeiro / DRE','Agenda','Relatórios','Configurações','Lista de compra','Veículos','Caixa','PDV','Sair pro Evento','Oficina','Inventário / Contagem','Monitoramento de Eventos','Eventos Concluídos','Capas dos Orçamentos'];
 // V212 — grupos recolhíveis sem alterar os índices dos módulos.
 const cz212Menu=[
- {i:21,label:'Monitoramento de Eventos'},{i:22,label:'Eventos Concluídos'},
- {i:2},{i:3},{i:1},{i:11},{i:4},{i:18,label:'Sair pro Evento'},
- {i:5},{i:12},{i:0},
- {g:'Estoque',items:[{i:7,label:'Ativos e Equipamentos'},{i:6,label:'Estoque Consumível'},{i:20},{i:14}]},
+ {i:2},{i:3},{i:21,label:'Monitoramento de Eventos'},{i:0,label:'Central Operacional'},{i:11},{i:22,label:'Eventos Concluídos'},{i:1},
+  {i:4},{i:18,label:'Sair pro Evento'},{i:5},{i:12},
+ {g:'Estoque',items:[{i:7,label:'Ativos e Equipamentos'},{i:6,label:'Estoque Consumível'},{i:20},{i:14},{action:'calculadoraCompras',label:'Calculadora de Compras'}]},
  {g:'Configurações',items:[{i:8},{i:15},{i:13,label:'Usuários / Permissões'},{i:23,label:'Capas dos Orçamentos',masterOnly:true}]},
  {g:'Manutenção',items:[{i:19,label:'Oficina'},{i:9,label:'Ordens de manutenção'}]},
  {g:'Financeiro',items:[{i:16},{i:10,label:'DRE / Financeiro'},{action:'novaDespesa',label:'Nova despesa'},{i:17}]}
@@ -473,7 +472,8 @@ cz212MontarMenu();
 $('#nav').onclick=e=>{
  const b=e.target.closest('button');if(!b)return;
  if(b.dataset.grupo){const g=b.dataset.grupo;const aberto=cz212MenuAbertos.has(g)||(g==='Financeiro'&&cz212MasterPronto()&&!cz212MenuFechados.has(g));if(aberto){cz212MenuAbertos.delete(g);cz212MenuFechados.add(g)}else{cz212MenuFechados.delete(g);cz212MenuAbertos.add(g)}cz212MontarMenu();return}
- if(b.dataset.action==='novaDespesa'){document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');$('.side').classList.remove('mobile-open');novaDespesa();return}
+ if(b.dataset.action==='calculadoraCompras'){document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');$('.side').classList.remove('mobile-open');renderCalculadoraComprasCZ();return}
+  if(b.dataset.action==='novaDespesa'){document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');$('.side').classList.remove('mobile-open');novaDespesa();return}
  if(b.dataset.i===undefined)return;
  document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');$('.side').classList.remove('mobile-open');renderModule(Number(b.dataset.i));
 };
@@ -1645,7 +1645,7 @@ async function renderDashboard(){
     central.innerHTML=`<div class="card" style="margin:0 0 14px;padding:14px;border-color:#394654">
       <div class="sectionhead" style="margin-bottom:12px"><div><h3 style="margin:0">⚡ Central Operacional</h3><div class="muted">O que precisa de atenção na operação</div></div></div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:10px">
-        <button class="btn secondary" onclick="renderModule(4)" style="text-align:left;padding:14px"><div class="muted">🎪 Eventos hoje</div><div style="font-size:26px;font-weight:900;margin-top:4px">${hojeOps}</div></button>
+        <button class="btn secondary" onclick="renderModule(4)" style="text-align:left;padding:14px"><div class="muted">🎪 Eventos hoje</div><div style="font-size:26px;font-weight:900;margin-top:4px">${hojeOps}</div></button><button class="btn secondary" onclick="renderModule(21)" style="text-align:left;padding:14px"><div class="muted">📆 Eventos futuros</div><div style="font-size:26px;font-weight:900;margin-top:4px">${(typeof eventosOps!=='undefined'&&Array.isArray(eventosOps)?eventosOps.filter(x=>String(x.data_evento||'').slice(0,10)>new Date().toLocaleDateString('en-CA')).length:'—')}</div></button>
         <button class="btn secondary" onclick="renderModule(4)" style="text-align:left;padding:14px"><div class="muted">📋 Em preparação</div><div style="font-size:26px;font-weight:900;margin-top:4px">${preparacaoOps}</div></button>
         <button class="btn secondary" onclick="renderModule(5)" style="text-align:left;padding:14px"><div class="muted">↩️ Aguardando retorno</div><div style="font-size:26px;font-weight:900;margin-top:4px">${retornoOps}</div></button>
         <button class="btn secondary" onclick="renderModule(9)" style="text-align:left;padding:14px"><div class="muted">🛠️ Manutenção / Oficina</div><div style="font-size:16px;font-weight:900;margin-top:8px">ABRIR</div></button>
@@ -4258,14 +4258,14 @@ async function abrirNovaOSManual(){
  const {data,error}=await db.from('ativos').select('*').order('nome').limit(10000);
  if(error)return czAlert('Não foi possível carregar os equipamentos: '+error.message,'Nova ordem');
  const lista=(data||[]).filter(a=>Number(a.quantidade||0)>0);
- if(!lista.length)return czAlert('Não há equipamentos com quantidade disponível no cadastro de Ativos.','Nova ordem');
+ // Ordens com material livre não exigem ativo cadastrado.
  document.getElementById('czNovaOSModal')?.remove();
  const modal=document.createElement('div');modal.id='czNovaOSModal';modal.className='modal';
  modal.innerHTML=`<div class="modalbox" style="width:min(650px,100%)"><div class="sectionhead"><h2>🛠️ Nova ordem de manutenção</h2><button class="btn secondary" type="button" onclick="document.getElementById('czNovaOSModal')?.remove()">Fechar</button></div>
  <div class="field"><label>📷 Bipar código do material / rastreio</label><input id="czNovaOSBip" type="text" autocomplete="off" placeholder="Bipe ou digite o código e pressione Enter"><div id="czNovaOSBipMsg" class="muted" style="margin-top:6px">Use o leitor de código de barras ou digite manualmente.</div></div>
- <div class="field"><label>Equipamento *</label><select id="czNovaOSAtivo"><option value="">Selecione o equipamento</option>${lista.map(a=>`<option value="${esc(a.id)}">${esc(a.nome||'Ativo')} — ${esc(a.codigo_interno||a.codigo_barras||'Sem código')} (disponível: ${Number(a.quantidade||0)})</option>`).join('')}</select></div>
+ <input type="hidden" id="czNovaOSAtivo"><div class="field"><label>Material *</label><input id="czNovaOSMaterial" placeholder="Nome do equipamento ou material livre"></div>
  <div class="row"><div class="field"><label>Quantidade *</label><input id="czNovaOSQtd" type="number" min="1" step="1" value="1"></div><div class="field"><label>Data de abertura</label><input value="${new Date().toLocaleDateString('pt-BR')}" disabled></div></div>
- <div class="field"><label>Ocorrência / defeito *</label><textarea id="czNovaOSOcorrencia" placeholder="Descreva o problema e o motivo da manutenção"></textarea></div>
+ <div class="field"><label>Ocorrência / defeito *</label><textarea id="czNovaOSOcorrencia" placeholder="Descreva o problema e o motivo da manutenção"></textarea></div><div class="field"><label>Nome de quem está abrindo a ordem *</label><input id="czNovaOSResponsavel" placeholder="Responsável"></div>
  <div class="muted" style="margin-top:12px">A ordem registra a manutenção sem bloquear o equipamento nem alterar sua quantidade no estoque.</div>
  <div class="actions"><button class="btn secondary" type="button" onclick="document.getElementById('czNovaOSModal')?.remove()">Cancelar</button><button class="btn primary" id="czNovaOSSalvar" type="button" onclick="salvarNovaOSManual()">ABRIR ORDEM</button></div><div class="msg" id="czNovaOSErro"></div></div>`;
  document.body.appendChild(modal);
@@ -4286,7 +4286,7 @@ async function abrirNovaOSManual(){
  function localizar(){
   const codigo=normalizar(campo.value);if(!codigo)return;
   const achados=[...new Map((codigos.get(codigo)||[]).map(a=>[a.id,a])).values()];
-  if(achados.length===1){seletor.value=String(achados[0].id);aviso.textContent='✓ Encontrado: '+achados[0].nome+' — '+campo.value.trim();aviso.style.color='#38b86b';document.getElementById('czNovaOSOcorrencia')?.focus()}
+  if(achados.length===1){seletor.value=String(achados[0].id);document.getElementById('czNovaOSMaterial').value=achados[0].nome||'';aviso.textContent='✓ Encontrado: '+achados[0].nome+' — '+campo.value.trim();aviso.style.color='#38b86b';document.getElementById('czNovaOSOcorrencia')?.focus()}
   else{aviso.textContent=achados.length?'Código vinculado a mais de um equipamento. Selecione o correto.':'Material não encontrado. Confira o código cadastrado.';aviso.style.color='#ef5350';seletor.value='';campo.select()}
  }
  campo.addEventListener('change',localizar);
@@ -4298,12 +4298,13 @@ async function salvarNovaOSManual(){
  const id=document.getElementById('czNovaOSAtivo')?.value||'';
  const qtd=Number(document.getElementById('czNovaOSQtd')?.value||0);
  const ocorrencia=String(document.getElementById('czNovaOSOcorrencia')?.value||'').trim();
- if(!id||!Number.isInteger(qtd)||qtd<1||!ocorrencia){if(msg)msg.textContent='Selecione o equipamento, informe a quantidade inteira e descreva a ocorrência.';return}
+ const material=String(document.getElementById('czNovaOSMaterial')?.value||'').trim();const responsavel=String(document.getElementById('czNovaOSResponsavel')?.value||'').trim();
+ if(!material||!responsavel||!Number.isInteger(qtd)||qtd<1||!ocorrencia){if(msg)msg.textContent='Informe material, responsável, quantidade e ocorrência.';return}
  btn.disabled=true;if(msg)msg.textContent='Abrindo ordem...';
  try{
-  const {data:a,error}=await db.from('ativos').select('*').eq('id',id).single();if(error)throw error;
-  if(qtd>Number(a.quantidade||0))throw new Error('Quantidade maior que a disponível no estoque.');
-  const ordem={id:crypto.randomUUID(),numero:czOsNumero(),evento_id:'',material_id:'',ativo_id:id,equipamento:a.nome||'Ativo',codigo:document.getElementById('czNovaOSBip')?.value.trim()||a.codigo_interno||a.codigo_barras||'',fabricante:a.fabricante||'',marca:a.marca||'',quantidade:qtd,ocorrencia,criado_em:new Date().toISOString(),status:'aguardando',inicio_em:'',conclusao_em:'',pecas:[],servico:'',origem:'abertura_manual'};
+  let a=null;if(id){const r=await db.from('ativos').select('*').eq('id',id).single();if(r.error)throw r.error;a=r.data;}
+  if(a&&qtd>Number(a.quantidade||0))throw new Error('Quantidade maior que a disponível no estoque.');
+  const ordem={id:crypto.randomUUID(),numero:czOsNumero(),evento_id:'',material_id:'',ativo_id:id,equipamento:material,responsavel_abertura:responsavel,codigo:document.getElementById('czNovaOSBip')?.value.trim()||(a?.codigo_interno||a?.codigo_barras||''),fabricante:a?.fabricante||'',marca:a?.marca||'',quantidade:qtd,ocorrencia,criado_em:new Date().toISOString(),status:'aguardando',inicio_em:'',conclusao_em:'',pecas:[],servico:'',origem:'abertura_manual'};
   // Confirmar no Supabase antes de alterar o estoque, sem depender do navegador.
   const ordens=czOsLoad();ordens.push(ordem);
   const chave=CZ_OS_KEY,valor=JSON.stringify(ordens);
@@ -6053,9 +6054,9 @@ async function prep141Abrir(eventoId){
 
   <div class="card"><div class="sectionhead"><div><h3 style="margin:0">5. Projeto de execução</h3><div class="muted">O desenho fica oculto até abrir o projeto. O desenho salvo será preservado.</div></div><button type="button" class="btn primary" onclick="editarProjetoEvento('${eventoId}')">✎ Abrir Projeto</button></div></div>
 
-  <div class="card"><h3 style="margin-top:0">6. Anotação técnica</h3><textarea id="prep145Anotacao" rows="6" placeholder="Orientações para montagem e operação">${coEsc(e.anotacao_tecnica||'')}</textarea></div>
+  <div class="card"><h3 style="margin-top:0">6. Anotação técnica</h3><textarea id="prep145Anotacao" style="display:block;width:100%;box-sizing:border-box;min-height:180px;resize:vertical" rows="6" placeholder="Orientações para montagem e operação">${coEsc(e.anotacao_tecnica||'')}</textarea></div>
 
-  <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">7. Documentação</h3><div class="tablewrap"><table><thead><tr><th>Documento</th><th>Status</th></tr></thead><tbody><tr><td>Alvará de Queima de Fogos</td><td>${coEsc(docs217.alvara||'Pendente')}</td></tr><tr><td>Croqui Polícia Civil</td><td>${coEsc(docs217.croqui||'Pendente')}</td></tr></tbody></table></div><p class="muted">A situação da documentação é mantida pelo módulo de documentação do evento.</p></div><div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">8. Ocorrências de campo</h3><textarea id="prep217Ocorrencias" rows="4" placeholder="Registre ocorrências, observações e acontecimentos durante o evento">${coEsc(info217.ocorrencias||'')}</textarea></div><div class="actions"><button class="btn primary" onclick="prep145Salvar('${eventoId}')">Salvar preparação</button><button class="btn secondary" onclick="prep217Imprimir('${eventoId}')">🖨 Imprimir projeto de execução</button><button class="btn secondary" onclick="abrirMapaReservasV140()">Ver reservas</button></div><div id="prep145Msg" class="msg"></div>`;
+  <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">7. Documentação</h3><div class="tablewrap"><table><thead><tr><th>Documento</th><th>Status</th></tr></thead><tbody><tr><td>Alvará de Queima de Fogos</td><td><span style="color:${String(docs217.alvara||'').toLowerCase()==='concluído'?'#38b86b':'#ef5350'};font-weight:800">${coEsc(docs217.alvara||'Pendente')}</span></td></tr><tr><td>Croqui Polícia Civil</td><td><span style="color:${String(docs217.croqui||'').toLowerCase()==='concluído'?'#38b86b':'#ef5350'};font-weight:800">${coEsc(docs217.croqui||'Pendente')}</span></td></tr></tbody></table></div><p class="muted">A situação da documentação é mantida pelo módulo de documentação do evento.</p></div><div class="card" style="display:none;margin-bottom:16px"><h3 style="margin-top:0">8. Ocorrências de campo</h3><textarea id="prep217Ocorrencias" rows="4" placeholder="Registre ocorrências, observações e acontecimentos durante o evento">${coEsc(info217.ocorrencias||'')}</textarea></div><div class="actions"><button class="btn primary" onclick="prep145Salvar('${eventoId}')">Salvar preparação</button><button class="btn secondary" onclick="prep217Imprimir('${eventoId}')">🖨 Imprimir projeto de execução</button><button class="btn secondary" onclick="abrirMapaReservasV140()">Ver reservas</button></div><div id="prep145Msg" class="msg"></div>`;
  }catch(err){$('#content').innerHTML=`<div class="msg">Erro: ${coEsc(err.message)}</div>`}
 }
 async function prep145Salvar(id){
@@ -8759,5 +8760,21 @@ const oldShow=showApp;
 showApp=async function(user){await oldShow(user);try{await ready()}catch(e){showError(e)}};
 })();
 
+</script>
+<style id="cz270-style">.cz270-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}.cz270-item{background:#17212c;border:1px solid #334454;border-radius:12px;padding:15px;margin:12px 0}.cz270-item .field{margin:5px 0}.cz270-result{background:#0b2d24;padding:12px;border-radius:10px;margin-top:10px}.cz270-item h3{margin:0 0 12px}</style>
+<script id="cz270-calculadora">
+let cz270Itens=[];
+function cz270Num(v){return Math.max(0,Number(v)||0)}
+function cz270Money(v){return (Number(v)||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
+function cz270Novo(){cz270Itens.push({id:Date.now()+Math.random(),nome:'',caixas:1,unidades:1,compra:0,extra:0,descricao:'',varejo:0,atacado:0});cz270Desenhar()}
+function cz270Atualizar(id,k,v){let x=cz270Itens.find(a=>String(a.id)===String(id));if(!x)return;x[k]=v;cz270Calcular()}
+function cz270Excluir(id){cz270Itens=cz270Itens.filter(x=>String(x.id)!==String(id));cz270Desenhar()}
+function renderCalculadoraComprasCZ(){document.getElementById('pageTitle').textContent='Calculadora de Compras';if(!cz270Itens.length)cz270Novo();else cz270Desenhar()}
+function cz270Desenhar(){const content=document.getElementById('content');if(!content)return;
+const f=(x,k,label,type='number')=>`<div class="field"><label>${label}</label><input type="${type}" min="0" step="${type==='number'?'any':''}" value="${esc(String(x[k]??''))}" oninput="cz270Atualizar('${x.id}','${k}',this.value)"></div>`;
+content.innerHTML=`<div class="sectionhead"><div><h2>🧮 Calculadora de Compras</h2><div class="muted">Simulação independente: não altera estoque, preços cadastrados ou financeiro.</div></div><button class="btn secondary" onclick="window.print()">Imprimir</button></div><div class="card"><h3>Despesas gerais da nota</h3><div class="cz270-grid">${['frete','imposto','geral'].map((k,i)=>`<div class="field"><label>${['Frete total (R$)','Imposto da nota (R$)','Despesa extra geral (R$)'][i]}</label><input id="cz270_${k}" type="number" min="0" step="any" value="${cz270Num(window['cz270_'+k])}" oninput="window['cz270_'+k]=this.value;cz270Calcular()"></div>`).join('')}</div></div><div class="sectionhead" style="margin-top:20px"><h2>Produtos da compra</h2><button class="btn primary" onclick="cz270Novo()">+ Adicionar produto</button></div><div id="cz270Itens">${cz270Itens.map((x,i)=>`<div class="cz270-item"><div class="sectionhead"><h3>Produto ${i+1}</h3><button class="btn danger" onclick="cz270Excluir('${x.id}')">Excluir</button></div><div class="cz270-grid">${f(x,'nome','Nome do produto','text')}${f(x,'caixas','Quantidade de caixas')}${f(x,'unidades','Unidades por caixa')}${f(x,'compra','Compra bruta (R$)')}${f(x,'descricao','Descrição da despesa individual','text')}${f(x,'extra','Despesa extra deste item (R$)')}${f(x,'varejo','Margem varejo (%)')}${f(x,'atacado','Margem atacado (%)')}</div><div class="cz270-result" id="cz270_r_${x.id}"></div></div>`).join('')}</div><div class="card" id="cz270Total"></div>`;cz270Calcular()}
+function cz270Calcular(){const qtd=cz270Itens.reduce((a,x)=>a+cz270Num(x.caixas)*cz270Num(x.unidades),0),bruto=cz270Itens.reduce((a,x)=>a+cz270Num(x.compra),0),extras=cz270Itens.reduce((a,x)=>a+cz270Num(x.extra),0),gerais=cz270Num(window.cz270_frete)+cz270Num(window.cz270_imposto)+cz270Num(window.cz270_geral);
+for(const x of cz270Itens){const q=cz270Num(x.caixas)*cz270Num(x.unidades),rateio=qtd?gerais*q/qtd:0,custo=q?(cz270Num(x.compra)+cz270Num(x.extra)+rateio)/q:0,el=document.getElementById('cz270_r_'+x.id);if(el)el.innerHTML=`<b>${q} unidades</b> · Despesas gerais rateadas: <b>${cz270Money(rateio)}</b> · Despesa exclusiva: <b>${cz270Money(x.extra)}</b><br>Custo total: <b>${cz270Money(custo*q)}</b> · Custo unitário: <b>${cz270Money(custo)}</b><br>Varejo/un.: <b>${cz270Money(custo*(1+cz270Num(x.varejo)/100))}</b> (lucro ${cz270Money(custo*cz270Num(x.varejo)/100)}) · Atacado/un.: <b>${cz270Money(custo*(1+cz270Num(x.atacado)/100))}</b> (lucro ${cz270Money(custo*cz270Num(x.atacado)/100)})`}
+const el=document.getElementById('cz270Total');if(el)el.innerHTML=`<h3>Fechamento geral da compra</h3>Produtos: <b>${cz270Itens.length}</b> · Unidades: <b>${qtd}</b><br>Compra bruta: <b>${cz270Money(bruto)}</b> · Frete: <b>${cz270Money(cz270Num(window.cz270_frete))}</b> · Imposto: <b>${cz270Money(cz270Num(window.cz270_imposto))}</b><br>Despesa geral: <b>${cz270Money(cz270Num(window.cz270_geral))}</b> · Despesas individuais: <b>${cz270Money(extras)}</b><h2>Total investido: ${cz270Money(bruto+gerais+extras)}</h2>${qtd?'':'<p style="color:#fbbf24">Informe as quantidades para distribuir as despesas.</p>'}`}
 </script>
 </body></html>
