@@ -3254,20 +3254,30 @@ function codigoCadastroAtivo(a){return String(a?.codigo_interno||a?.codigo_barra
 const CZ181_TAG='[CZ_RASTREIO_V181]';
 const CZ186_AUDIT='[CZ_BAIXAS_RASTREIO_V186]';
 function cz186ExtrairNotas(v){
- let texto=String(v||'').replace(/(?:\r?\n)?\[CZ274_LOTE\][^\r\n]*/g,''),codigos=[],baixas=[],temRastreio=false;
- const pos=texto.lastIndexOf('\n'+CZ181_TAG);
- if(pos>=0){
-  try{const arr=JSON.parse(texto.slice(pos+1+CZ181_TAG.length));if(Array.isArray(arr)){codigos=arr.map(x=>String(x).trim()).filter(Boolean);temRastreio=true;texto=texto.slice(0,pos)}}catch(_){}
+ // V277: lê metadados linha a linha, inclusive tags duplicadas e sem quebra inicial.
+ // Mantém o último conjunto válido de rastreios e a auditoria, sem expor tags no formulário.
+ const linhas=String(v||'').split(/\r?\n/);
+ const notas=[],codigosEncontrados=[],baixasEncontradas=[];
+ let temRastreio=false;
+ for(const linha of linhas){
+  const limpa=linha.trim();
+  if(limpa.startsWith(CZ181_TAG)){
+   try{const arr=JSON.parse(limpa.slice(CZ181_TAG.length));if(Array.isArray(arr)){
+    codigosEncontrados.push(arr.map(x=>String(x).trim()).filter(Boolean));temRastreio=true;
+   }}catch(e){console.warn('Metadado de rastreio inválido preservado no registro original',e)}
+  }else if(limpa.startsWith(CZ186_AUDIT)){
+   try{const arr=JSON.parse(limpa.slice(CZ186_AUDIT.length));if(Array.isArray(arr))baixasEncontradas.push(arr)}catch(e){console.warn('Auditoria inválida no registro original',e)}
+  }else if(limpa.startsWith('[CZ274_LOTE]')){
+   // Código do lote é lido separadamente por cz274Lote.
+  }else notas.push(linha);
  }
- const posBaixa=texto.lastIndexOf('\n'+CZ186_AUDIT);
- if(posBaixa>=0){
-  try{const arr=JSON.parse(texto.slice(posBaixa+1+CZ186_AUDIT.length));if(Array.isArray(arr)){baixas=arr;texto=texto.slice(0,posBaixa)}}catch(_){}
- }
- return {texto,codigos,baixas,temRastreio};
+ const codigos=codigosEncontrados.length?codigosEncontrados[codigosEncontrados.length-1]:[];
+ const baixas=baixasEncontradas.length?baixasEncontradas[baixasEncontradas.length-1]:[];
+ return {texto:notas.join('\n').trim(),codigos,baixas,temRastreio};
 }
 function cz181ExtrairNotas(v){return cz186ExtrairNotas(v)}
 function cz181MontarNotas(texto,codigos,baixas=[]){
- let base=String(texto||'').trim();
+ let base=cz186ExtrairNotas(texto).texto;
  if(baixas.length)base+='\n'+CZ186_AUDIT+JSON.stringify(baixas);
  // Tag presente mesmo com zero códigos para não restaurar rastreios antigos do navegador.
  base+='\n'+CZ181_TAG+JSON.stringify(codigos.map(x=>String(x).trim()).filter(Boolean));
@@ -3424,7 +3434,7 @@ async function proximoCodigoAtivo(){
 async function previewCodigoAtivo(){renderAssetUnitsPreview()}
 function openAsset(a=null){
  $('#assetModal').classList.remove('hidden');$('#assetModalTitle').textContent=a?'Editar ativo':'Novo ativo';$('#assetId').value=a?.id||'';$('#assetName').value=a?.nome||'';
- $('#assetCode').value=a?codigoCadastroAtivo(a):'';$('#assetSupplier').value=a?.fornecedor||'';$('#assetQuantity').value=a?.quantidade??1;$('#assetPurchaseDate').value=a?.data_compra||'';$('#assetPurchaseValue').value=moedaInputValor(a?.valor_compra??0);$('#assetRent1').value=a?.valor_locacao_tabela1??0;$('#assetRent2').value=a?.valor_locacao_tabela2??0;$('#assetWeight').value=a?.peso??'';$('#assetCase').value=String(a?.possui_case??false);$('#assetMontagem').checked=a?.material_montagem===true;$('#assetNotes').value=cz181ExtrairNotas(a?.observacoes).texto.trim();$('#assetPhoto').value='';
+ $('#assetCode').value=a?codigoCadastroAtivo(a):'';$('#assetSupplier').value=a?.fornecedor||'';$('#assetQuantity').value=a?.quantidade??1;$('#assetPurchaseDate').value=a?.data_compra||'';$('#assetPurchaseValue').value=moedaInputValor(a?.valor_compra??0);$('#assetRent1').value=a?.valor_locacao_tabela1??0;$('#assetRent2').value=a?.valor_locacao_tabela2??0;$('#assetWeight').value=a?.peso??'';$('#assetCase').value=String(a?.possui_case??false);$('#assetMontagem').checked=a?.material_montagem===true;$('#assetNotes').value=cz186ExtrairNotas(a?.observacoes).texto.trim();$('#assetPhoto').value='';
  const im=$('#assetPreview');if(a?.foto_url){im.src=a.foto_url;im.classList.remove('hidden')}else im.classList.add('hidden');$('#assetMsg').textContent='';$('#assetUnitsList').innerHTML='';const codigos=a?unidadesAtivo(a):[];if(codigos.length)codigos.forEach(c=>cz181AdicionarRastreio(c));else cz181AdicionarRastreio();
  const lote=cz274Lote(a);$('#cz274Modo').value=lote?'lote':'individual';$('#cz274CodigoLote').value=lote;cz274Alternar();
  const historico=cz186ExtrairNotas(a?.observacoes).baixas;
