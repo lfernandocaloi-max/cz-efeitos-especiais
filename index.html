@@ -312,7 +312,7 @@ body .ret226Dialog button[aria-label="Fechar"]{color:#334155!important}
 <div class="row"><div class="field"><label>Código do cadastro</label><input id="assetCode" placeholder="Digite o código livremente"><div class="muted" style="margin-top:5px">Ex.: FOGO-01, CO2-05 ou 0001</div></div></div>
 <div class="card" style="margin:12px 0;padding:14px">
  <div class="sectionhead" style="margin-bottom:8px"><div><b>Códigos de rastreio individuais</b><div class="muted">Cada equipamento físico recebe seu próprio código. Os códigos não são gerados nem apagados ao alterar a quantidade.</div></div><button type="button" class="btn secondary" id="assetAddTracking">+ Código de rastreio</button></div>
- <div id="assetUnitsList"></div>
+ <div class="field" style="margin-bottom:12px"><label>Modo de rastreio</label><select id="cz274Modo" onchange="cz274Alternar()"><option value="individual">Individual — um código por unidade</option><option value="lote">Em lote — um código para várias unidades</option></select></div><div id="cz274LoteArea" class="field hidden" style="margin-bottom:12px"><label>Código de rastreio do lote</label><input id="cz274CodigoLote" placeholder="Ex.: 500001" autocomplete="off"><div class="muted">Uma leitura soma uma unidade na saída ou no retorno. A quantidade máxima é controlada pelo pedido do evento.</div></div><div id="assetUnitsList"></div>
  <div class="muted" style="margin-top:6px">Ex.: CZ-FOGO-A01, CZ-FOGO-A02. Digite ou leia cada código. Não repita códigos entre equipamentos.</div>
  <button type="button" class="btn secondary" style="margin-top:10px" onclick="imprimirEtiquetasAtivoAtual()">Imprimir etiquetas de rastreio</button>
  </div>
@@ -3274,6 +3274,10 @@ function cz181MontarNotas(texto,codigos,baixas=[]){
  return base;
 }
 function cz155Load(){try{return JSON.parse(czSharedStorage.getItem('cz155_codigos_unidades')||'{}')}catch(e){return {}}}
+const CZ274_TAG='[CZ274_LOTE]';
+function cz274Lote(a){const m=String(a?.observacoes||'').match(/\[CZ274_LOTE\]([^\r\n]+)/);return m?m[1].trim():''}
+function cz274Alternar(){const lote=document.getElementById('cz274Modo')?.value==='lote';document.getElementById('cz274LoteArea')?.classList.toggle('hidden',!lote);document.getElementById('assetUnitsList').style.display=lote?'none':'';const b=document.getElementById('assetAddTracking');if(b)b.style.display=lote?'none':''}
+function cz274CodigoEmLote(codigo,item){const a=assets.find(a=>String(a.id)===String(item?.item_id));return !!a&&normalizarCodigoEvento(cz274Lote(a))===normalizarCodigoEvento(codigo)&&!!cz274Lote(a)}
 function unidadesAtivo(a){
  const info=cz181ExtrairNotas(a?.observacoes);
  if(info.temRastreio)return info.codigos;
@@ -3420,8 +3424,9 @@ async function proximoCodigoAtivo(){
 async function previewCodigoAtivo(){renderAssetUnitsPreview()}
 function openAsset(a=null){
  $('#assetModal').classList.remove('hidden');$('#assetModalTitle').textContent=a?'Editar ativo':'Novo ativo';$('#assetId').value=a?.id||'';$('#assetName').value=a?.nome||'';
- $('#assetCode').value=a?codigoCadastroAtivo(a):'';$('#assetSupplier').value=a?.fornecedor||'';$('#assetQuantity').value=a?.quantidade??1;$('#assetPurchaseDate').value=a?.data_compra||'';$('#assetPurchaseValue').value=moedaInputValor(a?.valor_compra??0);$('#assetRent1').value=a?.valor_locacao_tabela1??0;$('#assetRent2').value=a?.valor_locacao_tabela2??0;$('#assetWeight').value=a?.peso??'';$('#assetCase').value=String(a?.possui_case??false);$('#assetMontagem').checked=a?.material_montagem===true;$('#assetNotes').value=cz181ExtrairNotas(a?.observacoes).texto;$('#assetPhoto').value='';
+ $('#assetCode').value=a?codigoCadastroAtivo(a):'';$('#assetSupplier').value=a?.fornecedor||'';$('#assetQuantity').value=a?.quantidade??1;$('#assetPurchaseDate').value=a?.data_compra||'';$('#assetPurchaseValue').value=moedaInputValor(a?.valor_compra??0);$('#assetRent1').value=a?.valor_locacao_tabela1??0;$('#assetRent2').value=a?.valor_locacao_tabela2??0;$('#assetWeight').value=a?.peso??'';$('#assetCase').value=String(a?.possui_case??false);$('#assetMontagem').checked=a?.material_montagem===true;$('#assetNotes').value=cz181ExtrairNotas(a?.observacoes).texto.replace(/\[CZ274_LOTE\][^\r\n]*/g,'').trim();$('#assetPhoto').value='';
  const im=$('#assetPreview');if(a?.foto_url){im.src=a.foto_url;im.classList.remove('hidden')}else im.classList.add('hidden');$('#assetMsg').textContent='';$('#assetUnitsList').innerHTML='';const codigos=a?unidadesAtivo(a):[];if(codigos.length)codigos.forEach(c=>cz181AdicionarRastreio(c));else cz181AdicionarRastreio();
+ const lote=cz274Lote(a);$('#cz274Modo').value=lote?'lote':'individual';$('#cz274CodigoLote').value=lote;cz274Alternar();
  const historico=cz186ExtrairNotas(a?.observacoes).baixas;
  let hist=$('#cz186Historico');
  if(!hist){hist=document.createElement('div');hist.id='cz186Historico';$('#assetUnitsList').parentElement.appendChild(hist)}
@@ -3454,7 +3459,9 @@ $('#saveAssetBtn').onclick=async()=>{
  try{
   let foto_url=id?assets.find(p=>String(p.id)===String(id))?.foto_url:null;const f=$('#assetPhoto').files[0];if(f)foto_url=await uploadPhoto(f,'ativos');
   const atual=id?assets.find(a=>String(a.id)===String(id)):null;
-  const rastreios=cz181LerRastreios(),normalizados=rastreios.map(x=>x.toUpperCase());
+  const modoLote=$('#cz274Modo').value==='lote';const codigoLote=$('#cz274CodigoLote').value.trim();if(modoLote&&!codigoLote)throw new Error('Informe o código de rastreio do lote.');
+  if(atual&&cz274Lote(atual)&&(!modoLote||codigoLote.toUpperCase()!==cz274Lote(atual).toUpperCase()))throw new Error('Não é permitido alterar o modo ou código de um lote existente sem migração das movimentações.');
+  const rastreios=modoLote?[codigoLote]:cz181LerRastreios(),normalizados=rastreios.map(x=>x.toUpperCase());
   if(atual){
    const antigos=unidadesAtivo(atual);
    const removidos=antigos.filter(c=>!normalizados.includes(c.toUpperCase()));
@@ -3465,7 +3472,7 @@ $('#saveAssetBtn').onclick=async()=>{
   if(rastreios.some(c=>emUso.has(c.toUpperCase())))throw new Error('Um código de rastreio já está cadastrado em outro equipamento.');
   const codigo=$('#assetCode').value.trim();
   if(!codigo)throw new Error('Informe o código principal do ativo.');
-  const payload={nome:$('#assetName').value.trim(),quantidade:qtd,codigo_interno:codigo,fornecedor:$('#assetSupplier').value.trim()||null,data_compra:$('#assetPurchaseDate').value||null,valor_compra:moedaInputNumero($('#assetPurchaseValue').value),valor_locacao_tabela1:+$('#assetRent1').value||0,valor_locacao_tabela2:+$('#assetRent2').value||0,peso:$('#assetWeight').value?+$('#assetWeight').value:null,possui_case:$('#assetCase').value==='true',material_montagem:$('#assetMontagem').checked,observacoes:cz181MontarNotas($('#assetNotes').value,rastreios,cz186ExtrairNotas(atual?.observacoes).baixas),foto_url,atualizado_em:new Date().toISOString()};
+  const payload={nome:$('#assetName').value.trim(),quantidade:qtd,codigo_interno:codigo,fornecedor:$('#assetSupplier').value.trim()||null,data_compra:$('#assetPurchaseDate').value||null,valor_compra:moedaInputNumero($('#assetPurchaseValue').value),valor_locacao_tabela1:+$('#assetRent1').value||0,valor_locacao_tabela2:+$('#assetRent2').value||0,peso:$('#assetWeight').value?+$('#assetWeight').value:null,possui_case:$('#assetCase').value==='true',material_montagem:$('#assetMontagem').checked,observacoes:cz181MontarNotas($('#assetNotes').value,rastreios,cz186ExtrairNotas(atual?.observacoes).baixas)+(modoLote?'\n'+CZ274_TAG+codigoLote:''),foto_url,atualizado_em:new Date().toISOString()};
   if(!payload.nome)throw new Error('Informe o nome do equipamento.');
   const {data,error}=id?await db.from('ativos').update(payload).eq('id',id).select():await db.from('ativos').insert({...payload,status:'disponivel'}).select();
   if(error)throw error;
@@ -5794,7 +5801,7 @@ async function sair142Bipar(id){
    throw new Error(outro?'O código pertence a outro material: '+sair222Nome(outro)+'. Selecione a linha correta.':'Código não encontrado no cadastro do material selecionado.');
   }
   if(Number(c[item.id]||0)>=sair220Qtd(item))throw new Error('Este material já está totalmente conferido.');
-  if(sair220Ativo(item)&&(st.rastreiosLidos||[]).includes(codigo))throw new Error('Este rastreio de ativo já foi conferido.');
+  if(sair220Ativo(item)&&!cz274CodigoEmLote(codigo,item)&&(st.rastreiosLidos||[]).includes(codigo))throw new Error('Este rastreio de ativo já foi conferido.');
   c[item.id]=Number(c[item.id]||0)+1;
   const b=[...new Set([...(st.bipados||[]),String(item.codigo_barras||item.codigo||item.id)])];
   sair142Set(id,{responsavel:resp,contagens:c,bipados:b,rastreiosLidos:sair220Ativo(item)?[...(st.rastreiosLidos||[]),codigo]:(st.rastreiosLidos||[]),historico:[...(st.historico||[]),{acao:'Conferência',codigo:cod,material_id:item.id,data:new Date().toISOString(),responsavel:resp}]});
@@ -6169,7 +6176,7 @@ async function prep192AdicionarMaterial(eventoId,origem){
      if(!qtdTexto||!Number.isInteger(qtd)||qtd<1){msg.textContent='Informe uma quantidade inteira maior que zero para '+item.nome+'.';return}
      const disponivel=Number(ativo?item.quantidade:item.estoque_atual)||0;
      const jaNoEvento=usados.get(String(item.id))||0;
-     if(ativo && unidadesAtivo(item).length<qtd+jaNoEvento){msg.textContent=item.nome+': não há códigos de rastreio individuais suficientes para esta quantidade. Cadastre os rastreios no ativo antes de adicionar.';return}
+     if(ativo && !cz274Lote(item) && unidadesAtivo(item).length<qtd+jaNoEvento){msg.textContent=item.nome+': não há códigos de rastreio individuais suficientes para esta quantidade. Cadastre os rastreios no ativo antes de adicionar.';return}
      if(qtd+jaNoEvento>disponivel){
        msg.textContent=item.nome+': disponível '+disponivel+', já separado para este evento '+jaNoEvento+'. Quantidade adicional máxima: '+Math.max(0,disponivel-jaNoEvento)+'.';return;
      }
@@ -7185,9 +7192,9 @@ async function czNovoBiparSaida(id){
   if(!aptos.length)throw new Error('Quantidade já conferida para este produto ('+codigo+').');
   // Se um produto está em duas linhas, confere primeiro a linha ainda pendente.
   // Para ativos, um rastreio não pode estar repetido em linhas diferentes.
-  if(aptos.length>1&&aptos.some(sair220Ativo))throw new Error('Rastreio duplicado em linhas do evento. Corrija o cadastro antes de conferir.');
+  if(aptos.length>1&&aptos.some(x=>sair220Ativo(x)&&!cz274CodigoEmLote(codigo,x)))throw new Error('Rastreio duplicado em linhas do evento. Corrija o cadastro antes de conferir.');
   const item=aptos[0];
-  if(sair220Ativo(item)&&(st.rastreiosLidos||[]).some(v=>normalizarCodigoEvento(v)===codigo))
+  if(sair220Ativo(item)&&!cz274CodigoEmLote(codigo,item)&&(st.rastreiosLidos||[]).some(v=>normalizarCodigoEvento(v)===codigo))
    throw new Error('Este equipamento já foi bipado nesta saída.');
   contagens[item.id]=Number(contagens[item.id]||0)+1;
   const historico=[...(st.historico||[]),{acao:'Conferência',codigo,material_id:item.id,data:new Date().toISOString(),responsavel:resp}];
@@ -7728,7 +7735,7 @@ window.cz241Bipar=async function(){
   const codigo=normalizarCodigoEvento(cod);
   const possiveis=g.linhas.filter(x=>(x._codigos||[]).some(v=>normalizarCodigoEvento(v)===codigo));
   if(!possiveis.length)throw Error('Código não pertence ao material selecionado.');
-  if(g.tipo==='Ativo'&&(st.rastreiosLidos||[]).includes(codigo))throw Error('Este código de rastreio já foi bipado.');
+  if(g.tipo==='Ativo'&&!possiveis.some(x=>cz274CodigoEmLote(codigo,x))&&(st.rastreiosLidos||[]).includes(codigo))throw Error('Este código de rastreio já foi bipado.');
   // A conferência por linha é preservada para a rotina oficial de saída.
   const alvo=possiveis.sort((a,b)=>Number(ehExtra(a))-Number(ehExtra(b))).find(x=>Number(s.c[x.id]||0)<qtd(x));
   if(!alvo)throw Error('Quantidade correspondente a este código já está completa.');
