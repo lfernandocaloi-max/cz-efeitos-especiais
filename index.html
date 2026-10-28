@@ -415,6 +415,23 @@ const czSharedStorage=(()=>{
  return {init,getItem,setItem,removeItem,atualizar,importarLegado,descarregar,pendentes};
 })();
 </script>
+<script id="cz280-ajustes-seguros">
+/* CZ V280: campos adicionais isolados; sem mudança de schema do Supabase. */
+const CZ280_ATIVO='[CZ280_ATIVO_META]';
+function cz280MetaAtivoTag(){const o={marca:document.getElementById('cz280AssetMarca').value.trim(),modelo:document.getElementById('cz280AssetModelo').value.trim(),voltagem:document.getElementById('cz280AssetVoltagem').value.trim(),comando:document.getElementById('cz280AssetComando').value.trim()};return CZ280_ATIVO+JSON.stringify(o)}
+function cz280LimparMetaAtivo(t){return String(t||'').replace(/\[CZ280_ATIVO_META\]\{[^\r\n]*\}/g,'')}
+function cz280LerMetaAtivo(a){let o={};try{const m=String(a?.observacoes||'').match(/\[CZ280_ATIVO_META\](\{[^\r\n]*\})/);if(m)o=JSON.parse(m[1])}catch(e){}for(const [id,k] of [['cz280AssetMarca','marca'],['cz280AssetModelo','modelo'],['cz280AssetVoltagem','voltagem'],['cz280AssetComando','comando']])document.getElementById(id).value=o[k]||''}
+function cz280GerarRastreios(){if(document.getElementById('assetId').value){czAlert('A geração automática é destinada a novos ativos. Os códigos já cadastrados são preservados.');return}const campos=[...document.querySelectorAll('#assetUnitsList .cz181Rastreio')];if(campos.some(x=>x.value.trim())){czAlert('Já existem códigos preenchidos. Para proteger os rastreios, eles não serão substituídos automaticamente.');return}cz280SugerirRastreios()}
+function cz280SugerirRastreios(){if(document.getElementById('assetId').value)return;const base=document.getElementById('assetCode').value.trim();if(!/^\d{4,}$/.test(base))return;const qtd=Math.min(200,Math.max(1,Number(document.getElementById('assetQuantity').value)||1));const campos=[...document.querySelectorAll('#assetUnitsList .cz181Rastreio')];if(campos.some(e=>e.value.trim()))return;const usados=new Set((window.assets||[]).flatMap(a=>typeof unidadesAtivo==='function'?unidadesAtivo(a):[]).map(x=>String(x).toUpperCase()));const prefixo=base+'-';for(let i=0;i<qtd;i++){let n=i+1,codigo;do{codigo=prefixo+String(n++).padStart(3,'0')}while(usados.has(codigo.toUpperCase()));if(campos[i])campos[i].value=codigo;else cz181AdicionarRastreio(codigo)}}
+document.getElementById('assetQuantity').addEventListener('change',cz280SugerirRastreios);
+const CZ280_PROD_PREFIX='cz280_produto_caixa_';
+function cz280LerProduto(id){try{return JSON.parse(czSharedStorage.getItem(CZ280_PROD_PREFIX+id)||'{}')}catch(e){return {}}}
+function cz280AbrirProduto(p){const o=p?.id?cz280LerProduto(p.id):{};for(const [id,k,d] of [['cz280UnCx','unidades',1],['cz280CodCx','codigo',''],['cz280PctCxV','varejo',0],['cz280PctCxA','atacado',0]])document.getElementById(id).value=o[k]??d;cz280CalcularCaixa()}
+function cz280CalcularCaixa(){const n=id=>Math.max(0,Number(document.getElementById(id)?.value)||0);const custo=moedaInputNumero(document.getElementById('productCost').value)*n('cz280UnCx');for(const [suf,pct] of [['V','cz280PctCxV'],['A','cz280PctCxA']]){const lucro=custo*n(pct)/100;document.getElementById('cz280LucroCx'+suf).value=lucro.toFixed(2);document.getElementById('cz280ValorCx'+suf).value=(custo+lucro).toFixed(2)}}
+for(const id of ['cz280UnCx','cz280PctCxV','cz280PctCxA','productCost'])document.getElementById(id).addEventListener('input',cz280CalcularCaixa);
+function cz280SalvarProduto(id){const o={unidades:Math.max(1,Math.trunc(Number(document.getElementById('cz280UnCx').value)||1)),codigo:document.getElementById('cz280CodCx').value.trim(),varejo:Number(document.getElementById('cz280PctCxV').value)||0,atacado:Number(document.getElementById('cz280PctCxA').value)||0};czSharedStorage.setItem(CZ280_PROD_PREFIX+id,JSON.stringify(o))}
+</script>
+
 <script>
 const SUPABASE_URL='https://locvpksjntwnlqrytqqx.supabase.co';
 const SUPABASE_KEY='sb_publishable_UN34ALY6Oxc1_V863pgq3Q_hNj7tuIQ';
@@ -1399,22 +1416,7 @@ function relImprimirEstoque(){
  const w=window.open('','_blank','width=1100,height=800');
  if(!w){czAlert('O navegador bloqueou a janela de impressão. Libere pop-ups para este site.','Impressão');return}
  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Conferência de Estoque - CZ Efeitos Especiais</title><style>body{font-family:Arial,sans-serif;color:#111;margin:28px}h1{margin:0 0 4px;font-size:22px}.sub{margin-bottom:18px;color:#444}.resumo{display:flex;gap:30px;margin:14px 0 20px;font-size:14px;flex-wrap:wrap}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #777;padding:7px;vertical-align:middle}th{background:#eee;text-align:left}.check{width:28px;text-align:center;font-size:20px}.num{text-align:center}.obs{width:190px;height:25px}.assinatura{margin-top:38px;display:flex;gap:50px}.linha{flex:1;border-top:1px solid #222;padding-top:6px;text-align:center;font-size:12px}@media print{button{display:none}body{margin:10mm}}</style></head><body><h1>CZ Efeitos Especiais — Conferência de Estoque</h1><div class="sub">Lista para conferência física dos produtos de consumo</div><div class="resumo"><b>Produtos: ${a.length}</b><b>Valor de custo em estoque: ${money(total)}</b><b>Data: ${new Date().toLocaleDateString('pt-BR')}</b></div><table><thead><tr><th>Conf.</th><th>Produto</th><th>Cód. barras</th><th>Unidade</th><th>Qtd. atual</th><th>Mínimo</th><th>Observação</th></tr></thead><tbody>${linhas}</tbody></table><div class="assinatura"><div class="linha">Responsável pela conferência</div><div class="linha">Data / assinatura</div></div><script>window.onload=()=>{window.print()}<\/script>
-<script id="cz280-ajustes-seguros">
-/* CZ V280: campos adicionais isolados; sem mudança de schema do Supabase. */
-const CZ280_ATIVO='[CZ280_ATIVO_META]';
-function cz280MetaAtivoTag(){const o={marca:document.getElementById('cz280AssetMarca').value.trim(),modelo:document.getElementById('cz280AssetModelo').value.trim(),voltagem:document.getElementById('cz280AssetVoltagem').value.trim(),comando:document.getElementById('cz280AssetComando').value.trim()};return CZ280_ATIVO+JSON.stringify(o)}
-function cz280LimparMetaAtivo(t){return String(t||'').replace(/\[CZ280_ATIVO_META\]\{[^\r\n]*\}/g,'')}
-function cz280LerMetaAtivo(a){let o={};try{const m=String(a?.observacoes||'').match(/\[CZ280_ATIVO_META\](\{[^\r\n]*\})/);if(m)o=JSON.parse(m[1])}catch(e){}for(const [id,k] of [['cz280AssetMarca','marca'],['cz280AssetModelo','modelo'],['cz280AssetVoltagem','voltagem'],['cz280AssetComando','comando']])document.getElementById(id).value=o[k]||''}
-function cz280GerarRastreios(){if(document.getElementById('assetId').value){czAlert('A geração automática é destinada a novos ativos. Os códigos já cadastrados são preservados.');return}const campos=[...document.querySelectorAll('#assetUnitsList .cz181Rastreio')];if(campos.some(x=>x.value.trim())){czAlert('Já existem códigos preenchidos. Para proteger os rastreios, eles não serão substituídos automaticamente.');return}cz280SugerirRastreios()}
-function cz280SugerirRastreios(){if(document.getElementById('assetId').value)return;const base=document.getElementById('assetCode').value.trim();if(!/^\d{4,}$/.test(base))return;const qtd=Math.min(200,Math.max(1,Number(document.getElementById('assetQuantity').value)||1));const campos=[...document.querySelectorAll('#assetUnitsList .cz181Rastreio')];if(campos.some(e=>e.value.trim()))return;const usados=new Set((window.assets||[]).flatMap(a=>typeof unidadesAtivo==='function'?unidadesAtivo(a):[]).map(x=>String(x).toUpperCase()));const prefixo=base+'-';for(let i=0;i<qtd;i++){let n=i+1,codigo;do{codigo=prefixo+String(n++).padStart(3,'0')}while(usados.has(codigo.toUpperCase()));if(campos[i])campos[i].value=codigo;else cz181AdicionarRastreio(codigo)}}
-document.getElementById('assetQuantity').addEventListener('change',cz280SugerirRastreios);
-const CZ280_PROD_PREFIX='cz280_produto_caixa_';
-function cz280LerProduto(id){try{return JSON.parse(czSharedStorage.getItem(CZ280_PROD_PREFIX+id)||'{}')}catch(e){return {}}}
-function cz280AbrirProduto(p){const o=p?.id?cz280LerProduto(p.id):{};for(const [id,k,d] of [['cz280UnCx','unidades',1],['cz280CodCx','codigo',''],['cz280PctCxV','varejo',0],['cz280PctCxA','atacado',0]])document.getElementById(id).value=o[k]??d;cz280CalcularCaixa()}
-function cz280CalcularCaixa(){const n=id=>Math.max(0,Number(document.getElementById(id)?.value)||0);const custo=moedaInputNumero(document.getElementById('productCost').value)*n('cz280UnCx');for(const [suf,pct] of [['V','cz280PctCxV'],['A','cz280PctCxA']]){const lucro=custo*n(pct)/100;document.getElementById('cz280LucroCx'+suf).value=lucro.toFixed(2);document.getElementById('cz280ValorCx'+suf).value=(custo+lucro).toFixed(2)}}
-for(const id of ['cz280UnCx','cz280PctCxV','cz280PctCxA','productCost'])document.getElementById(id).addEventListener('input',cz280CalcularCaixa);
-function cz280SalvarProduto(id){const o={unidades:Math.max(1,Math.trunc(Number(document.getElementById('cz280UnCx').value)||1)),codigo:document.getElementById('cz280CodCx').value.trim(),varejo:Number(document.getElementById('cz280PctCxV').value)||0,atacado:Number(document.getElementById('cz280PctCxA').value)||0};czSharedStorage.setItem(CZ280_PROD_PREFIX+id,JSON.stringify(o))}
-</script>
+
 </body></html>`);
  w.document.close();
 }
