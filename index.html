@@ -282,7 +282,7 @@ body .ret226Dialog button[aria-label="Fechar"]{color:#334155!important}
   },4000);
 })();
 </script>
-<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><span id="czBuildTag" style="margin-left:10px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:900">V269-M1</span><div class="muted" style="font-size:12px">Sistema de gestão CZ · Atualização V269-M1</div></div><div><span id="czNuvemStatus" title="Sincronização de dados da empresa" style="font-size:12px;color:#86efac;margin-right:8px">☁ Aguardando login</span> <button id="czNuvemAtualizar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.atualizar()">Atualizar dados</button> <button id="czNuvemImportar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.importarLegado()">Importar dados antigos</button> <span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
+<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><span id="czBuildTag" style="margin-left:10px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:900">V282-A1</span><div class="muted" style="font-size:12px">Sistema de gestão CZ · Atualização V282-A1</div></div><div><span id="czNuvemStatus" title="Sincronização de dados da empresa" style="font-size:12px;color:#86efac;margin-right:8px">☁ Aguardando login</span> <button id="czNuvemAtualizar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.atualizar()">Atualizar dados</button> <button id="czNuvemImportar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.importarLegado()">Importar dados antigos</button> <span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
 <div id="clientModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="modalTitle">Novo cliente</h2><button class="btn secondary" onclick="closeClient()">Fechar</button></div>
   <input id="clientId" type="hidden"><div class="muted" id="clientOpenedAt" style="font-size:13px">Data de abertura: será definida ao salvar</div>
   <div class="row"><div class="field"><label>Nome / Razão social *</label><input id="clientName" autocomplete="name"></div><div class="field"><label>Telefone *</label><input id="clientPhone" type="tel" inputmode="tel" autocomplete="tel"><div id="clientPhoneAviso" role="status" style="font-size:12px;margin-top:5px"></div></div></div>
@@ -421,7 +421,27 @@ const CZ280_ATIVO='[CZ280_ATIVO_META]';
 function cz280MetaAtivoTag(){const o={marca:document.getElementById('cz280AssetMarca').value.trim(),modelo:document.getElementById('cz280AssetModelo').value.trim(),voltagem:document.getElementById('cz280AssetVoltagem').value.trim(),comando:document.getElementById('cz280AssetComando').value.trim()};return CZ280_ATIVO+JSON.stringify(o)}
 function cz280LimparMetaAtivo(t){return String(t||'').replace(/\[CZ280_ATIVO_META\]\{[^\r\n]*\}/g,'')}
 function cz280LerMetaAtivo(a){let o={};try{const m=String(a?.observacoes||'').match(/\[CZ280_ATIVO_META\](\{[^\r\n]*\})/);if(m)o=JSON.parse(m[1])}catch(e){}for(const [id,k] of [['cz280AssetMarca','marca'],['cz280AssetModelo','modelo'],['cz280AssetVoltagem','voltagem'],['cz280AssetComando','comando']])document.getElementById(id).value=o[k]||''}
-function cz280GerarRastreios(){if(document.getElementById('assetId').value){czAlert('A geração automática é destinada a novos ativos. Os códigos já cadastrados são preservados.');return}const campos=[...document.querySelectorAll('#assetUnitsList .cz181Rastreio')];if(campos.some(x=>x.value.trim())){czAlert('Já existem códigos preenchidos. Para proteger os rastreios, eles não serão substituídos automaticamente.');return}cz280SugerirRastreios()}
+function cz280GerarRastreios(){
+ const id=document.getElementById('assetId').value;
+ if(id){czAlert('Este ativo já está cadastrado. Seus rastreios existentes serão preservados. Para acrescentar rastreios, utilize + Código de rastreio.');return}
+ if(document.getElementById('cz274Modo')?.value==='lote'){czAlert('No modo em lote, informe o código de rastreio do lote. A geração sequencial é para rastreios individuais.');return}
+ const base=document.getElementById('assetCode').value.trim();
+ if(!/^\d{4,}$/.test(base)){czAlert('Informe primeiro o código numérico do cadastro do ativo (ex.: 0005).');return}
+ const qtd=Math.min(200,Math.max(1,Math.trunc(Number(document.getElementById('assetQuantity').value)||1)));
+ const campos=[...document.querySelectorAll('#assetUnitsList .cz181Rastreio')];
+ const usados=new Set((window.assets||[]).flatMap(a=>typeof unidadesAtivo==='function'?unidadesAtivo(a):[]).map(x=>String(x).trim().toUpperCase()));
+ const preenchidos=new Set(campos.map(x=>x.value.trim().toUpperCase()).filter(Boolean));
+ let contador=1,gerados=0;
+ for(let i=0;i<qtd;i++){
+  let campo=campos[i];
+  if(campo?.value.trim())continue;
+  let codigo;
+  do{codigo=base+'-'+String(contador++).padStart(3,'0')}while(usados.has(codigo.toUpperCase())||preenchidos.has(codigo.toUpperCase()));
+  if(campo)campo.value=codigo;else cz181AdicionarRastreio(codigo);
+  preenchidos.add(codigo.toUpperCase());gerados++;
+ }
+ if(!gerados){czAlert('Os '+qtd+' códigos de rastreio já estão preenchidos. Nenhum código foi substituído.');}
+}
 function cz280SugerirRastreios(){if(document.getElementById('assetId').value)return;const base=document.getElementById('assetCode').value.trim();if(!/^\d{4,}$/.test(base))return;const qtd=Math.min(200,Math.max(1,Number(document.getElementById('assetQuantity').value)||1));const campos=[...document.querySelectorAll('#assetUnitsList .cz181Rastreio')];if(campos.some(e=>e.value.trim()))return;const usados=new Set((window.assets||[]).flatMap(a=>typeof unidadesAtivo==='function'?unidadesAtivo(a):[]).map(x=>String(x).toUpperCase()));const prefixo=base+'-';for(let i=0;i<qtd;i++){let n=i+1,codigo;do{codigo=prefixo+String(n++).padStart(3,'0')}while(usados.has(codigo.toUpperCase()));if(campos[i])campos[i].value=codigo;else cz181AdicionarRastreio(codigo)}}
 document.getElementById('assetQuantity').addEventListener('change',cz280SugerirRastreios);
 const CZ280_PROD_PREFIX='cz280_produto_caixa_';
