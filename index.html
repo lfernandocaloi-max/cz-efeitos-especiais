@@ -313,6 +313,15 @@ body .ret226Dialog button[aria-label="Fechar"]{color:#334155!important}
 <div class="card" style="margin:12px 0;padding:14px">
  <div class="sectionhead" style="margin-bottom:8px"><div><b>Códigos de rastreio individuais</b><div class="muted">Cada equipamento físico recebe seu próprio código. Os códigos não são gerados nem apagados ao alterar a quantidade.</div></div><div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="btn secondary" onclick="cz280GerarRastreios()">Gerar códigos sequenciais</button><button type="button" class="btn secondary" id="assetAddTracking">+ Código de rastreio</button></div></div>
  <div class="field" style="margin-bottom:12px"><label>Modo de rastreio</label><select id="cz274Modo" onchange="cz274Alternar()"><option value="individual">Individual — um código por unidade</option><option value="lote">Em lote — um código para várias unidades</option></select></div><div id="cz274LoteArea" class="field hidden" style="margin-bottom:12px"><label>Código de rastreio do lote</label><button type="button" class="btn secondary" style="margin-bottom:7px" onclick="cz280GerarRastreios()">Gerar código do lote</button><input id="cz274CodigoLote" placeholder="Ex.: 500001" autocomplete="off"><div class="muted">Uma leitura soma uma unidade na saída ou no retorno. A quantidade máxima é controlada pelo pedido do evento.</div></div><div id="assetUnitsList"></div>
+ <div id="cz287EntradaArea" class="card hidden" style="margin-top:14px;padding:14px;border:1px solid #4b6476">
+  <div class="sectionhead"><div><b>Entrada de novos equipamentos</b><div class="muted">Somente para um ativo já cadastrado com rastreio individual.</div></div><button type="button" class="btn secondary" id="cz287AbrirEntrada" onclick="cz287AlternarEntrada()">+ Adicionar equipamentos</button></div>
+  <div id="cz287EntradaFormulario" class="hidden" style="margin-top:12px">
+   <div class="row"><div class="field"><label>Quantidade recebida *</label><input id="cz287Qtd" type="number" min="1" step="1" inputmode="numeric" value="1" oninput="cz287AtualizarResumo()"></div><div class="field"><label>Valor unitário da compra (R$) *</label><input id="cz287Valor" type="number" min="0" step="0.01" inputmode="decimal" value="0" oninput="cz287AtualizarResumo()"></div></div>
+   <div id="cz287Resumo" class="muted" style="margin:9px 0"></div>
+   <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn secondary" onclick="cz287GerarEntrada()">Gerar códigos dos novos equipamentos</button><button type="button" class="btn secondary" onclick="cz287CancelarEntrada()">Cancelar entrada</button></div>
+   <div id="cz287Mensagem" class="muted" style="margin-top:9px"></div>
+  </div>
+ </div>
  <div class="muted" style="margin-top:6px">Ex.: CZ-FOGO-A01, CZ-FOGO-A02. Digite ou leia cada código. Não repita códigos entre equipamentos.</div>
  <button type="button" class="btn secondary" style="margin-top:10px" onclick="imprimirEtiquetasAtivoAtual()">Imprimir etiquetas de rastreio</button>
  </div>
@@ -3497,11 +3506,91 @@ async function proximoCodigoAtivo(){
  return String(maior+1).padStart(4,'0');
 }
 async function previewCodigoAtivo(){renderAssetUnitsPreview()}
+// CZ V287 — acréscimo de equipamentos individuais em cadastro existente.
+let cz287Entrada=null;
+const CZ287_HIST='[CZ287_ENTRADAS]';
+function cz287ExtrairHistorico(texto){
+ const m=String(texto||'').match(/\[CZ287_ENTRADAS\]([\s\S]*?)\[\/CZ287_ENTRADAS\]/);
+ if(!m)return [];
+ try{const v=JSON.parse(m[1]);return Array.isArray(v)?v:[]}catch(_){return []}
+}
+function cz287SemHistorico(texto){return String(texto||'').replace(/\n?\[CZ287_ENTRADAS\][\s\S]*?\[\/CZ287_ENTRADAS\]/g,'')}
+function cz287AtualizarVisibilidade(){
+ const id=document.getElementById('assetId')?.value;
+ const individual=document.getElementById('cz274Modo')?.value==='individual';
+ const area=document.getElementById('cz287EntradaArea');if(!area)return;
+ area.classList.toggle('hidden',!id||!individual);
+ if(!id||!individual)cz287CancelarEntrada();
+}
+const cz287AlternarModoOriginal=cz274Alternar;cz274Alternar=function(){cz287AlternarModoOriginal();cz287AtualizarVisibilidade()};
+function cz287AlternarEntrada(){
+ const f=document.getElementById('cz287EntradaFormulario');
+ if(f.classList.contains('hidden')){f.classList.remove('hidden');cz287AtualizarResumo()}
+ else cz287CancelarEntrada();
+}
+function cz287CancelarEntrada(){
+ if(cz287Entrada){
+  const lista=document.getElementById('assetUnitsList');
+  const novos=new Set(cz287Entrada.codigos);
+  [...lista.querySelectorAll('.cz181RastreioLinha')].forEach(l=>{if(novos.has(l.querySelector('.cz181Rastreio')?.value.trim()))l.remove()});
+  document.getElementById('assetQuantity').value=cz287Entrada.quantidadeAnterior;
+ }
+ cz287Entrada=null;
+ document.getElementById('cz287EntradaFormulario')?.classList.add('hidden');
+ const msg=document.getElementById('cz287Mensagem');if(msg)msg.textContent='';
+}
+function cz287AtualizarResumo(){
+ const id=document.getElementById('assetId')?.value;
+ const atual=assets.find(a=>String(a.id)===String(id));
+ const qtd=Number(document.getElementById('cz287Qtd')?.value||0);
+ const valor=Number(document.getElementById('cz287Valor')?.value||0);
+ const box=document.getElementById('cz287Resumo');if(!box)return;
+ const base=cz287Entrada?cz287Entrada.quantidadeAnterior:Number(atual?.quantidade||0);
+ box.textContent='Quantidade atual: '+base+' | Após entrada: '+(base+(Number.isInteger(qtd)&&qtd>0?qtd:0))+' | Total desta compra: '+(Number.isFinite(qtd*valor)?money(qtd*valor):'—');
+}
+async function cz287GerarEntrada(){
+ const msg=document.getElementById('cz287Mensagem');
+ try{
+  const id=document.getElementById('assetId').value;
+  const atual=assets.find(a=>String(a.id)===String(id));
+  if(!atual||document.getElementById('cz274Modo').value!=='individual'||cz274Lote(atual))throw Error('Abra um ativo existente de rastreio individual.');
+  if(cz287Entrada)throw Error('Já existem novos códigos preparados. Salve o ativo ou cancele esta entrada antes de gerar outra.');
+  const qtd=Number(document.getElementById('cz287Qtd').value),valor=Number(document.getElementById('cz287Valor').value);
+  if(!Number.isSafeInteger(qtd)||qtd<1||qtd>1000)throw Error('Informe de 1 a 1000 equipamentos por entrada.');
+  if(!Number.isFinite(valor)||valor<0)throw Error('Informe um valor unitário de compra válido.');
+  const base=String(document.getElementById('assetCode').value||'').trim();
+  if(!/^\d+$/.test(base))throw Error('O código do cadastro deve conter somente números para gerar rastreios numéricos.');
+  // Reconsulta os ativos para reduzir o risco de colisões entre sessões.
+  const {data,error}=await db.from('ativos').select('id,codigo_interno,observacoes');
+  if(error)throw error;
+  const usados=new Set();
+  for(const a of data||[]){
+   unidadesAtivo(a).forEach(c=>usados.add(String(c).trim()));
+   const baixas=cz186ExtrairNotas(a.observacoes).baixas||[];
+   baixas.forEach(b=>{if(b.codigo)usados.add(String(b.codigo).trim())});
+   const lote=cz274Lote(a);if(lote)usados.add(String(lote).trim());
+  }
+  document.querySelectorAll('#assetUnitsList .cz181Rastreio').forEach(x=>{if(x.value.trim())usados.add(x.value.trim())});
+  const novos=[];
+  let numero=1;
+  while(novos.length<qtd&&numero<1000000){
+   const codigo=base+String(numero++).padStart(3,'0');
+   if(!usados.has(codigo)){usados.add(codigo);novos.push(codigo)}
+  }
+  if(novos.length!==qtd)throw Error('Não foi possível gerar códigos suficientes sem repetição.');
+  const quantidadeAnterior=Number(atual.quantidade||0);
+  novos.forEach(c=>cz181AdicionarRastreio(c));
+  document.getElementById('assetQuantity').value=quantidadeAnterior+qtd;
+  cz287Entrada={id,quantidadeAnterior,qtd,valor,codigos:novos,geradoEm:new Date().toISOString()};
+  msg.textContent='Gerados '+qtd+' códigos numéricos. Confira a lista e clique em Salvar ativo para confirmar a entrada.';
+  cz287AtualizarResumo();
+ }catch(e){msg.textContent='Erro: '+e.message}
+}
 function openAsset(a=null){
  $('#assetModal').classList.remove('hidden');$('#assetModalTitle').textContent=a?'Editar ativo':'Novo ativo';$('#assetId').value=a?.id||'';$('#assetName').value=a?.nome||'';
- $('#assetCode').value=a?codigoCadastroAtivo(a):'';if(!a){proximoCodigoAtivo().then(c=>{if(!$('#assetId').value&&!$('#assetCode').value.trim()){$('#assetCode').value=c;queueMicrotask(cz280SugerirRastreios)}}).catch(e=>{$('#assetMsg').textContent='Não foi possível sugerir o código sequencial: '+e.message})}$('#assetSupplier').value=a?.fornecedor||'';$('#assetQuantity').value=a?.quantidade??1;$('#assetPurchaseDate').value=a?.data_compra||'';$('#assetPurchaseValue').value=moedaInputValor(a?.valor_compra??0);$('#assetRent1').value=a?.valor_locacao_tabela1??0;$('#assetRent2').value=a?.valor_locacao_tabela2??0;$('#assetWeight').value=a?.peso??'';$('#assetCase').value=String(a?.possui_case??false);$('#assetMontagem').checked=a?.material_montagem===true;$('#assetNotes').value=cz280LimparMetaAtivo(cz186ExtrairNotas(a?.observacoes).texto).trim();cz280LerMetaAtivo(a);$('#assetPhoto').value='';
+ $('#assetCode').value=a?codigoCadastroAtivo(a):'';if(!a){proximoCodigoAtivo().then(c=>{if(!$('#assetId').value&&!$('#assetCode').value.trim()){$('#assetCode').value=c;queueMicrotask(cz280SugerirRastreios)}}).catch(e=>{$('#assetMsg').textContent='Não foi possível sugerir o código sequencial: '+e.message})}$('#assetSupplier').value=a?.fornecedor||'';$('#assetQuantity').value=a?.quantidade??1;$('#assetPurchaseDate').value=a?.data_compra||'';$('#assetPurchaseValue').value=moedaInputValor(a?.valor_compra??0);$('#assetRent1').value=a?.valor_locacao_tabela1??0;$('#assetRent2').value=a?.valor_locacao_tabela2??0;$('#assetWeight').value=a?.peso??'';$('#assetCase').value=String(a?.possui_case??false);$('#assetMontagem').checked=a?.material_montagem===true;$('#assetNotes').value=cz280LimparMetaAtivo(cz186ExtrairNotas(a?.observacoes).texto).trim();$('#assetNotes').value=cz287SemHistorico($('#assetNotes').value).trim();cz287Entrada=null;document.getElementById('cz287EntradaFormulario').classList.add('hidden');cz280LerMetaAtivo(a);$('#assetPhoto').value='';
  const im=$('#assetPreview');if(a?.foto_url){im.src=a.foto_url;im.classList.remove('hidden')}else im.classList.add('hidden');$('#assetMsg').textContent='';$('#assetUnitsList').innerHTML='';const codigos=a?unidadesAtivo(a):[];if(codigos.length)codigos.forEach(c=>cz181AdicionarRastreio(c));else cz181AdicionarRastreio();
- const lote=cz274Lote(a);$('#cz274Modo').value=lote?'lote':'individual';$('#cz274CodigoLote').value=lote;cz274Alternar();
+ const lote=cz274Lote(a);$('#cz274Modo').value=lote?'lote':'individual';$('#cz274CodigoLote').value=lote;cz274Alternar();cz287AtualizarVisibilidade();
  const historico=cz186ExtrairNotas(a?.observacoes).baixas;
  let hist=$('#cz186Historico');
  if(!hist){hist=document.createElement('div');hist.id='cz186Historico';$('#assetUnitsList').parentElement.appendChild(hist)}
@@ -3530,6 +3619,7 @@ function imprimirEtiquetasAtivoAtual(){
 }
 $('#saveAssetBtn').onclick=async()=>{
  const id=$('#assetId').value;$('#assetMsg').textContent='Salvando...';const qtd=Number($('#assetQuantity').value);
+ if(cz287Entrada&&String(cz287Entrada.id)!==String(id)){ $('#assetMsg').textContent='Entrada vinculada a outro ativo. Reabra o cadastro.';return }
  if($('#assetQuantity').value===''||!Number.isInteger(qtd)||qtd<0){$('#assetMsg').textContent='Informe uma quantidade inteira maior ou igual a zero.';return}
  try{
   let foto_url=id?assets.find(p=>String(p.id)===String(id))?.foto_url:null;const f=$('#assetPhoto').files[0];if(f)foto_url=await uploadPhoto(f,'ativos');
@@ -3537,6 +3627,11 @@ $('#saveAssetBtn').onclick=async()=>{
   const modoLote=$('#cz274Modo').value==='lote';const codigoLote=$('#cz274CodigoLote').value.trim();if(modoLote&&!codigoLote)throw new Error('Informe o código de rastreio do lote.');
   if(atual&&cz274Lote(atual)&&(!modoLote||codigoLote.toUpperCase()!==cz274Lote(atual).toUpperCase()))throw new Error('Não é permitido alterar o modo ou código de um lote existente sem migração das movimentações.');
   const rastreios=modoLote?[codigoLote]:cz181LerRastreios(),normalizados=rastreios.map(x=>x.toUpperCase());
+  if(cz287Entrada){
+   if(qtd!==cz287Entrada.quantidadeAnterior+cz287Entrada.qtd)throw Error('A quantidade foi alterada após gerar a entrada. Cancele e gere novamente.');
+   if(cz287Entrada.codigos.some(c=>!rastreios.includes(c)))throw Error('Um código gerado foi removido. Cancele a entrada e gere novamente.');
+  }
+
   if(atual){
    const antigos=unidadesAtivo(atual);
    const removidos=antigos.filter(c=>!normalizados.includes(c.toUpperCase()));
@@ -3548,6 +3643,15 @@ $('#saveAssetBtn').onclick=async()=>{
   const codigo=$('#assetCode').value.trim();
   if(!codigo)throw new Error('Informe o código principal do ativo.');
   const payload={nome:$('#assetName').value.trim(),quantidade:qtd,codigo_interno:codigo,fornecedor:$('#assetSupplier').value.trim()||null,data_compra:$('#assetPurchaseDate').value||null,valor_compra:moedaInputNumero($('#assetPurchaseValue').value),valor_locacao_tabela1:+$('#assetRent1').value||0,valor_locacao_tabela2:+$('#assetRent2').value||0,peso:$('#assetWeight').value?+$('#assetWeight').value:null,possui_case:$('#assetCase').value==='true',material_montagem:$('#assetMontagem').checked,observacoes:cz181MontarNotas($('#assetNotes').value+'\n'+cz280MetaAtivoTag(),rastreios,cz186ExtrairNotas(atual?.observacoes).baixas)+(modoLote?'\n'+CZ274_TAG+codigoLote:''),foto_url,atualizado_em:new Date().toISOString()};
+  if(cz287Entrada){
+   const anteriores=cz287ExtrairHistorico(atual?.observacoes);
+   const registro={data:cz287Entrada.geradoEm,quantidade:cz287Entrada.qtd,valor_unitario:cz287Entrada.valor,valor_total:cz287Entrada.qtd*cz287Entrada.valor,codigos:cz287Entrada.codigos};
+   payload.valor_compra=Number(atual?.valor_compra||0)+registro.valor_total;
+   payload.observacoes=cz287SemHistorico(payload.observacoes)+'\n'+CZ287_HIST+JSON.stringify([...anteriores,registro])+'[/CZ287_ENTRADAS]';
+  }else if(atual){
+   const anteriores=cz287ExtrairHistorico(atual.observacoes);
+   if(anteriores.length)payload.observacoes=cz287SemHistorico(payload.observacoes)+'\n'+CZ287_HIST+JSON.stringify(anteriores)+'[/CZ287_ENTRADAS]';
+  }
   if(!payload.nome)throw new Error('Informe o nome do equipamento.');
   const {data,error}=id?await db.from('ativos').update(payload).eq('id',id).select():await db.from('ativos').insert({...payload,status:'disponivel'}).select();
   if(error)throw error;
