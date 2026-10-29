@@ -8022,7 +8022,17 @@ const dev=x=>Math.max(0,ret226Devolvido(x,evento));
 const extra=x=>ret226Extra(x);
 const ativo=x=>ret226Ativo(x);
 const nome=x=>sair222Nome(x);
-const cod=x=>String(x._codigoExibicao||x.codigo_barras||x.codigo||x._codigos?.[0]||'—');
+// V292: no retorno, ativos mostram SOMENTE os rastreios efetivamente bipados na saida deste evento.
+// Nunca usar _codigoExibicao/_codigos para ativos: eles contêm todo o cadastro do estoque.
+const cod=x=>{
+ if(!ativo(x))return String(x.codigo_barras||x._codigos?.[0]||x.codigo||'—');
+ const estado=sair142State(id);
+ const registros=(Array.isArray(estado?.historico)?estado.historico:[])
+  .filter(h=>h.acao==='Conferência'&&String(h.material_id)===String(x.id))
+  .map(h=>String(h.codigo||'').trim()).filter(Boolean);
+ const unicos=[...new Set(registros)];
+ return unicos.length?unicos.join(' · '):'Sem rastreio de saída registrado';
+};
 const chave=x=>String(x.id);
 const ler=()=>{try{return JSON.parse(czSharedStorage.getItem(prefix+id)||'{}')}catch{return {}}};
 const salvar=d=>czSharedStorage.setItem(prefix+id,JSON.stringify(d));
