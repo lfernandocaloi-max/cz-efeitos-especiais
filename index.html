@@ -282,7 +282,7 @@ body .ret226Dialog button[aria-label="Fechar"]{color:#334155!important}
   },4000);
 })();
 </script>
-<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><span id="czBuildTag" style="margin-left:10px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:900">V307</span><div class="muted" style="font-size:12px">Sistema de gestão CZ · Atualização V282-A1</div></div><div><span id="czNuvemStatus" title="Sincronização de dados da empresa" style="font-size:12px;color:#86efac;margin-right:8px">☁ Aguardando login</span> <button id="czNuvemAtualizar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.atualizar()">Atualizar dados</button> <button id="czNuvemImportar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.importarLegado()">Importar dados antigos</button> <span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
+<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><span id="czBuildTag" style="margin-left:10px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:900">V309</span><div class="muted" style="font-size:12px">Sistema de gestão CZ · Atualização V282-A1</div></div><div><span id="czNuvemStatus" title="Sincronização de dados da empresa" style="font-size:12px;color:#86efac;margin-right:8px">☁ Aguardando login</span> <button id="czNuvemAtualizar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.atualizar()">Atualizar dados</button> <button id="czNuvemImportar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.importarLegado()">Importar dados antigos</button> <span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
 <div id="clientModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="modalTitle">Novo cliente</h2><button class="btn secondary" onclick="closeClient()">Fechar</button></div>
   <input id="clientId" type="hidden"><div class="muted" id="clientOpenedAt" style="font-size:13px">Data de abertura: será definida ao salvar</div>
   <div class="row"><div class="field"><label>Nome / Razão social *</label><input id="clientName" autocomplete="name"></div><div class="field"><label>Telefone *</label><input id="clientPhone" type="tel" inputmode="tel" autocomplete="tel"><div id="clientPhoneAviso" role="status" style="font-size:12px;margin-top:5px"></div></div></div>
@@ -5830,16 +5830,18 @@ async function prep141Abrir(eventoId){
   const {data:e,error}=await db.from('eventos_operacionais').select('*').eq('id',eventoId).single();if(error)throw error;
   const {data:m}=await db.from('evento_materiais').select('*').eq('evento_id',eventoId);
   const mats=m||[], grupos={
-   contratado:mats.filter(x=>['contratado','produto_contratado','produto'].includes(String(x.tipo||'').toLowerCase())),
-   extra:mats.filter(x=>String(x.tipo||'').toLowerCase().includes('extra')),
-   montagem:mats.filter(x=>['ativo','equipamento','montagem','material_montagem'].includes(String(x.tipo||'').toLowerCase()))
+   contratado:mats.filter(x=>!['extra','extras','montagem','material_montagem'].includes(String(x.origem||'').toLowerCase())&&!['ativo','equipamento','montagem','material_montagem'].includes(String(x.tipo||'').toLowerCase())),
+   extra:mats.filter(x=>['extra','extras'].includes(String(x.origem||'').toLowerCase())&&!['ativo','equipamento','montagem','material_montagem'].includes(String(x.tipo||'').toLowerCase())),
+   montagem:mats.filter(x=>['ativo','equipamento','montagem','material_montagem'].includes(String(x.tipo||'').toLowerCase())||['montagem','material_montagem'].includes(String(x.origem||'').toLowerCase()))
   };
   const linha=x=>`<tr><td>${coEsc(x.nome_item||x.descricao||x.produto_nome||x.ativo_nome||'Material')}</td><td>${coEsc(x.quantidade_necessaria||x.quantidade||1)}</td><td>${coEsc(x.codigo_barras||x.codigo||'')}</td><td>${coEsc(x.observacao||'')}</td></tr>`;
   $('#content').innerHTML=`<div class="sectionhead"><div><h2>${coEsc(e.nome_evento||'Evento')}</h2><div class="muted">${coEsc(e.cliente_nome||'')} • ${finDate(e.data_evento)} • ${coEsc(e.cidade_evento||'')}</div></div><button class="btn secondary" onclick="renderEventos()">Voltar</button></div>
   <div class="card"><h3 style="margin-top:0">1. Informação</h3><div class="row"><div class="field"><label>Cliente</label><input value="${coEsc(e.cliente_nome||'')}" disabled></div><div class="field"><label>Telefone</label><input value="${coEsc(e.cliente_telefone||'')}" disabled></div></div><div class="row"><div class="field"><label>Data</label><input value="${finDate(e.data_evento)}" disabled></div><div class="field"><label>Horário</label><input value="${coEsc(e.horario_evento||'')}" disabled></div></div><div class="row"><div class="field"><label>Local</label><input value="${coEsc(e.local_evento||'')}" disabled></div><div class="field"><label>Cidade</label><input value="${coEsc(e.cidade_evento||'')}" disabled></div></div></div>
   ${prep141Grupo('2. Produtos Contratados',grupos.contratado,linha,'Os produtos da proposta/contrato aparecem aqui automaticamente.')}
   ${prep141Grupo('3. Produto Extra',grupos.extra,linha,'Produtos de uso e consumo levados como extras. Não entram na reserva de equipamentos; o consumo real será definido no retorno.')}
-  ${prep141Grupo('4. Materiais de Montagem',grupos.montagem,linha,'Equipamentos e ativos usados na montagem. Entram automaticamente na reserva do evento.')}
+  ${prep141Grupo('4. Materiais de Montagem',grupos.montagem,linha,'Somente ativos e equipamentos usados na montagem. Entram automaticamente na lista geral e na reserva do evento.')}
+  <div class="card"><h3 style="margin-top:0">Lista geral de materiais para o evento</h3><div class="muted">Inclui contratados, extras de consumo e todos os ativos de montagem.</div>
+  <div class="tablewrap"><table><thead><tr><th>Origem</th><th>Produto / Material</th><th>Quantidade</th><th>Código</th></tr></thead><tbody>${mats.map(x=>`<tr><td>${coEsc(['ativo','equipamento','montagem','material_montagem'].includes(String(x.tipo||'').toLowerCase())||String(x.origem||'').toLowerCase()==='montagem'?'Montagem / Ativo':String(x.origem||'').toLowerCase()==='extra'?'Extra / Consumo':'Contratado')}</td><td>${coEsc(x.nome_item||x.descricao||x.produto_nome||x.ativo_nome||'Material')}</td><td>${coEsc(x.quantidade_necessaria??x.quantidade??1)}</td><td>${coEsc(x.codigo_barras||x.codigo||'—')}</td></tr>`).join('')||'<tr><td colspan="4">Nenhum material.</td></tr>'}</tbody></table></div></div>
   <div class="card"><h3 style="margin-top:0">5. Desenvolvimento</h3><button class="btn secondary" onclick="prep141Desenvolvimento('${eventoId}')">Abrir desenvolvimento / projeto</button></div>
   <div class="card"><h3 style="margin-top:0">6. Observação</h3><textarea id="prep141Obs" style="min-height:100px">${coEsc(e.observacao||e.observacoes||'')}</textarea></div>
   <div class="actions"><button class="btn primary" onclick="prep141Salvar('${eventoId}')">Salvar preparação</button><button class="btn secondary" onclick="abrirMapaReservasV140()">Ver reservas</button></div>`;
@@ -6414,8 +6416,8 @@ async function prep217Imprimir(id){
 async function prep192AdicionarMaterial(eventoId,origem){
  const ativo=origem==='montagem';
  const [produtos,ativos]=await Promise.all([
-  ativo?Promise.resolve({data:[]}):db.from('produtos').select('id,nome,estoque_atual,codigo_barras,consumivel').order('nome'),
-  db.from('ativos').select('id,nome,quantidade,status,codigo_interno,observacoes').order('nome')
+  ativo?Promise.resolve({data:[],error:null}):db.from('produtos').select('id,nome,estoque_atual,codigo_barras,consumivel').order('nome'),
+  ativo?db.from('ativos').select('id,nome,quantidade,status,codigo_interno,observacoes').order('nome'):Promise.resolve({data:[],error:null})
  ]);
  if(produtos.error||ativos.error)return czAlert((produtos.error||ativos.error).message,'Selecionar material');
  const itens=[
@@ -6445,7 +6447,7 @@ async function prep192AdicionarMaterial(eventoId,origem){
      <td><input class="prep216Qtd" aria-label="Quantidade de ${esc(x.nome)}" type="number" min="1" step="1" inputmode="numeric" placeholder="Qtd." value="" style="width:94px;min-width:78px;padding:9px"></td>
      <td>${esc(codigo||'—')}</td></tr>`;
  }).join('');
- box.innerHTML=`<h3 style="margin-top:0">${ativo?'4. Materiais de Montagem — Ativos / Equipamentos':'3. Material Extra — Consumo e Ativos'}</h3>
+ box.innerHTML=`<h3 style="margin-top:0">${ativo?'4. Materiais de Montagem — Ativos / Equipamentos':'3. Material Extra — Somente Consumo'}</h3>
   <p class="muted">Selecione vários itens, preencha a quantidade na mesma linha e confira o estoque disponível. O mesmo produto pode ser adicionado novamente em outra operação.</p>
   <div class="field"><label>Pesquisar por produto ou código</label><input id="prep216Busca" placeholder="Digite para pesquisar"></div>
   <div class="tablewrap" style="max-height:360px;overflow:auto;margin-top:12px"><table><thead><tr><th>Sel.</th><th>Produto</th><th>Disponível</th><th>Qtd.</th><th>Código</th></tr></thead><tbody id="prep216Tabela">${rows}</tbody></table></div>
@@ -8042,12 +8044,37 @@ window.cz241Bipar=async function(){
   const contagens={...s.c,[alvo.id]:Number(s.c[alvo.id]||0)+1};
   const bipados=[...new Set([...(st.bipados||[]),String(alvo.codigo_barras||alvo.codigo||alvo.id)])];
   sair142Set(eventoAtual,{responsavel:resp,contagens,bipados,rastreiosLidos:g.tipo==='Ativo'&&!cz274CodigoEmLote(codigo,alvo)?[...(st.rastreiosLidos||[]),codigo]:(st.rastreiosLidos||[]),historico:[...(st.historico||[]),{acao:'Conferência',codigo:cod,material_id:alvo.id,data:new Date().toISOString(),responsavel:resp}]});
+  // V308: não anunciar sucesso enquanto a leitura não existir no Supabase.
+  await czSharedStorage.descarregar();
+  const {data:confirmado,error:erroConf}=await db.from('cz_estado_compartilhado').select('valor').eq('chave',SAIR142_KEY).maybeSingle();
+  if(erroConf)throw Error('A leitura não pôde ser verificada na nuvem: '+erroConf.message);
+  let estadoNuvem={};try{estadoNuvem=JSON.parse(confirmado?.valor||'{}')[String(eventoAtual)]||{}}catch(_){}
+  const numLidos=(estadoNuvem.historico||[]).filter(h=>h.acao==='Conferência'&&String(h.material_id)===String(alvo.id)&&normalizarCodigoEvento(h.codigo)===codigo).length;
+  const numLocal=(sair142State(eventoAtual).historico||[]).filter(h=>h.acao==='Conferência'&&String(h.material_id)===String(alvo.id)&&normalizarCodigoEvento(h.codigo)===codigo).length;
+  if(numLidos<numLocal)throw Error('A leitura ainda não foi confirmada no Supabase. Não continue a saída; confira a sincronização.');
   desenhar();const novo=document.getElementById('cz241Msg');if(novo){novo.style.color='#8af1b8';novo.textContent='✓ Leitura registrada: '+estado(g).bipado+'/'+estado(g).total}
  }catch(err){if(aviso){aviso.textContent=err.message;aviso.style.color='#ffb8a8'}}
  finally{bloqueado=false;const novo=document.getElementById('cz241Codigo');if(novo){novo.value='';novo.focus()}}
 };
 window.cz241Concluir=async function(){const g=grupos.find(g=>g.chave===modalChave);if(!g)return;const s=estado(g);if(s.falta>0){const msg=document.getElementById('cz241Msg');if(msg)msg.textContent='Ainda faltam '+s.falta+' unidade(s). Termine a bipagem antes de concluir.';return}const st=sair142State(eventoAtual);sair142Set(eventoAtual,{v241Concluidos:{...(st.v241Concluidos||{}),[g.chave]:true}});modalChave=null;desenhar()};
-window.cz241FinalizarSaida=async function(){const faltantes=grupos.filter(g=>!estado(g).pronto);if(faltantes.length)return czAlert('Conclua a conferência dos materiais antes da saída: '+faltantes.map(g=>g.nome).join(', '),'Saída');await sair142DarSaida(eventoAtual)};
+window.cz241FinalizarSaida=async function(){
+ const faltantes=grupos.filter(g=>!estado(g).pronto);
+ if(faltantes.length)return czAlert('Conclua a conferência dos materiais antes da saída: '+faltantes.map(g=>g.nome).join(', '),'Saída');
+ try{
+  await czSharedStorage.descarregar();
+  const {data,error}=await db.from('cz_estado_compartilhado').select('valor').eq('chave',SAIR142_KEY).maybeSingle();
+  if(error)throw error;
+  const todos=JSON.parse(data?.valor||'{}'),st=todos[String(eventoAtual)]||{};
+  for(const g of grupos.filter(g=>g.tipo==='Ativo')){
+   for(const x of g.linhas){
+    const esperado=Number(estado(g).c[x.id]||0);
+    const encontrado=(st.historico||[]).filter(h=>h.acao==='Conferência'&&String(h.material_id)===String(x.id)).length;
+    if(encontrado<esperado)throw Error('Faltam '+(esperado-encontrado)+' registro(s) de código no Supabase para '+g.nome+'. A saída não pode ser confirmada.');
+   }
+  }
+ }catch(e){return czAlert('Não foi possível confirmar os rastreios da saída na nuvem: '+e.message,'Saída não sincronizada')}
+ await sair142DarSaida(eventoAtual);
+};
 window.sair142Abrir=async function(eventoId){
  eventoAtual=String(eventoId);modalChave=null;
  try{const [er,mats]=await Promise.all([db.from('eventos_operacionais').select('*').eq('id',eventoId).single(),sair221Materiais(eventoId)]);if(er.error)throw er.error;
@@ -8153,31 +8180,33 @@ const CZ299_CHAVE='cz_v142_saida_eventos'; // Chave existente permitida pela val
 window.cz299Regularizacao=null;
 async function cz299LerRegularizacao(){
  window.cz299Regularizacao=null;
- if(String(id)!==CZ299_EVENTO)return;
+ if(!evento?.saida_baixada_em)return;
  const {data,error}=await db.from('cz_estado_compartilhado').select('valor').eq('chave',CZ299_CHAVE).maybeSingle();
  if(error)throw new Error('Falha ao consultar regularização do evento: '+error.message);
  if(!data?.valor)return;
  let todos;try{todos=JSON.parse(data.valor)}catch(_){throw new Error('Histórico compartilhado armazenado está inválido.');}
- const v=todos?.[CZ299_EVENTO]?.regularizacao_rastreios_v300;
+ const v=todos?.[String(id)]?.regularizacao_rastreios_v300;
  if(!v)return;
- if(v.evento!==CZ299_EVENTO||!Array.isArray(v.materiais))throw new Error('Regularização inválida.');
+ if(v.evento!==String(id)||!Array.isArray(v.materiais))throw new Error('Regularização inválida.');
  window.cz299Regularizacao=v;
 }
 function cz299Codigos(x){
- if(String(id)!==CZ299_EVENTO)return [];
+ if(!evento?.saida_baixada_em)return [];
  const r=window.cz299Regularizacao?.materiais?.find(m=>String(m.materialId)===String(x.id)&&String(m.cadastroId)===String(x.item_id));
  return Array.isArray(r?.codigos)?r.codigos.map(normalizarCodigoEvento):[];
 }
 window.cz299AbrirRegularizacao=()=>{
- if(String(id)!==CZ299_EVENTO||!evento?.saida_baixada_em)return;
+ if(!evento?.saida_baixada_em)return;
  const pendentes=mat.filter(x=>ativo(x)&&qtd(x)>0&&!cz293CodigosSaida(x).length);
  if(!pendentes.length)return czAlert('Não há ativos sem rastreios neste evento.','Regularização');
  const html=pendentes.map(x=>{
   const codigos=[...new Set((x._codigos||[]).map(normalizarCodigoEvento).filter(Boolean))];
-  return `<div style="padding:10px;border:1px solid #ddd;margin:10px 0;border-radius:8px"><b>${E(nome(x))}</b> · Levou ${qtd(x)}<div class="cz245Muted">Selecione exatamente ${qtd(x)} código(s) que realmente saíram.</div>${codigos.map(c=>`<label style="display:inline-flex;align-items:center;gap:5px;margin:7px 13px 4px 0"><input type="checkbox" class="cz299Opcao" data-material="${E(x.id)}" value="${E(c)}">${E(c)}</label>`).join('')}</div>`;
+  const cadastro=assets.find(a=>String(a.id)===String(x.item_id));
+  const lote=cadastro?normalizarCodigoEvento(cz274Lote(cadastro)):'';
+  return `<div style="padding:10px;border:1px solid #ddd;margin:10px 0;border-radius:8px"><b>${E(nome(x))}</b> · Levou ${qtd(x)}<div class="cz245Muted">${lote?'Código por lote: confirme a etiqueta usada nas '+qtd(x)+' unidades.':'Selecione exatamente '+qtd(x)+' códigos individuais que realmente saíram.'}</div>${lote?`<label><input type="checkbox" class="cz309Lote" data-material="${E(x.id)}" value="${E(lote)}"> Confirmo lote ${E(lote)} — ${qtd(x)} unidades</label>`:codigos.map(c=>`<label style="display:inline-flex;align-items:center;gap:5px;margin:7px 13px 4px 0"><input type="checkbox" class="cz299Opcao" data-material="${E(x.id)}" value="${E(c)}">${E(c)}</label>`).join('')}</div>`;
  }).join('');
  const el=document.getElementById('cz299Area');if(!el)return;
- el.innerHTML=`<div style="border:2px solid #d97706;border-radius:9px;padding:13px;background:#fff7ed;color:#17212b"><b>Regularização excepcional da saída antiga</b><p>O histórico dos códigos individuais não foi encontrado. Confirme somente os códigos que você sabe que foram levados. Isto registra a identificação para o retorno, sem alterar quantidades nem estoque.</p>${html}<label style="display:block;margin:12px 0"><input type="checkbox" id="cz299Confirma"> Confirmo que os códigos selecionados são os equipamentos efetivamente enviados neste evento.</label><button class="cz245Btn" onclick="cz299SalvarRegularizacao()">Registrar códigos confirmados</button><div id="cz299Msg" style="margin-top:8px"></div></div>`;
+ el.innerHTML=`<div style="border:2px solid #d97706;border-radius:9px;padding:13px;background:#fff7ed;color:#17212b"><b>Regularização de rastreios não recuperados</b><p>O histórico dos códigos individuais não foi encontrado. Confirme somente os códigos que você sabe que foram levados. Isto registra a identificação para o retorno, sem alterar quantidades nem estoque.</p>${html}<label style="display:block;margin:12px 0"><input type="checkbox" id="cz299Confirma"> Confirmo que os códigos selecionados são os equipamentos efetivamente enviados neste evento.</label><button class="cz245Btn" onclick="cz299SalvarRegularizacao()">Registrar códigos confirmados</button><div id="cz299Msg" style="margin-top:8px"></div></div>`;
 };
 window.cz299SalvarRegularizacao=async()=>{
  const msg=document.getElementById('cz299Msg');if(!msg)return;
@@ -8185,16 +8214,20 @@ window.cz299SalvarRegularizacao=async()=>{
  const pendentes=mat.filter(x=>ativo(x)&&qtd(x)>0&&!cz293CodigosSaida(x).length);
  const materiais=[];const todos=[];
  for(const x of pendentes){
-  const codigos=[...document.querySelectorAll('.cz299Opcao')].filter(c=>c.dataset.material===String(x.id)&&c.checked).map(c=>normalizarCodigoEvento(c.value));
-  if(codigos.length!==qtd(x)||new Set(codigos).size!==codigos.length){msg.textContent=`Selecione exatamente ${qtd(x)} rastreio(s) para ${nome(x)}.`;return;}
+  const cadastroAtivo=assets.find(a=>String(a.id)===String(x.item_id));
+  const lote=cadastroAtivo?normalizarCodigoEvento(cz274Lote(cadastroAtivo)):'';
+  const loteSelecionado=[...document.querySelectorAll('.cz309Lote')].find(c=>c.dataset.material===String(x.id)&&c.checked);
+  const codigos=lote?(loteSelecionado&&normalizarCodigoEvento(loteSelecionado.value)===lote?Array(qtd(x)).fill(lote):[]):[...document.querySelectorAll('.cz299Opcao')].filter(c=>c.dataset.material===String(x.id)&&c.checked).map(c=>normalizarCodigoEvento(c.value));
+  if(codigos.length!==qtd(x)||(!lote&&new Set(codigos).size!==codigos.length)){msg.textContent=`Confirme exatamente ${qtd(x)} rastreio(s) para ${nome(x)}.`;return;}
   const cadastro=(x._codigos||[]).map(normalizarCodigoEvento);
-  if(codigos.some(c=>!cadastro.includes(c))){msg.textContent='Código não pertence ao cadastro do ativo.';return;}
-  materiais.push({materialId:String(x.id),cadastroId:String(x.item_id),codigos,quantidade:qtd(x)});todos.push(...codigos);
+  if(codigos.some(c=>!cadastro.includes(c)&&c!==lote)){msg.textContent='Código não pertence ao cadastro do ativo.';return;}
+  materiais.push({materialId:String(x.id),cadastroId:String(x.item_id),codigos,quantidade:qtd(x),tipo:lote?'lote':'individual'});
+  if(!lote)todos.push(...codigos);
  }
  if(new Set(todos).size!==todos.length){msg.textContent='Um rastreio não pode pertencer a dois materiais.';return;}
- if(String(id)!==CZ299_EVENTO||!evento?.saida_baixada_em){msg.textContent='Evento não autorizado para regularização.';return;}
+ if(!evento?.saida_baixada_em){msg.textContent='Somente eventos com saída confirmada podem ser regularizados.';return;}
  msg.textContent='Registrando identificação no Supabase...';
- const registro={evento:CZ299_EVENTO,tipo:'regularizacao_manual_identificacao_saida',origem:'operador_confirmou_codigos',criadoEm:new Date().toISOString(),materiais};
+ const registro={evento:String(id),tipo:'regularizacao_manual_identificacao_saida',origem:'operador_confirmou_codigos',criadoEm:new Date().toISOString(),materiais};
  try{
   // A chave separada da V299 era recusada por cz_estado_chave_valida.
   // Atualização otimista da chave compartilhada já existente, preservando outros eventos.
@@ -8203,10 +8236,10 @@ window.cz299SalvarRegularizacao=async()=>{
   if(!anterior||typeof anterior.valor!=='string')throw Error('Histórico compartilhado da saída não existe no banco. Nenhuma alteração foi feita.');
   let todos;try{todos=JSON.parse(anterior.valor)}catch(_){throw Error('Histórico compartilhado inválido. Nenhuma alteração foi feita.');}
   if(!todos||typeof todos!=='object'||Array.isArray(todos))throw Error('Formato inválido do histórico de saída.');
-  const existente=todos[CZ299_EVENTO];
+  const existente=todos[String(id)];
   if(existente?.regularizacao_rastreios_v300)throw Error('Já existe regularização para este evento. Atualize a tela.');
   // Nunca altera a quantidade ou o estado da saída: adiciona apenas metadados de rastreio.
-  todos[CZ299_EVENTO]={...(existente||{}),regularizacao_rastreios_v300:registro};
+  todos[String(id)]={...(existente||{}),regularizacao_rastreios_v300:registro};
   const {data:gravado,error}=await db.from('cz_estado_compartilhado')
     .update({valor:JSON.stringify(todos)}).eq('chave',CZ299_CHAVE)
     .eq('valor',anterior.valor).select('valor');
@@ -8275,7 +8308,7 @@ function render(){
  ${aberto?`<input id="scanRetorno" class="cz245Input" autocomplete="off" placeholder="Aguardando próxima bipagem..." aria-label="Código de barras / rastreio"><div id="retMsg" role="status" aria-live="polite" style="min-height:20px;margin-top:7px"></div><div style="text-align:right;margin-top:8px"><button class="cz245Btn" style="background:#e87512;color:white;padding:7px 12px;font-size:12px" onclick="cz291ConcluirBipagem()">✓ Concluir Bipagem</button></div>`:`<button class="cz245Btn" onclick="cz291IniciarBipagem()" ${evento.status==='finalizado'?'disabled':''}>▣ Bipar Todos os Materiais</button>`}
  </div>
  ${mat.some(x=>ativo(x)&&qtd(x)>0&&!cz293CodigosSaida(x).length)||mat.some(x=>Number(x.quantidade_necessaria||0)>0&&qtd(x)===0)?`<div class="cz245Card" style="border-color:#eab308"><b>⚠ Conferência da saída: rastreios ou quantidades não recuperados</b><p>A quantidade Levou vem do evento, mas os rastreios individuais podem estar em outro registro. O diagnóstico abaixo consulta as fontes antigas e atuais sem registrar devolução nem alterar estoque.</p><button class="cz245Btn alt" onclick="cz298Diagnostico()">Ver diagnóstico dos rastreios</button><div id="cz297Diagnostico" style="margin-top:8px"></div></div>`:""}
- ${String(id)===CZ299_EVENTO&&mat.some(x=>ativo(x)&&qtd(x)>0&&!cz293CodigosSaida(x).length)?`<div class="cz245Card"><b>Evento antigo — regularizar identificação dos rastreios</b><p>Somente para este evento: escolha os códigos que realmente saíram. A regularização não altera o estoque.</p><button class="cz245Btn alt" onclick="cz299AbrirRegularizacao()">Identificar rastreios da saída</button><div id="cz299Area"></div></div>`:""}
+ ${evento?.saida_baixada_em&&mat.some(x=>ativo(x)&&qtd(x)>0&&!cz293CodigosSaida(x).length)?`<div class="cz245Card"><b>Regularizar identificação dos rastreios</b><p>Selecione somente os códigos que realmente saíram. A regularização não altera o estoque.</p><button class="cz245Btn alt" onclick="cz299AbrirRegularizacao()">Identificar rastreios da saída</button><div id="cz299Area"></div></div>`:""}
  <div class="cz245Card"><h3>2. Lista de Bipagem de Retorno</h3><div id="cz291ListaBipados">${cz291ListaBipados()}</div></div>
  <div class="cz245Card"><h3>3. Lista principal — Materiais enviados</h3><div id="cz291ListaPrincipal">${cz291ListaPrincipal()}</div></div>
  ${concluido||cz307TemFaltantes()?cz291Pendencias():''}
