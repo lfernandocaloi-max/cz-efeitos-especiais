@@ -8086,15 +8086,26 @@ window.cz266Destino=async i=>{
  if(!pend.length)return czAlert('Não há extras pendentes de classificação.','Retorno');
  return czAlert('Há mais de uma linha extra para este produto. Use "Classificar extras" para escolher a linha correta e evitar cobrança duplicada.','Retorno');
 };
+// V293: códigos do ativo pertencentes à saída deste evento, não ao estoque inteiro.
+function cz293CodigosSaida(x){
+ if(!ativo(x))return [cod(x)];
+ const st=sair142State(id);
+ const logs=(st.historico||[]).filter(h=>String(h.material_id)===String(x.id)&&h.acao==='Conferência');
+ return [...new Set(logs.map(h=>String(h.codigo||'').trim()).filter(Boolean))];
+}
+function cz293CodigoLinha(x){
+ const cs=cz293CodigosSaida(x);
+ return ativo(x)?(cs.length?cs.join(' · '):'Códigos da saída não disponíveis neste dispositivo'):cod(x);
+}
 function cz291ListaPrincipal(){
  const grupos=cz266Grupos();
  const consumos=grupos.map(g=>`<tr><td><b>${E(g.nome)}</b><div class="cz245Muted">${E(g.codigo)}</div></td><td>${g.contratado}</td><td>${g.extra}</td><td><b>${g.total}</b></td><td><b>${g.voltou}</b></td></tr>`).join('');
- const ativos=resumo().ativos.map(x=>`<tr><td><b>${E(nome(x))}</b><div class="cz245Muted">${E(cod(x))}</div></td><td>—</td><td>—</td><td><b>${qtd(x)}</b></td><td><b>${dev(x)}</b></td></tr>`).join('');
+ const ativos=resumo().ativos.map(x=>`<tr><td><b>${E(nome(x))}</b><div class="cz245Muted">${E(cz293CodigoLinha(x))}</div></td><td>—</td><td>—</td><td><b>${qtd(x)}</b></td><td><b>${dev(x)}</b></td></tr>`).join('');
  return tabela(['Produto / Código','Contratado','Extra','Levou','Voltou'],consumos+ativos);
 }
 function cz291ListaBipados(){
  const grupos=cz266Grupos().map(g=>({nome:g.nome,codigo:g.codigo,levou:g.total,voltou:g.voltou}));
- const ativos=resumo().ativos.map(x=>({nome:nome(x),codigo:cod(x),levou:qtd(x),voltou:dev(x)}));
+ const ativos=resumo().ativos.map(x=>({nome:nome(x),codigo:cz293CodigoLinha(x),levou:qtd(x),voltou:dev(x)}));
  const linhas=[...grupos,...ativos].filter(x=>x.voltou>0);
  return linhas.length?linhas.map(x=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 11px;margin:6px 0;border-radius:7px;background:${x.voltou>=x.levou?'#dcfce7':'#fff3c4'};color:#17212b"><span><b>${E(x.nome)}</b><small style="display:block">${E(x.codigo)}</small></span><b>${x.voltou}/${x.levou}</b></div>`).join(''):'<p class="cz245Muted">A lista será preenchida automaticamente conforme os códigos forem bipados.</p>';
 }
@@ -8275,10 +8286,10 @@ window.cz245Bipar=async()=>{
   if(!(tipo==='todos'?true:tipo==='ativo'?ativo(x):tipo==='consumo'?!ativo(x):extra(x)&&!ativo(x))||dev(x)>=qtd(x))return false;
   // Aceita o código mostrado na lista, o cadastro atual e o código salvo no evento.
   // Alguns eventos antigos têm _codigos vazio ou código_barras não sincronizado.
-  const codigos=[...(x._codigos||[]),x.codigo_barras,x.codigo,x._codigoExibicao];
+  const codigos=ativo(x)?cz293CodigosSaida(x):[...(x._codigos||[]),x.codigo_barras,x.codigo,x._codigoExibicao];
   return codigos.some(c=>normalizarCodigoEvento(c)===codigo);
  });
- if(!candidatos.length){msg.textContent='Código '+codigo+' não encontrado entre os itens pendentes. Confira o código do produto na lista e se ele foi bipado na saída.';inp.value='';inp.focus();return}
+ if(!candidatos.length){msg.textContent='Código '+codigo+' não encontrado no registro de saída deste evento neste dispositivo. Se a saída foi feita em outro computador, é necessário sincronizar os rastreios no banco.';inp.value='';inp.focus();return}
  // Ativos: conferir o rastreio exato; extras: devolver primeiro a linha extra.
  const st=sair142State(id),historico=st.historico||[];
  const ativosCodigo=candidatos.filter(ativo);
