@@ -8076,20 +8076,48 @@ window.cz266Destino=async i=>{
  if(!pend.length)return czAlert('Não há extras pendentes de classificação.','Retorno');
  return czAlert('Há mais de uma linha extra para este produto. Use "Classificar extras" para escolher a linha correta e evitar cobrança duplicada.','Retorno');
 };
+function cz291ListaPrincipal(){
+ const grupos=cz266Grupos();
+ const consumos=grupos.map(g=>`<tr><td><b>${E(g.nome)}</b><div class="cz245Muted">${E(g.codigo)}</div></td><td>${g.contratado}</td><td>${g.extra}</td><td><b>${g.total}</b></td><td><b>${g.voltou}</b></td></tr>`).join('');
+ const ativos=resumo().ativos.map(x=>`<tr><td><b>${E(nome(x))}</b><div class="cz245Muted">${E(cod(x))}</div></td><td>—</td><td>—</td><td><b>${qtd(x)}</b></td><td><b>${dev(x)}</b></td></tr>`).join('');
+ return tabela(['Produto / Código','Contratado','Extra','Levou','Voltou'],consumos+ativos);
+}
+function cz291ListaBipados(){
+ const grupos=cz266Grupos().map(g=>({nome:g.nome,codigo:g.codigo,levou:g.total,voltou:g.voltou}));
+ const ativos=resumo().ativos.map(x=>({nome:nome(x),codigo:cod(x),levou:qtd(x),voltou:dev(x)}));
+ const linhas=[...grupos,...ativos].filter(x=>x.voltou>0);
+ return linhas.length?linhas.map(x=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 11px;margin:6px 0;border-radius:7px;background:${x.voltou>=x.levou?'#dcfce7':'#fff3c4'};color:#17212b"><span><b>${E(x.nome)}</b><small style="display:block">${E(x.codigo)}</small></span><b>${x.voltou}/${x.levou}</b></div>`).join(''):'<p class="cz245Muted">A lista será preenchida automaticamente conforme os códigos forem bipados.</p>';
+}
+function cz291Pendencias(){
+ const {extras,ativos}=resumo();
+ const extraLinhas=extras.filter(x=>restante(x)>0).map(x=>`<div class="cz245Row" style="justify-content:space-between;margin:8px 0"><span><b>${E(nome(x))}</b> · ${restante(x)} faltando</span><span><button class="cz245Btn alt" onclick="cz245AbrirAcao('${E(chave(x))}','pdv')">PDV</button> <button class="cz245Btn alt" onclick="cz245AbrirAcao('${E(chave(x))}','sub')">Substituição</button></span></div>`).join('');
+ const ativoLinhas=ativos.filter(x=>dev(x)<qtd(x)).map(x=>`<div class="cz245Row" style="justify-content:space-between;margin:8px 0"><span><b>${E(nome(x))}</b> · ${qtd(x)-dev(x)} faltando</span><span><button class="cz245Btn alt" onclick="cz245Aguardar('${E(chave(x))}')">Procurar</button> <button class="cz245Btn alt" onclick="cz245Perda('${E(chave(x))}')">Perda</button></span></div>`).join('');
+ const contratado=cz266Grupos().filter(g=>g.contratadoUsado>0).map(g=>`<div style="margin:8px 0">${E(g.nome)} · ${g.contratadoUsado} consumido(s) contratado(s)</div>`).join('');
+ return `<div class="cz245Card"><h3>4. Materiais não conferidos</h3>${extraLinhas}${ativoLinhas}${contratado?`<h4>Consumo contratado (conferir na finalização)</h4>${contratado}`:''}${!extraLinhas&&!ativoLinhas&&!contratado?'<p>Não há pendências.</p>':''}</div>`;
+}
 function render(){
  if(!evento)return;
- const {cons,extras,ativos}=resumo();
- // Sem segunda etapa de baixa: a tabela unica ja calcula o consumo pela diferenca.
- const linhasCons='';
- const linhasExtra=extras.map(x=>`<tr class="${dev(x)===qtd(x)||restante(x)===0&&tratado(x)>0?'ok':''}"><td>${E(nome(x))}</td><td>${qtd(x)}</td><td>${dev(x)}</td><td>${tratado(x)?`PDV ${decisao(x).pdv||0} · Substituição ${decisao(x).sub||0}`:'—'}</td><td>${linhaStatus(dev(x)===qtd(x)||restante(x)===0&&tratado(x)>0)}</td></tr>`).join('');
- const linhasAtivo=ativos.map(x=>`<tr class="${dev(x)===qtd(x)?'ok':''}"><td>${E(nome(x))}</td><td>${qtd(x)}</td><td style="max-width:290px;white-space:normal;overflow-wrap:anywhere">${E(cz231RastreiosEvento(id,x))}</td><td>${dev(x)}</td><td>${Math.max(0,qtd(x)-dev(x))}</td><td>${linhaStatus(dev(x)===qtd(x))}</td></tr>`).join('');
- const totalAt=ativos.reduce((a,x)=>a+qtd(x),0),retAt=ativos.reduce((a,x)=>a+dev(x),0);
  document.getElementById('pageTitle').textContent='Retorno do Evento';
- document.getElementById('content').innerHTML=estilos()+`<div class="sectionhead"><div><h2>Retorno de Evento</h2></div></div>
- <div class="cz245Card"><div class="cz245Head"><h3>1. Retorno de materiais — conferência única</h3><button class="cz245Btn" onclick="cz245AbrirScan('todos')" ${evento.status==='finalizado'?'disabled':''}>▣ Bipar todos os materiais</button></div><p class="cz245Muted">O sistema soma contratados e extras do mesmo produto. A bipagem registra tudo o que voltou. O consumo contratado é calculado automaticamente pela diferença; apenas o excedente contratado precisa ser classificado no PDV ou como substituição. Nenhuma segunda baixa é exigida. As devoluções são confirmadas pelo Supabase.</p>${cz266TabelaConsumo()}<div class="cz245Row" style="margin-top:12px"><button class="cz245Btn alt" onclick="cz245Faltantes()">Classificar extras por linha</button></div></div>
- <div class="cz245Card"><div class="cz245Head"><h3>2. Materiais Ativos</h3><button class="cz245Btn alt" onclick="cz245AbrirScan('todos')" ${evento.status==='finalizado'?'disabled':''}>▣ Continuar bipagem geral</button></div><p class="cz245Muted">Rastreio individual; leitura em qualquer ordem.</p>${tabela(['Descrição','Levou','Código de rastreio da saída','Voltou','Faltou','Concluído'],linhasAtivo)}<div class="cz245Row" style="margin-top:12px"><strong>Ativos pendentes: ${totalAt-retAt} de ${totalAt}</strong><button class="cz245Btn alt" onclick="cz245FaltantesAtivos()">Faltantes</button></div></div>
- <div class="cz245Card"><div class="cz245Row"><button class="cz245Btn" onclick="cz245Finalizar()" ${evento.status==='finalizado'?'disabled':''}>✓ Concluir Retorno de Evento</button><button class="cz245Btn alt" onclick="cz245Imprimir()">▤ Imprimir Relatório</button></div><p class="cz245Muted">A impressão funciona antes da conclusão. O fechamento exige conferências completas e registros oficiais confirmados.</p></div>`;
+ const aberto=!!window.cz291BipagemAberta, concluido=!!window.cz291BipagemConcluida;
+ document.getElementById('content').innerHTML=estilos()+`<div class="sectionhead"><div><h2>Retorno de Evento — CZ</h2></div></div>
+ <div class="cz245Card"><div class="cz245Head"><h3>1. Bipagem de Retorno</h3><span class="cz245Muted">${aberto?'● Leitor ativo':'Aguardando início'}</span></div>
+ ${aberto?`<input id="scanRetorno" class="cz245Input" autocomplete="off" placeholder="Aguardando próxima bipagem..." aria-label="Código de barras / rastreio"><div id="retMsg" role="status" aria-live="polite" style="min-height:20px;margin-top:7px"></div><div style="text-align:right;margin-top:8px"><button class="cz245Btn" style="background:#e87512;color:white;padding:7px 12px;font-size:12px" onclick="cz291ConcluirBipagem()">✓ Concluir Bipagem</button></div>`:`<button class="cz245Btn" onclick="cz291IniciarBipagem()" ${evento.status==='finalizado'?'disabled':''}>▣ Bipar Todos os Materiais</button>`}
+ </div>
+ <div class="cz245Card"><h3>2. Lista de Bipagem de Retorno</h3><div id="cz291ListaBipados">${cz291ListaBipados()}</div></div>
+ <div class="cz245Card"><h3>3. Lista principal — Materiais enviados</h3><div id="cz291ListaPrincipal">${cz291ListaPrincipal()}</div></div>
+ ${concluido?cz291Pendencias():''}
+ <div class="cz245Card"><div class="cz245Row"><button class="cz245Btn" onclick="cz245Finalizar()" ${evento.status==='finalizado'?'disabled':''}>✓ Concluir Retorno de Evento</button><button class="cz245Btn alt" onclick="cz245Imprimir()">▤ Imprimir Relatório</button></div></div>`;
+ if(aberto)cz291AtivarLeitor();
  if(modal)desenharModal();
+}
+window.cz291IniciarBipagem=()=>{window.cz291BipagemAberta=true;window.cz291BipagemConcluida=false;render()};
+window.cz291ConcluirBipagem=()=>{window.cz291BipagemAberta=false;window.cz291BipagemConcluida=true;render()};
+function cz291AtivarLeitor(){
+ const inp=document.getElementById('scanRetorno');if(!inp)return;
+ let timer=null;
+ inp.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key==='Tab'){ev.preventDefault();clearTimeout(timer);if(inp.value.trim())window.cz245Bipar()}});
+ inp.addEventListener('input',()=>{clearTimeout(timer);if(normalizarCodigoEvento(inp.value).length>=4)timer=setTimeout(()=>{if(inp.isConnected&&!ocupado&&inp.value.trim())window.cz245Bipar()},450)});
+ inp.focus();
 }
 function popup(html){document.getElementById('cz245Overlay')?.remove();const ov=document.createElement('div');ov.id='cz245Overlay';ov.className='cz245Modal';ov.innerHTML=`<div class="cz245Box" role="dialog" aria-modal="true"><div class="cz245Head"><h3 style="margin:0">${modal.titulo}</h3><button class="cz245Btn alt" onclick="cz245Fechar()">✕</button></div>${html}</div>`;document.body.appendChild(ov);ov.addEventListener('click',ev=>{if(ev.target===ov)window.cz245Fechar()});}
 window.cz245Fechar=()=>{modal=null;document.getElementById('cz245Overlay')?.remove()};
@@ -8245,13 +8273,13 @@ window.cz245Bipar=async()=>{
  const st=sair142State(id),historico=st.historico||[];
  const ativosCodigo=candidatos.filter(ativo);
  const alvo=ativosCodigo.length?(ativosCodigo.find(x=>historico.some(h=>String(h.material_id)===String(x.id)&&normalizarCodigoEvento(h.codigo)===codigo))||ativosCodigo[0]):candidatos.sort((a,b)=>Number(extra(b))-Number(extra(a)))[0];
- ocupado=true;try{const ok=await biparRetornoEvento(id,alvo.id);if(!ok)throw Error(document.getElementById('retMsg')?.textContent||'Falha na leitura.');const antes=tipo;await carregar();modal={tipo:antes,titulo:antes==='todos'?'Bipagem única — Todo material devolvido':antes==='ativo'?'Bipagem Livre — Ativos':'Bipagem — Consumíveis devolvidos'};render();const m=document.getElementById('retMsg');if(m){m.style.color='#8be9b1';m.textContent='✓ Código reconhecido e devolução registrada.'}}
+ ocupado=true;try{const ok=await biparRetornoEvento(id,alvo.id);if(!ok)throw Error(document.getElementById('retMsg')?.textContent||'Falha na leitura.');const antes=tipo;await carregar();if(window.cz291BipagemAberta){modal=null;render();const m=document.getElementById('retMsg');if(m){m.style.color='#15803d';m.textContent='✓ '+nome(alvo)+' · Código '+codigo;setTimeout(()=>{if(m.isConnected)m.textContent=''},2000)}}else{modal={tipo:antes,titulo:antes==='todos'?'Bipagem única — Todo material devolvido':antes==='ativo'?'Bipagem Livre — Ativos':'Bipagem — Consumíveis devolvidos'};render();const m=document.getElementById('retMsg');if(m){m.style.color='#8be9b1';m.textContent='✓ Código reconhecido e devolução registrada.'}}}
  catch(e){const aviso=document.getElementById('retMsg');if(aviso){aviso.style.color='#b42318';aviso.textContent=e.message}}finally{ocupado=false;const novo=document.getElementById('scanRetorno');if(novo){novo.value='';novo.focus()}}
 };
 window.cz245Perda=async mid=>{const x=mat.find(x=>chave(x)===mid);if(!x)return;await marcarPerdaRetorno(id,x.id,x.item_id||'');await carregar();window.cz245FaltantesAtivos()};
 window.cz245Aguardar=async mid=>{const x=mat.find(x=>chave(x)===mid);if(!x)return;const d=ler();d.aguardar=d.aguardar||{};d.aguardar[mid]=true;salvar(d);await czAlert('Ativo mantido como pendente de devolução. O retorno do evento NÃO poderá ser finalizado até resolução oficial.','Aguardando');};
 async function carregar(){const [er,ms]=await Promise.all([db.from('eventos_operacionais').select('*').eq('id',id).single(),sair221Materiais(id)]);if(er.error)throw er.error;evento=er.data;mat=ms.filter(x=>ret226Esperado(x,evento)>0);ret226Cache={e:evento,mats:mat}}
-window.cz245Abrir=async eventoId=>{window.cz245Fechar();id=String(eventoId);modal=null;document.getElementById('content').innerHTML='<div class="card">Carregando retorno...</div>';try{await carregar();render()}catch(e){document.getElementById('content').innerHTML='<div class="msg">Erro ao carregar retorno: '+E(e.message)+'</div>'}};
+window.cz245Abrir=async eventoId=>{window.cz245Fechar();id=String(eventoId);modal=null;window.cz291BipagemAberta=false;window.cz291BipagemConcluida=false;document.getElementById('content').innerHTML='<div class="card">Carregando retorno...</div>';try{await carregar();render()}catch(e){document.getElementById('content').innerHTML='<div class="msg">Erro ao carregar retorno: '+E(e.message)+'</div>'}};
 let cz245Finalizando=false;
 window.cz245Finalizar=async()=>{
  if(cz245Finalizando)return;
