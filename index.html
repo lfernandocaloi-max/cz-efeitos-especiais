@@ -4326,7 +4326,7 @@ async function biparRetornoEvento(eventoId,materialSelecionadoId=null){
    }
    const historico=Array.isArray(stSaida.historico)?stSaida.historico:[];
    const leituraNaSaida=historico.some(h=>normalizarCodigoEvento(h.codigo)===codigo&&candidatos.some(m=>String(m.id)===String(h.material_id)));
-   const legado=cz185Lidos(eventoId,'saida').includes(codigo)|| (String(eventoId)===CZ299_EVENTO&&window.cz299Regularizacao?.materiais?.some(r=>candidatos.some(m=>String(m.id)===String(r.materialId)&&String(m.item_id)===String(r.cadastroId))&&r.codigos.includes(codigo)));
+   const legado=cz185Lidos(eventoId,'saida').includes(codigo)|| (String(eventoId)==='a5e02ed6-e93f-46c8-854c-5f3bd7190cb8'&&window.cz299Regularizacao?.materiais?.some(r=>candidatos.some(m=>String(m.id)===String(r.materialId)&&String(m.item_id)===String(r.cadastroId))&&Array.isArray(r.codigos)&&r.codigos.map(normalizarCodigoEvento).includes(codigo)));
    // Rastreamento por unidade: não basta o código existir no cadastro.
    if(!leituraNaSaida&&!legado){
     throw new Error('Este rastreio está cadastrado, mas não há registro da sua bipagem na saída deste evento no histórico de saída do Supabase. Confira o registro da saída.');
