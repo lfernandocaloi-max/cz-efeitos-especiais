@@ -282,7 +282,7 @@ body .ret226Dialog button[aria-label="Fechar"]{color:#334155!important}
   },4000);
 })();
 </script>
-<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><span id="czBuildTag" style="margin-left:10px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:900">V282-A1</span><div class="muted" style="font-size:12px">Sistema de gestão CZ · Atualização V282-A1</div></div><div><span id="czNuvemStatus" title="Sincronização de dados da empresa" style="font-size:12px;color:#86efac;margin-right:8px">☁ Aguardando login</span> <button id="czNuvemAtualizar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.atualizar()">Atualizar dados</button> <button id="czNuvemImportar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.importarLegado()">Importar dados antigos</button> <span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
+<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><span id="czBuildTag" style="margin-left:10px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:900">V297</span><div class="muted" style="font-size:12px">Sistema de gestão CZ · Atualização V282-A1</div></div><div><span id="czNuvemStatus" title="Sincronização de dados da empresa" style="font-size:12px;color:#86efac;margin-right:8px">☁ Aguardando login</span> <button id="czNuvemAtualizar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.atualizar()">Atualizar dados</button> <button id="czNuvemImportar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.importarLegado()">Importar dados antigos</button> <span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
 <div id="clientModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="modalTitle">Novo cliente</h2><button class="btn secondary" onclick="closeClient()">Fechar</button></div>
   <input id="clientId" type="hidden"><div class="muted" id="clientOpenedAt" style="font-size:13px">Data de abertura: será definida ao salvar</div>
   <div class="row"><div class="field"><label>Nome / Razão social *</label><input id="clientName" autocomplete="name"></div><div class="field"><label>Telefone *</label><input id="clientPhone" type="tel" inputmode="tel" autocomplete="tel"><div id="clientPhoneAviso" role="status" style="font-size:12px;margin-top:5px"></div></div></div>
@@ -8057,9 +8057,9 @@ function cz266Grupos(){
   grupos.get(k)[extra(x)?'extras':'contratados'].push(x);
  }
  return [...grupos.values()].map(g=>{
-  g.contratado=g.contratados.reduce((a,x)=>a+qtd(x),0);
-  g.extra=g.extras.reduce((a,x)=>a+qtd(x),0);
-  g.total=g.contratado+g.extra;
+  g.contratado=g.contratados.reduce((a,x)=>a+Math.max(0,Number(x.quantidade_necessaria||0)),0);
+  g.extra=g.extras.reduce((a,x)=>a+Math.max(0,Number(x.quantidade_necessaria||0)),0);
+  g.total=[...g.contratados,...g.extras].reduce((a,x)=>a+qtd(x),0);
   g.voltou=[...g.contratados,...g.extras].reduce((a,x)=>a+dev(x),0);
   g.usou=Math.max(0,g.total-g.voltou);
   g.extraUsado=Math.max(0,g.usou-g.contratado);
@@ -8122,7 +8122,7 @@ function cz293CodigoLinha(x){
 function cz291ListaPrincipal(){
  const grupos=cz266Grupos();
  const consumos=grupos.map(g=>`<tr><td><b>${E(g.nome)}</b><div class="cz245Muted">${E(g.codigo)}</div></td><td>${g.contratado}</td><td>${g.extra}</td><td><b>${g.total}</b></td><td><b>${g.voltou}</b></td></tr>`).join('');
- const ativos=resumo().ativos.map(x=>`<tr><td><b>${E(nome(x))}</b><div class="cz245Muted">${E(cz293CodigoLinha(x))}</div></td><td>${extra(x)?0:qtd(x)}</td><td>${extra(x)?qtd(x):0}</td><td><b>${qtd(x)}</b></td><td><b>${dev(x)}</b></td></tr>`).join('');
+ const ativos=resumo().ativos.map(x=>`<tr><td><b>${E(nome(x))}</b><div class="cz245Muted">${E(cz293CodigoLinha(x))}</div></td><td>${extra(x)?0:Number(x.quantidade_necessaria||0)}</td><td>${extra(x)?Number(x.quantidade_necessaria||0):0}</td><td><b>${qtd(x)}</b></td><td><b>${dev(x)}</b></td></tr>`).join('');
  return tabela(['Produto / Código','Contratado','Extra','Levou','Voltou'],consumos+ativos);
 }
 function cz291ListaBipados(){
@@ -8146,6 +8146,7 @@ function render(){
  <div class="cz245Card"><div class="cz245Head"><h3>1. Bipagem de Retorno</h3><span class="cz245Muted">${aberto?'● Leitor ativo':'Aguardando início'}</span></div>
  ${aberto?`<input id="scanRetorno" class="cz245Input" autocomplete="off" placeholder="Aguardando próxima bipagem..." aria-label="Código de barras / rastreio"><div id="retMsg" role="status" aria-live="polite" style="min-height:20px;margin-top:7px"></div><div style="text-align:right;margin-top:8px"><button class="cz245Btn" style="background:#e87512;color:white;padding:7px 12px;font-size:12px" onclick="cz291ConcluirBipagem()">✓ Concluir Bipagem</button></div>`:`<button class="cz245Btn" onclick="cz291IniciarBipagem()" ${evento.status==='finalizado'?'disabled':''}>▣ Bipar Todos os Materiais</button>`}
  </div>
+ ${mat.some(x=>Number(x.quantidade_necessaria||0)>0&&qtd(x)===0)?`<div class="cz245Card" style="border-color:#eab308"><b>⚠ Saída sem quantidade recuperada</b><p>Há materiais contratados neste evento cuja quantidade efetivamente bipada na saída não foi encontrada. A coluna Contratado mostra o pedido; a coluna Levou mostra apenas a saída registrada. Não será presumida a saída nem alterado o estoque.</p><button class="cz245Btn alt" onclick="cz297Diagnostico()">Ver diagnóstico da saída</button><div id="cz297Diagnostico" style="margin-top:8px"></div></div>`:""}
  <div class="cz245Card"><h3>2. Lista de Bipagem de Retorno</h3><div id="cz291ListaBipados">${cz291ListaBipados()}</div></div>
  <div class="cz245Card"><h3>3. Lista principal — Materiais enviados</h3><div id="cz291ListaPrincipal">${cz291ListaPrincipal()}</div></div>
  ${concluido?cz291Pendencias():''}
@@ -8153,6 +8154,12 @@ function render(){
  if(aberto)cz291AtivarLeitor();
  if(modal)desenharModal();
 }
+window.cz297Diagnostico=()=>{
+ const st=sair142State(id),out=mat.map(x=>({produto:nome(x),origem:x.origem,contratado:Number(x.quantidade_necessaria||0),saidaBanco:Number(x.quantidade_bipada||0),saidaConferencia:Number((st.contagens||{})[x.id]||0),codigosSaida:cz293CodigosSaida(x)}));
+ const el=document.getElementById('cz297Diagnostico');if(!el)return;
+ const resumoSaida={evento:id,saidaConfirmada:!!evento.saida_baixada_em,linhas:out,leiturasHistorico:(st.historico||[]).length};
+ el.innerHTML='<pre style="white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px">'+E(JSON.stringify(resumoSaida,null,2))+'</pre>';
+};
 window.cz291IniciarBipagem=()=>{window.cz291BipagemAberta=true;window.cz291BipagemConcluida=false;render()};
 window.cz291ConcluirBipagem=()=>{window.cz291BipagemAberta=false;window.cz291BipagemConcluida=true;render()};
 function cz291AtivarLeitor(){
@@ -8312,7 +8319,7 @@ window.cz245Bipar=async()=>{
   const codigos=ativo(x)?cz293CodigosSaida(x):[...(x._codigos||[]),x.codigo_barras,x.codigo,x._codigoExibicao];
   return codigos.some(c=>normalizarCodigoEvento(c)===codigo);
  });
- if(!candidatos.length){msg.textContent='Código '+codigo+' não consta nas leituras de saída registradas para este evento (histórico atual ou legado). Confira o registro original da saída.';inp.value='';inp.focus();return}
+ if(!candidatos.length){msg.textContent='Código '+codigo+' não encontrado entre os materiais com saída registrada neste evento. Verifique a quantidade Levou e o diagnóstico da saída. Nenhum estoque foi alterado.';inp.value='';inp.focus();return}
  // Ativos: conferir o rastreio exato; extras: devolver primeiro a linha extra.
  const st=sair142State(id),historico=st.historico||[];
  const ativosCodigo=candidatos.filter(ativo);
@@ -8322,7 +8329,16 @@ window.cz245Bipar=async()=>{
 };
 window.cz245Perda=async mid=>{const x=mat.find(x=>chave(x)===mid);if(!x)return;await marcarPerdaRetorno(id,x.id,x.item_id||'');await carregar();window.cz245FaltantesAtivos()};
 window.cz245Aguardar=async mid=>{const x=mat.find(x=>chave(x)===mid);if(!x)return;const d=ler();d.aguardar=d.aguardar||{};d.aguardar[mid]=true;salvar(d);await czAlert('Ativo mantido como pendente de devolução. O retorno do evento NÃO poderá ser finalizado até resolução oficial.','Aguardando');};
-async function carregar(){await cz294CarregarSaidaRemota(id);const [er,ms]=await Promise.all([db.from('eventos_operacionais').select('*').eq('id',id).single(),sair221Materiais(id)]);if(er.error)throw er.error;evento=er.data;mat=ms.filter(x=>ret226Esperado(x,evento)>0);ret226Cache={e:evento,mats:mat}}
+async function carregar(){
+ await cz294CarregarSaidaRemota(id);
+ const [er,ms]=await Promise.all([db.from('eventos_operacionais').select('*').eq('id',id).single(),sair221Materiais(id)]);
+ if(er.error)throw er.error;
+ evento=er.data;
+ // V297: não descartar linhas contratadas só porque o registro de saída está zerado.
+ // Quantidade contratada e quantidade efetivamente saída são informações distintas.
+ mat=ms.filter(x=>Number(x.quantidade_necessaria||0)>0||ret226Esperado(x,evento)>0);
+ ret226Cache={e:evento,mats:mat};
+}
 window.cz245Abrir=async eventoId=>{window.cz245Fechar();id=String(eventoId);modal=null;window.cz291BipagemAberta=false;window.cz291BipagemConcluida=false;document.getElementById('content').innerHTML='<div class="card">Carregando retorno...</div>';try{await carregar();render()}catch(e){document.getElementById('content').innerHTML='<div class="msg">Erro ao carregar retorno: '+E(e.message)+'</div>'}};
 let cz245Finalizando=false;
 window.cz245Finalizar=async()=>{
