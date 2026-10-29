@@ -282,7 +282,7 @@ body .ret226Dialog button[aria-label="Fechar"]{color:#334155!important}
   },4000);
 })();
 </script>
-<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><span id="czBuildTag" style="margin-left:10px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:900">V297</span><div class="muted" style="font-size:12px">Sistema de gestão CZ · Atualização V282-A1</div></div><div><span id="czNuvemStatus" title="Sincronização de dados da empresa" style="font-size:12px;color:#86efac;margin-right:8px">☁ Aguardando login</span> <button id="czNuvemAtualizar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.atualizar()">Atualizar dados</button> <button id="czNuvemImportar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.importarLegado()">Importar dados antigos</button> <span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
+<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><span id="czBuildTag" style="margin-left:10px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:900">V298</span><div class="muted" style="font-size:12px">Sistema de gestão CZ · Atualização V282-A1</div></div><div><span id="czNuvemStatus" title="Sincronização de dados da empresa" style="font-size:12px;color:#86efac;margin-right:8px">☁ Aguardando login</span> <button id="czNuvemAtualizar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.atualizar()">Atualizar dados</button> <button id="czNuvemImportar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.importarLegado()">Importar dados antigos</button> <span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
 <div id="clientModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="modalTitle">Novo cliente</h2><button class="btn secondary" onclick="closeClient()">Fechar</button></div>
   <input id="clientId" type="hidden"><div class="muted" id="clientOpenedAt" style="font-size:13px">Data de abertura: será definida ao salvar</div>
   <div class="row"><div class="field"><label>Nome / Razão social *</label><input id="clientName" autocomplete="name"></div><div class="field"><label>Telefone *</label><input id="clientPhone" type="tel" inputmode="tel" autocomplete="tel"><div id="clientPhoneAviso" role="status" style="font-size:12px;margin-top:5px"></div></div></div>
@@ -8146,7 +8146,7 @@ function render(){
  <div class="cz245Card"><div class="cz245Head"><h3>1. Bipagem de Retorno</h3><span class="cz245Muted">${aberto?'● Leitor ativo':'Aguardando início'}</span></div>
  ${aberto?`<input id="scanRetorno" class="cz245Input" autocomplete="off" placeholder="Aguardando próxima bipagem..." aria-label="Código de barras / rastreio"><div id="retMsg" role="status" aria-live="polite" style="min-height:20px;margin-top:7px"></div><div style="text-align:right;margin-top:8px"><button class="cz245Btn" style="background:#e87512;color:white;padding:7px 12px;font-size:12px" onclick="cz291ConcluirBipagem()">✓ Concluir Bipagem</button></div>`:`<button class="cz245Btn" onclick="cz291IniciarBipagem()" ${evento.status==='finalizado'?'disabled':''}>▣ Bipar Todos os Materiais</button>`}
  </div>
- ${mat.some(x=>Number(x.quantidade_necessaria||0)>0&&qtd(x)===0)?`<div class="cz245Card" style="border-color:#eab308"><b>⚠ Saída sem quantidade recuperada</b><p>Há materiais contratados neste evento cuja quantidade efetivamente bipada na saída não foi encontrada. A coluna Contratado mostra o pedido; a coluna Levou mostra apenas a saída registrada. Não será presumida a saída nem alterado o estoque.</p><button class="cz245Btn alt" onclick="cz297Diagnostico()">Ver diagnóstico da saída</button><div id="cz297Diagnostico" style="margin-top:8px"></div></div>`:""}
+ ${mat.some(x=>ativo(x)&&qtd(x)>0&&!cz293CodigosSaida(x).length)||mat.some(x=>Number(x.quantidade_necessaria||0)>0&&qtd(x)===0)?`<div class="cz245Card" style="border-color:#eab308"><b>⚠ Conferência da saída: rastreios ou quantidades não recuperados</b><p>A quantidade Levou vem do evento, mas os rastreios individuais podem estar em outro registro. O diagnóstico abaixo consulta as fontes antigas e atuais sem registrar devolução nem alterar estoque.</p><button class="cz245Btn alt" onclick="cz298Diagnostico()">Ver diagnóstico dos rastreios</button><div id="cz297Diagnostico" style="margin-top:8px"></div></div>`:""}
  <div class="cz245Card"><h3>2. Lista de Bipagem de Retorno</h3><div id="cz291ListaBipados">${cz291ListaBipados()}</div></div>
  <div class="cz245Card"><h3>3. Lista principal — Materiais enviados</h3><div id="cz291ListaPrincipal">${cz291ListaPrincipal()}</div></div>
  ${concluido?cz291Pendencias():''}
@@ -8154,12 +8154,39 @@ function render(){
  if(aberto)cz291AtivarLeitor();
  if(modal)desenharModal();
 }
-window.cz297Diagnostico=()=>{
- const st=sair142State(id),out=mat.map(x=>({produto:nome(x),origem:x.origem,contratado:Number(x.quantidade_necessaria||0),saidaBanco:Number(x.quantidade_bipada||0),saidaConferencia:Number((st.contagens||{})[x.id]||0),codigosSaida:cz293CodigosSaida(x)}));
+// V298: diagnóstico somente leitura. Não assume que códigos do cadastro foram enviados.
+window.cz298Diagnostico=async()=>{
  const el=document.getElementById('cz297Diagnostico');if(!el)return;
- const resumoSaida={evento:id,saidaConfirmada:!!evento.saida_baixada_em,linhas:out,leiturasHistorico:(st.historico||[]).length};
- el.innerHTML='<pre style="white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px">'+E(JSON.stringify(resumoSaida,null,2))+'</pre>';
+ el.textContent='Consultando histórico atual e legado...';
+ const key='cz184_rastreios_saida_'+String(id);
+ const parseLista=v=>{try{const a=JSON.parse(v||'[]');return Array.isArray(a)?a.map(normalizarCodigoEvento).filter(Boolean):[]}catch(_){return []}};
+ const estado=sair142State(id);
+ const historico=Array.isArray(estado.historico)?estado.historico:[];
+ let remoto=[],erroRemoto='';
+ try{
+  const {data,error}=await db.from('cz_estado_compartilhado').select('valor').eq('chave',key).maybeSingle();
+  if(error)erroRemoto=error.message;
+  else remoto=parseLista(data?.valor);
+ }catch(e){erroRemoto=String(e?.message||e)}
+ let navegador=[],estadoNavegador={};
+ try{navegador=parseLista(localStorage.getItem(key));estadoNavegador=JSON.parse(localStorage.getItem('cz_v142_saida_eventos')||'{}')?.[String(id)]||{}}catch(_){/* não há legado local acessível */}
+ const locais=(Array.isArray(estadoNavegador.historico)?estadoNavegador.historico:[]);
+ const linhas=mat.filter(ativo).map(x=>{
+  const cadastrado=(x._codigos||[]).map(normalizarCodigoEvento).filter(Boolean);
+  const doMaterial=historico.filter(h=>h.acao==='Conferência'&&String(h.material_id)===String(x.id)).map(h=>normalizarCodigoEvento(h.codigo));
+  const porCadastro=historico.filter(h=>h.acao==='Conferência'&&cadastrado.includes(normalizarCodigoEvento(h.codigo))).map(h=>normalizarCodigoEvento(h.codigo));
+  const legadosRemotos=remoto.filter(c=>cadastrado.includes(c));
+  const legadosLocais=navegador.filter(c=>cadastrado.includes(c));
+  const historicoLocal=locais.filter(h=>h.acao==='Conferência'&&(String(h.material_id)===String(x.id)||cadastrado.includes(normalizarCodigoEvento(h.codigo)))).map(h=>normalizarCodigoEvento(h.codigo));
+  return {produto:nome(x),idMaterial:String(x.id),idCadastro:String(x.item_id||''),contratado:Number(x.quantidade_necessaria||0),levou:qtd(x),voltou:dev(x),codigosCadastro:cadastrado,historicoPorMaterial:[...new Set(doMaterial)],historicoPorCodigo:[...new Set(porCadastro)],legadoSupabase:[...new Set(legadosRemotos)],legadoNesteNavegador:[...new Set(legadosLocais)],historicoLocal:[...new Set(historicoLocal)]};
+ });
+ const diagnostico={evento:String(id),saidaConfirmada:!!evento.saida_baixada_em,totalHistoricoCompartilhado:historico.length,totalLegadoSupabase:remoto.length,totalLegadoNavegador:navegador.length,totalHistoricoNavegador:locais.length,erroConsultaLegado:erroRemoto||undefined,ativos:linhas};
+ const pre=document.createElement('pre');pre.style.cssText='white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;max-height:450px;overflow:auto;background:#f8fafc;color:#1e293b;padding:12px;border-radius:8px';pre.textContent=JSON.stringify(diagnostico,null,2);
+ el.replaceChildren(pre);
+ const b=document.createElement('button');b.className='cz245Btn alt';b.textContent='Copiar diagnóstico';b.onclick=()=>{const ta=document.createElement('textarea');ta.value=pre.textContent;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');b.textContent='Diagnóstico copiado'}catch(_){b.textContent='Selecione o texto acima para copiar'}ta.remove()};el.appendChild(b);
 };
+window.cz297Diagnostico=window.cz298Diagnostico;
+
 window.cz291IniciarBipagem=()=>{window.cz291BipagemAberta=true;window.cz291BipagemConcluida=false;render()};
 window.cz291ConcluirBipagem=()=>{window.cz291BipagemAberta=false;window.cz291BipagemConcluida=true;render()};
 function cz291AtivarLeitor(){
