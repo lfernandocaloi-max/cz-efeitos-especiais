@@ -282,7 +282,7 @@ body .ret226Dialog button[aria-label="Fechar"]{color:#334155!important}
   },4000);
 })();
 </script>
-<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><span id="czBuildTag" style="margin-left:10px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:900">V305</span><div class="muted" style="font-size:12px">Sistema de gestão CZ · Atualização V282-A1</div></div><div><span id="czNuvemStatus" title="Sincronização de dados da empresa" style="font-size:12px;color:#86efac;margin-right:8px">☁ Aguardando login</span> <button id="czNuvemAtualizar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.atualizar()">Atualizar dados</button> <button id="czNuvemImportar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.importarLegado()">Importar dados antigos</button> <span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
+<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><span id="czBuildTag" style="margin-left:10px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:900">V306</span><div class="muted" style="font-size:12px">Sistema de gestão CZ · Atualização V282-A1</div></div><div><span id="czNuvemStatus" title="Sincronização de dados da empresa" style="font-size:12px;color:#86efac;margin-right:8px">☁ Aguardando login</span> <button id="czNuvemAtualizar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.atualizar()">Atualizar dados</button> <button id="czNuvemImportar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.importarLegado()">Importar dados antigos</button> <span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
 <div id="clientModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="modalTitle">Novo cliente</h2><button class="btn secondary" onclick="closeClient()">Fechar</button></div>
   <input id="clientId" type="hidden"><div class="muted" id="clientOpenedAt" style="font-size:13px">Data de abertura: será definida ao salvar</div>
   <div class="row"><div class="field"><label>Nome / Razão social *</label><input id="clientName" autocomplete="name"></div><div class="field"><label>Telefone *</label><input id="clientPhone" type="tel" inputmode="tel" autocomplete="tel"><div id="clientPhoneAviso" role="status" style="font-size:12px;margin-top:5px"></div></div></div>
@@ -3376,7 +3376,7 @@ function cz155Load(){try{return JSON.parse(czSharedStorage.getItem('cz155_codigo
 const CZ274_TAG='[CZ274_LOTE]';
 function cz274Lote(a){const m=String(a?.observacoes||'').match(/\[CZ274_LOTE\]([^\r\n]+)/);return m?m[1].trim():''}
 function cz274Alternar(){const lote=document.getElementById('cz274Modo')?.value==='lote';document.getElementById('cz274LoteArea')?.classList.toggle('hidden',!lote);document.getElementById('assetUnitsList').style.display=lote?'none':'';const b=document.getElementById('assetAddTracking');if(b)b.style.display=lote?'none':''}
-function cz274CodigoEmLote(codigo,item){const a=assets.find(a=>String(a.id)===String(item?.item_id));return !!a&&normalizarCodigoEvento(cz274Lote(a))===normalizarCodigoEvento(codigo)&&!!cz274Lote(a)}
+function cz274CodigoEmLote(codigo,item){const a=assets.find(a=>String(a.id)===String(item?.item_id));const lote=String(item?._codigoLote||cz274Lote(a)||'').trim();return !!lote&&normalizarCodigoEvento(lote)===normalizarCodigoEvento(codigo)}
 function unidadesAtivo(a){
  const info=cz181ExtrairNotas(a?.observacoes);
  if(info.temRastreio)return info.codigos;
@@ -5937,8 +5937,9 @@ async function sair221Materiais(eventoId){
   const rastreios=ativo&&cad?unidadesAtivo(cad).map(v=>String(v).trim()).filter(Boolean):[];
   const codProduto=!ativo?String(cad?.codigo_barras||x.codigo_barras||x.codigo||'').trim():'';
   // Rastreios individuais têm precedência sobre o código geral do cadastro.
-  const codigos=ativo?rastreios:(codProduto?[codProduto]:[]);
-  return {...x,_codigos:codigos,_codigoExibicao:codigos.join(' · ')||(!ativo?String(x.codigo||'').trim():'Cadastre rastreios individuais')};
+  const codigoLote=ativo?String(cz274Lote(cad)||'').trim():'';
+  const codigos=ativo?(codigoLote?[codigoLote]:rastreios):(codProduto?[codProduto]:[]);
+  return {...x,_codigos:codigos,_codigoLote:codigoLote,_codigoExibicao:codigos.join(' · ')||(!ativo?String(x.codigo||'').trim():'Cadastre rastreios individuais')};
  });
 }
 /* ===== V220 — SAIR PRO EVENTO: BIPAGEM AUTOMÁTICA E CONFERÊNCIA POR QUANTIDADE ===== */
@@ -6100,7 +6101,7 @@ async function sair142Bipar(id){
   if(sair220Ativo(item)&&!cz274CodigoEmLote(codigo,item)&&(st.rastreiosLidos||[]).includes(codigo))throw new Error('Este rastreio de ativo já foi conferido.');
   c[item.id]=Number(c[item.id]||0)+1;
   const b=[...new Set([...(st.bipados||[]),String(item.codigo_barras||item.codigo||item.id)])];
-  sair142Set(id,{responsavel:resp,contagens:c,bipados:b,rastreiosLidos:sair220Ativo(item)?[...(st.rastreiosLidos||[]),codigo]:(st.rastreiosLidos||[]),historico:[...(st.historico||[]),{acao:'Conferência',codigo:cod,material_id:item.id,data:new Date().toISOString(),responsavel:resp}]});
+  sair142Set(id,{responsavel:resp,contagens:c,bipados:b,rastreiosLidos:sair220Ativo(item)&&!cz274CodigoEmLote(codigo,item)?[...(st.rastreiosLidos||[]),codigo]:(st.rastreiosLidos||[]),historico:[...(st.historico||[]),{acao:'Conferência',codigo:cod,material_id:item.id,data:new Date().toISOString(),responsavel:resp}]});
   await sair142Abrir(id);
   const ok=$('#sair220Aviso');if(ok){ok.style.color='#75dba4';ok.textContent='✓ '+sair222Nome(item)+' — '+c[item.id]+'/'+sair220Qtd(item)}
  }catch(err){if(aviso){aviso.style.color='#ffb0b0';aviso.textContent=err.message}else if(typeof czAlert==='function')await czAlert(err.message,'Conferência')}
@@ -7497,7 +7498,7 @@ async function czNovoBiparSaida(id){
   sair142Set(id,{
    responsavel:resp,contagens,
    bipados:[...new Set([...(st.bipados||[]),String(item.codigo_barras||item.codigo||item.id)])],
-   rastreiosLidos:sair220Ativo(item)?[...(st.rastreiosLidos||[]),codigo]:(st.rastreiosLidos||[]),
+   rastreiosLidos:sair220Ativo(item)&&!cz274CodigoEmLote(codigo,item)?[...(st.rastreiosLidos||[]),codigo]:(st.rastreiosLidos||[]),
    historico
   });
   // Recarrega as tabelas e o resumo, sem abrir a antiga janela de bipagem.
@@ -8038,7 +8039,7 @@ window.cz241Bipar=async function(){
   if(!alvo)throw Error('Quantidade correspondente a este código já está completa.');
   const contagens={...s.c,[alvo.id]:Number(s.c[alvo.id]||0)+1};
   const bipados=[...new Set([...(st.bipados||[]),String(alvo.codigo_barras||alvo.codigo||alvo.id)])];
-  sair142Set(eventoAtual,{responsavel:resp,contagens,bipados,rastreiosLidos:g.tipo==='Ativo'?[...(st.rastreiosLidos||[]),codigo]:(st.rastreiosLidos||[]),historico:[...(st.historico||[]),{acao:'Conferência',codigo:cod,material_id:alvo.id,data:new Date().toISOString(),responsavel:resp}]});
+  sair142Set(eventoAtual,{responsavel:resp,contagens,bipados,rastreiosLidos:g.tipo==='Ativo'&&!cz274CodigoEmLote(codigo,alvo)?[...(st.rastreiosLidos||[]),codigo]:(st.rastreiosLidos||[]),historico:[...(st.historico||[]),{acao:'Conferência',codigo:cod,material_id:alvo.id,data:new Date().toISOString(),responsavel:resp}]});
   desenhar();const novo=document.getElementById('cz241Msg');if(novo){novo.style.color='#8af1b8';novo.textContent='✓ Leitura registrada: '+estado(g).bipado+'/'+estado(g).total}
  }catch(err){if(aviso){aviso.textContent=err.message;aviso.style.color='#ffb8a8'}}
  finally{bloqueado=false;const novo=document.getElementById('cz241Codigo');if(novo){novo.value='';novo.focus()}}
