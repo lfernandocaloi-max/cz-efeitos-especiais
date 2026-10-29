@@ -8122,7 +8122,7 @@ function cz293CodigoLinha(x){
 function cz291ListaPrincipal(){
  const grupos=cz266Grupos();
  const consumos=grupos.map(g=>`<tr><td><b>${E(g.nome)}</b><div class="cz245Muted">${E(g.codigo)}</div></td><td>${g.contratado}</td><td>${g.extra}</td><td><b>${g.total}</b></td><td><b>${g.voltou}</b></td></tr>`).join('');
- const ativos=resumo().ativos.map(x=>`<tr><td><b>${E(nome(x))}</b><div class="cz245Muted">${E(cz293CodigoLinha(x))}</div></td><td>—</td><td>—</td><td><b>${qtd(x)}</b></td><td><b>${dev(x)}</b></td></tr>`).join('');
+ const ativos=resumo().ativos.map(x=>`<tr><td><b>${E(nome(x))}</b><div class="cz245Muted">${E(cz293CodigoLinha(x))}</div></td><td>${extra(x)?0:qtd(x)}</td><td>${extra(x)?qtd(x):0}</td><td><b>${qtd(x)}</b></td><td><b>${dev(x)}</b></td></tr>`).join('');
  return tabela(['Produto / Código','Contratado','Extra','Levou','Voltou'],consumos+ativos);
 }
 function cz291ListaBipados(){
@@ -8304,7 +8304,7 @@ window.cz245ConfirmarBaixaCons=async()=>{
 window.cz245Bipar=async()=>{
  if(ocupado)return;const inp=document.getElementById('scanRetorno'),msg=document.getElementById('retMsg'),codigo=normalizarCodigoEvento(inp?.value);if(!codigo)return;
  try{await cz294CarregarSaidaRemota(id)}catch(e){msg.textContent=e.message;return}
- const tipo=modal?.tipo;
+ const tipo=window.cz291BipagemAberta?'todos':(modal?.tipo||'todos');
  const candidatos=mat.filter(x=>{
   if(!(tipo==='todos'?true:tipo==='ativo'?ativo(x):tipo==='consumo'?!ativo(x):extra(x)&&!ativo(x))||dev(x)>=qtd(x))return false;
   // Aceita o código mostrado na lista, o cadastro atual e o código salvo no evento.
