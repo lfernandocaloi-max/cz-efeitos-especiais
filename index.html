@@ -8104,7 +8104,7 @@ async function cz294CarregarSaidaRemota(eventoId){
 
 // V299: reconciliação auditável e restrita ao único evento legado com histórico perdido.
 const CZ299_EVENTO='a5e02ed6-e93f-46c8-854c-5f3bd7190cb8';
-const CZ299_CHAVE='cz299_regularizacao_saida_'+CZ299_EVENTO;
+const CZ299_CHAVE='cz_v142_saida_eventos'; // Chave existente permitida pela validação do Supabase
 window.cz299Regularizacao=null;
 async function cz299LerRegularizacao(){
  window.cz299Regularizacao=null;
@@ -8112,8 +8112,10 @@ async function cz299LerRegularizacao(){
  const {data,error}=await db.from('cz_estado_compartilhado').select('valor').eq('chave',CZ299_CHAVE).maybeSingle();
  if(error)throw new Error('Falha ao consultar regularização do evento: '+error.message);
  if(!data?.valor)return;
- let v;try{v=JSON.parse(data.valor)}catch(_){throw new Error('Regularização armazenada está inválida.');}
- if(v?.evento!==CZ299_EVENTO||!Array.isArray(v?.materiais))throw new Error('Regularização inválida.');
+ let todos;try{todos=JSON.parse(data.valor)}catch(_){throw new Error('Histórico compartilhado armazenado está inválido.');}
+ const v=todos?.[CZ299_EVENTO]?.regularizacao_rastreios_v300;
+ if(!v)return;
+ if(v.evento!==CZ299_EVENTO||!Array.isArray(v.materiais))throw new Error('Regularização inválida.');
  window.cz299Regularizacao=v;
 }
 function cz299Codigos(x){
@@ -8149,13 +8151,26 @@ window.cz299SalvarRegularizacao=async()=>{
  msg.textContent='Registrando identificação no Supabase...';
  const registro={evento:CZ299_EVENTO,tipo:'regularizacao_manual_identificacao_saida',origem:'operador_confirmou_codigos',criadoEm:new Date().toISOString(),materiais};
  try{
-  // Não sobrescreve regularização anterior. Uma nova edição exige análise manual.
+  // A chave separada da V299 era recusada por cz_estado_chave_valida.
+  // Atualização otimista da chave compartilhada já existente, preservando outros eventos.
   const {data:anterior,error:erroLeitura}=await db.from('cz_estado_compartilhado').select('valor').eq('chave',CZ299_CHAVE).maybeSingle();
   if(erroLeitura)throw erroLeitura;
-  if(anterior?.valor)throw Error('Já existe uma regularização para este evento. Atualize a tela para consultá-la.');
-  const {error}=await db.from('cz_estado_compartilhado').insert({chave:CZ299_CHAVE,valor:JSON.stringify(registro)});
+  if(!anterior||typeof anterior.valor!=='string')throw Error('Histórico compartilhado da saída não existe no banco. Nenhuma alteração foi feita.');
+  let todos;try{todos=JSON.parse(anterior.valor)}catch(_){throw Error('Histórico compartilhado inválido. Nenhuma alteração foi feita.');}
+  if(!todos||typeof todos!=='object'||Array.isArray(todos))throw Error('Formato inválido do histórico de saída.');
+  const existente=todos[CZ299_EVENTO];
+  if(existente?.regularizacao_rastreios_v300)throw Error('Já existe regularização para este evento. Atualize a tela.');
+  // Nunca altera a quantidade ou o estado da saída: adiciona apenas metadados de rastreio.
+  todos[CZ299_EVENTO]={...(existente||{}),regularizacao_rastreios_v300:registro};
+  const {data:gravado,error}=await db.from('cz_estado_compartilhado')
+    .update({valor:JSON.stringify(todos)}).eq('chave',CZ299_CHAVE)
+    .eq('valor',anterior.valor).select('valor');
   if(error)throw error;
+  if(!gravado?.length)throw Error('O histórico mudou enquanto você salvava. Atualize a tela e tente novamente.');
   await cz299LerRegularizacao();
+  if(!window.cz299Regularizacao)throw Error('O Supabase não confirmou a leitura da regularização.');
+  // Evita exibir uma cópia antiga do histórico em memória.
+  window.cz294SaidaRemota=todos;
   await carregar();render();
  }catch(e){msg.textContent='Não foi possível salvar: '+e.message;}
 };
