@@ -282,7 +282,7 @@ body .ret226Dialog button[aria-label="Fechar"]{color:#334155!important}
   },4000);
 })();
 </script>
-<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><span id="czBuildTag" style="margin-left:10px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:900">V302</span><div class="muted" style="font-size:12px">Sistema de gestão CZ · Atualização V282-A1</div></div><div><span id="czNuvemStatus" title="Sincronização de dados da empresa" style="font-size:12px;color:#86efac;margin-right:8px">☁ Aguardando login</span> <button id="czNuvemAtualizar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.atualizar()">Atualizar dados</button> <button id="czNuvemImportar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.importarLegado()">Importar dados antigos</button> <span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
+<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><span id="czBuildTag" style="margin-left:10px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:900">V303</span><div class="muted" style="font-size:12px">Sistema de gestão CZ · Atualização V282-A1</div></div><div><span id="czNuvemStatus" title="Sincronização de dados da empresa" style="font-size:12px;color:#86efac;margin-right:8px">☁ Aguardando login</span> <button id="czNuvemAtualizar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.atualizar()">Atualizar dados</button> <button id="czNuvemImportar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.importarLegado()">Importar dados antigos</button> <span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
 <div id="clientModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="modalTitle">Novo cliente</h2><button class="btn secondary" onclick="closeClient()">Fechar</button></div>
   <input id="clientId" type="hidden"><div class="muted" id="clientOpenedAt" style="font-size:13px">Data de abertura: será definida ao salvar</div>
   <div class="row"><div class="field"><label>Nome / Razão social *</label><input id="clientName" autocomplete="name"></div><div class="field"><label>Telefone *</label><input id="clientPhone" type="tel" inputmode="tel" autocomplete="tel"><div id="clientPhoneAviso" role="status" style="font-size:12px;margin-top:5px"></div></div></div>
@@ -378,7 +378,15 @@ const czSharedStorage=(()=>{
  function getItem(k){return cache.has(String(k))?cache.get(String(k)):null}
  function setItem(k,v){
   if(!iniciado){falha='A nuvem ainda não carregou; alteração não permitida.';status();throw new Error(falha)}
-  k=String(k);v=String(v);cache.set(k,v);pendentes.set(k,v);status();void descarregar();
+  k=String(k);v=String(v);
+  // V303: impedir gravação de rastreios em chave dinâmica rejeitada pelo banco.
+  // Nunca criar pendência impossível de sincronizar ou dar falso sucesso.
+  if(/^cz185_rastreios_retorno_/.test(k)){
+   const aviso='Gravação antiga de rastreio bloqueada. Utilize o registro confirmado no histórico compartilhado da saída.';
+   console.error('[CZ V303]',aviso,k);
+   throw new Error(aviso);
+  }
+  cache.set(k,v);pendentes.set(k,v);status();void descarregar();
  }
  function removeItem(k){
   if(!iniciado)throw new Error('A nuvem ainda não carregou.');
@@ -4351,7 +4359,12 @@ async function biparRetornoEvento(eventoId,materialSelecionadoId=null){
    if(!leituraNaSaida&&!legado){
     throw new Error('Este rastreio está cadastrado, mas não há registro da sua bipagem na saída deste evento no histórico de saída do Supabase. Confira o registro da saída.');
    }
-   if(cz185Lidos(eventoId,'retorno').includes(codigo))throw new Error('Este equipamento já foi bipado no retorno deste evento.');
+   // V303: confirmar no banco, não apenas no cache da sessão.
+   const {data:retNuvem,error:retErro}=await db.from('cz_estado_compartilhado').select('valor').eq('chave','cz_v142_saida_eventos').maybeSingle();
+   if(retErro)throw new Error('Não foi possível verificar os rastreios devolvidos: '+retErro.message);
+   let dadosRetorno={};try{dadosRetorno=JSON.parse(retNuvem?.valor||'{}')}catch(_){throw new Error('Histórico compartilhado inválido.')} 
+   const jaLidos=dadosRetorno?.[String(eventoId)]?.rastreios_retorno_v302||[];
+   if(Array.isArray(jaLidos)&&jaLidos.map(normalizarCodigoEvento).includes(codigo))throw new Error('Este equipamento já foi bipado no retorno deste evento.');
    material=candidatos.find(m=>{
     if(materialSelecionadoId&&String(m.id)!==String(materialSelecionadoId))return false;
     const dev=e.saida_baixada_em?Number(m.quantidade_devolvida||0):Number(retornoInfo(m.id).qtd||0);
@@ -4426,7 +4439,12 @@ async function biparRetornoEvento(eventoId,materialSelecionadoId=null){
     if(up.error)throw up.error;
    }
   }
-  if(rastreio)await cz185GravarRetorno(eventoId,codigo);
+  if(rastreio){
+   try{await cz185GravarRetorno(eventoId,codigo)}
+   catch(erroRastreio){
+    throw new Error('A quantidade do retorno pode já ter sido gravada, mas o código individual não foi confirmado. NÃO bipe novamente. '+(erroRastreio?.message||erroRastreio));
+   }
+  }
   if(campo)campo.value='';
   if(materialSelecionadoId){
    // Preserva a janela central e atualiza a contagem na própria tela.
