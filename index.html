@@ -8107,7 +8107,13 @@ function cz293CodigosSaida(x){
  if(!ativo(x))return [cod(x)];
  const st=sair142State(id);
  const logs=(st.historico||[]).filter(h=>String(h.material_id)===String(x.id)&&h.acao==='Conferência');
- return [...new Set(logs.map(h=>String(h.codigo||'').trim()).filter(Boolean))];
+ const diretos=logs.map(h=>String(h.codigo||'').trim()).filter(Boolean);
+ // Compatibilidade com a bipagem antiga: códigos da saída podem ter sido
+ // gravados em chave separada, antes da mudança do retorno.
+ const antigos=cz185Lidos(id,'saida');
+ const cadastro=(x._codigos||[]).map(v=>normalizarCodigoEvento(v));
+ const relacionados=antigos.filter(c=>cadastro.includes(normalizarCodigoEvento(c)));
+ return [...new Set([...diretos,...relacionados])];
 }
 function cz293CodigoLinha(x){
  const cs=cz293CodigosSaida(x);
@@ -8306,7 +8312,7 @@ window.cz245Bipar=async()=>{
   const codigos=ativo(x)?cz293CodigosSaida(x):[...(x._codigos||[]),x.codigo_barras,x.codigo,x._codigoExibicao];
   return codigos.some(c=>normalizarCodigoEvento(c)===codigo);
  });
- if(!candidatos.length){msg.textContent='Código '+codigo+' não consta no histórico de saída recuperado do Supabase para este evento. Verifique se a saída foi conferida e sincronizada.';inp.value='';inp.focus();return}
+ if(!candidatos.length){msg.textContent='Código '+codigo+' não consta nas leituras de saída registradas para este evento (histórico atual ou legado). Confira o registro original da saída.';inp.value='';inp.focus();return}
  // Ativos: conferir o rastreio exato; extras: devolver primeiro a linha extra.
  const st=sair142State(id),historico=st.historico||[];
  const ativosCodigo=candidatos.filter(ativo);
