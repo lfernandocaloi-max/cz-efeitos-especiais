@@ -4329,7 +4329,7 @@ async function biparRetornoEvento(eventoId,materialSelecionadoId=null){
    const legado=cz185Lidos(eventoId,'saida').includes(codigo);
    // Rastreamento por unidade: não basta o código existir no cadastro.
    if(!leituraNaSaida&&!legado){
-    throw new Error('Este rastreio está cadastrado, mas não há registro da sua bipagem na saída deste evento neste navegador. Verifique o dispositivo usado na saída.');
+    throw new Error('Este rastreio está cadastrado, mas não há registro da sua bipagem na saída deste evento no histórico de saída do Supabase. Confira o registro da saída.');
    }
    if(cz185Lidos(eventoId,'retorno').includes(codigo))throw new Error('Este equipamento já foi bipado no retorno deste evento.');
    material=candidatos.find(m=>{
@@ -5904,8 +5904,8 @@ async function sair221Materiais(eventoId){
 const SAIR142_KEY='cz_v142_saida_eventos';
 function sair142Load(){try{return JSON.parse(czSharedStorage.getItem(SAIR142_KEY)||'{}')}catch(_){return {}}}
 function sair142Save(v){czSharedStorage.setItem(SAIR142_KEY,JSON.stringify(v||{}))}
-function sair142State(id){const a=sair142Load();return a[String(id)]||{responsavel:'',bipados:[],historico:[]}}
-function sair142Set(id,v){const a=sair142Load();a[String(id)]={...sair142State(id),...v};sair142Save(a);return a[String(id)]}
+function sair142State(id){const a=(window.cz294SaidaRemota||sair142Load());return a[String(id)]||{responsavel:'',bipados:[],historico:[]}}
+function sair142Set(id,v){window.cz294SaidaRemota=null;const a=sair142Load();a[String(id)]={...sair142State(id),...v};sair142Save(a);return a[String(id)]}
 function sair220Cod(x){return String(x.codigo_rastreio||x.rastreio||x.codigo_barras||x.codigo||'').trim()}
 function sair220Qtd(x){return Math.max(1,Math.floor(Number(x.quantidade_necessaria??x.quantidade??1)||1))}
 function sair220Ativo(x){return ['ativo','equipamento','montagem','material_montagem'].includes(String(x.tipo||'').toLowerCase())||String(x.origem||'').toLowerCase()==='montagem'}
@@ -8086,6 +8086,22 @@ window.cz266Destino=async i=>{
  if(!pend.length)return czAlert('Não há extras pendentes de classificação.','Retorno');
  return czAlert('Há mais de uma linha extra para este produto. Use "Classificar extras" para escolher a linha correta e evitar cobrança duplicada.','Retorno');
 };
+
+// CZ V294 — Leitura atualizada e direta do histórico de saída na nuvem.
+// O estado compartilhado já é salvo na tabela cz_estado_compartilhado.
+// Consultar diretamente evita depender de cache do navegador de retorno.
+async function cz294CarregarSaidaRemota(eventoId){
+ const {data,error}=await db.from('cz_estado_compartilhado')
+   .select('valor').eq('chave','cz_v142_saida_eventos').maybeSingle();
+ if(error)throw new Error('Não foi possível consultar os rastreios da saída no Supabase: '+error.message);
+ let todos={};
+ try{todos=JSON.parse(data?.valor||'{}')}catch(_){throw new Error('O histórico de saída armazenado no Supabase está inválido. Não é seguro aceitar rastreios.');}
+ if(!todos||typeof todos!=='object')todos={};
+ window.cz294SaidaRemota=todos;
+ const saida=todos[String(eventoId)];
+ return {encontrou:!!saida,leituras:(saida?.historico||[]).filter(h=>h.acao==='Conferência').length};
+}
+
 // V293: códigos do ativo pertencentes à saída deste evento, não ao estoque inteiro.
 function cz293CodigosSaida(x){
  if(!ativo(x))return [cod(x)];
@@ -8095,7 +8111,7 @@ function cz293CodigosSaida(x){
 }
 function cz293CodigoLinha(x){
  const cs=cz293CodigosSaida(x);
- return ativo(x)?(cs.length?cs.join(' · '):'Códigos da saída não disponíveis neste dispositivo'):cod(x);
+ return ativo(x)?(cs.length?cs.join(' · '):'Rastreios da saída não encontrados no Supabase'):cod(x);
 }
 function cz291ListaPrincipal(){
  const grupos=cz266Grupos();
@@ -8281,6 +8297,7 @@ window.cz245ConfirmarBaixaCons=async()=>{
 };
 window.cz245Bipar=async()=>{
  if(ocupado)return;const inp=document.getElementById('scanRetorno'),msg=document.getElementById('retMsg'),codigo=normalizarCodigoEvento(inp?.value);if(!codigo)return;
+ try{await cz294CarregarSaidaRemota(id)}catch(e){msg.textContent=e.message;return}
  const tipo=modal?.tipo;
  const candidatos=mat.filter(x=>{
   if(!(tipo==='todos'?true:tipo==='ativo'?ativo(x):tipo==='consumo'?!ativo(x):extra(x)&&!ativo(x))||dev(x)>=qtd(x))return false;
@@ -8289,7 +8306,7 @@ window.cz245Bipar=async()=>{
   const codigos=ativo(x)?cz293CodigosSaida(x):[...(x._codigos||[]),x.codigo_barras,x.codigo,x._codigoExibicao];
   return codigos.some(c=>normalizarCodigoEvento(c)===codigo);
  });
- if(!candidatos.length){msg.textContent='Código '+codigo+' não encontrado no registro de saída deste evento neste dispositivo. Se a saída foi feita em outro computador, é necessário sincronizar os rastreios no banco.';inp.value='';inp.focus();return}
+ if(!candidatos.length){msg.textContent='Código '+codigo+' não consta no histórico de saída recuperado do Supabase para este evento. Verifique se a saída foi conferida e sincronizada.';inp.value='';inp.focus();return}
  // Ativos: conferir o rastreio exato; extras: devolver primeiro a linha extra.
  const st=sair142State(id),historico=st.historico||[];
  const ativosCodigo=candidatos.filter(ativo);
@@ -8299,7 +8316,7 @@ window.cz245Bipar=async()=>{
 };
 window.cz245Perda=async mid=>{const x=mat.find(x=>chave(x)===mid);if(!x)return;await marcarPerdaRetorno(id,x.id,x.item_id||'');await carregar();window.cz245FaltantesAtivos()};
 window.cz245Aguardar=async mid=>{const x=mat.find(x=>chave(x)===mid);if(!x)return;const d=ler();d.aguardar=d.aguardar||{};d.aguardar[mid]=true;salvar(d);await czAlert('Ativo mantido como pendente de devolução. O retorno do evento NÃO poderá ser finalizado até resolução oficial.','Aguardando');};
-async function carregar(){const [er,ms]=await Promise.all([db.from('eventos_operacionais').select('*').eq('id',id).single(),sair221Materiais(id)]);if(er.error)throw er.error;evento=er.data;mat=ms.filter(x=>ret226Esperado(x,evento)>0);ret226Cache={e:evento,mats:mat}}
+async function carregar(){await cz294CarregarSaidaRemota(id);const [er,ms]=await Promise.all([db.from('eventos_operacionais').select('*').eq('id',id).single(),sair221Materiais(id)]);if(er.error)throw er.error;evento=er.data;mat=ms.filter(x=>ret226Esperado(x,evento)>0);ret226Cache={e:evento,mats:mat}}
 window.cz245Abrir=async eventoId=>{window.cz245Fechar();id=String(eventoId);modal=null;window.cz291BipagemAberta=false;window.cz291BipagemConcluida=false;document.getElementById('content').innerHTML='<div class="card">Carregando retorno...</div>';try{await carregar();render()}catch(e){document.getElementById('content').innerHTML='<div class="msg">Erro ao carregar retorno: '+E(e.message)+'</div>'}};
 let cz245Finalizando=false;
 window.cz245Finalizar=async()=>{
