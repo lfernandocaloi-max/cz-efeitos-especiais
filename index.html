@@ -282,7 +282,7 @@ body .ret226Dialog button[aria-label="Fechar"]{color:#334155!important}
   },4000);
 })();
 </script>
-<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><span id="czBuildTag" style="margin-left:10px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:900">V306</span><div class="muted" style="font-size:12px">Sistema de gestão CZ · Atualização V282-A1</div></div><div><span id="czNuvemStatus" title="Sincronização de dados da empresa" style="font-size:12px;color:#86efac;margin-right:8px">☁ Aguardando login</span> <button id="czNuvemAtualizar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.atualizar()">Atualizar dados</button> <button id="czNuvemImportar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.importarLegado()">Importar dados antigos</button> <span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
+<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><span id="czBuildTag" style="margin-left:10px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:900">V307</span><div class="muted" style="font-size:12px">Sistema de gestão CZ · Atualização V282-A1</div></div><div><span id="czNuvemStatus" title="Sincronização de dados da empresa" style="font-size:12px;color:#86efac;margin-right:8px">☁ Aguardando login</span> <button id="czNuvemAtualizar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.atualizar()">Atualizar dados</button> <button id="czNuvemImportar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.importarLegado()">Importar dados antigos</button> <span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
 <div id="clientModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="modalTitle">Novo cliente</h2><button class="btn secondary" onclick="closeClient()">Fechar</button></div>
   <input id="clientId" type="hidden"><div class="muted" id="clientOpenedAt" style="font-size:13px">Data de abertura: será definida ao salvar</div>
   <div class="row"><div class="field"><label>Nome / Razão social *</label><input id="clientName" autocomplete="name"></div><div class="field"><label>Telefone *</label><input id="clientPhone" type="tel" inputmode="tel" autocomplete="tel"><div id="clientPhoneAviso" role="status" style="font-size:12px;margin-top:5px"></div></div></div>
@@ -6413,20 +6413,21 @@ async function prep217Imprimir(id){
 /* V216 — seleção múltipla, quantidade por linha, repetição permitida e código visível. */
 async function prep192AdicionarMaterial(eventoId,origem){
  const ativo=origem==='montagem';
- const tabela=ativo?'ativos':'produtos';
- const campos=ativo?'id,nome,quantidade,status,codigo_interno,observacoes':'id,nome,estoque_atual,codigo_barras,consumivel';
- const {data,error}=await db.from(tabela).select(campos).order('nome');
- if(error)return czAlert(error.message,'Selecionar material');
- const itens=(data||[]).filter(x=>ativo
-   ? (!['manutencao','em_manutencao','perdido','indisponivel'].includes(String(x.status||'').toLowerCase())&&Number(x.quantidade||0)>0)
-   : x.consumivel!==false);
+ const [produtos,ativos]=await Promise.all([
+  ativo?Promise.resolve({data:[]}):db.from('produtos').select('id,nome,estoque_atual,codigo_barras,consumivel').order('nome'),
+  db.from('ativos').select('id,nome,quantidade,status,codigo_interno,observacoes').order('nome')
+ ]);
+ if(produtos.error||ativos.error)return czAlert((produtos.error||ativos.error).message,'Selecionar material');
+ const itens=[
+  ...(produtos.data||[]).filter(x=>x.consumivel!==false).map(x=>({...x,_czTipo:'produto'})),
+  ...(ativos.data||[]).filter(x=>!['manutencao','em_manutencao','perdido','indisponivel'].includes(String(x.status||'').toLowerCase())&&Number(x.quantidade||0)>0).map(x=>({...x,_czTipo:'ativo'}))
+ ];
  if(!itens.length)return czAlert('Nenhum item disponível para seleção.','Materiais');
  const {data:atuais,error:em}=await db.from('evento_materiais').select('item_id,tipo,quantidade_necessaria').eq('evento_id',eventoId);
  if(em)return czAlert(em.message,'Materiais');
  const usados=new Map();
  for(const m of (atuais||[])){
-   if(m.tipo!==(ativo?'ativo':'produto'))continue;
-   const id=String(m.item_id);
+   const id=String(m.tipo)+':'+String(m.item_id);
    usados.set(id,(usados.get(id)||0)+Number(m.quantidade_necessaria||0));
  }
  const ov=document.createElement('div');
@@ -6434,17 +6435,17 @@ async function prep192AdicionarMaterial(eventoId,origem){
  const box=document.createElement('div');
  box.style.cssText='background:#17202b;color:white;border:1px solid #44556a;border-radius:14px;padding:20px;width:min(960px,100%);max-height:90vh;overflow:auto';
  const rows=itens.map(x=>{
-   const codigo=ativo?(unidadesAtivo(x).join(' · ')||'SEM RASTREIO'):(x.codigo_barras||'');
-   const disponivel=Math.max(0,Number(ativo?x.quantidade:x.estoque_atual)||0);
+   const codigo=x._czTipo==='ativo'?(cz274Lote(x)||unidadesAtivo(x).join(' · ')||'SEM RASTREIO'):(x.codigo_barras||'');
+   const disponivel=Math.max(0,Number(x._czTipo==='ativo'?x.quantidade:x.estoque_atual)||0);
    const busca=(String(x.nome||'')+' '+String(codigo)).toLowerCase();
-   return `<tr data-busca="${esc(busca)}" data-id="${esc(String(x.id))}">
+   return `<tr data-busca="${esc(busca)}" data-id="${esc(String(x.id))}" data-tipo="${esc(x._czTipo)}">
      <td style="text-align:center"><input type="checkbox" class="prep216Sel" aria-label="Selecionar ${esc(x.nome)}" style="width:25px;height:25px;min-width:25px;cursor:pointer;accent-color:#16a34a"></td>
-     <td>${esc(x.nome)}</td>
+     <td>${esc(x.nome)} <small style="opacity:.75">(${x._czTipo==='ativo'?'Ativo':'Consumo'})</small></td>
      <td>${disponivel}</td>
      <td><input class="prep216Qtd" aria-label="Quantidade de ${esc(x.nome)}" type="number" min="1" step="1" inputmode="numeric" placeholder="Qtd." value="" style="width:94px;min-width:78px;padding:9px"></td>
      <td>${esc(codigo||'—')}</td></tr>`;
  }).join('');
- box.innerHTML=`<h3 style="margin-top:0">${ativo?'4. Materiais de Montagem — Ativos / Equipamentos':'3. Produto Extra — Uso e Consumo'}</h3>
+ box.innerHTML=`<h3 style="margin-top:0">${ativo?'4. Materiais de Montagem — Ativos / Equipamentos':'3. Material Extra — Consumo e Ativos'}</h3>
   <p class="muted">Selecione vários itens, preencha a quantidade na mesma linha e confira o estoque disponível. O mesmo produto pode ser adicionado novamente em outra operação.</p>
   <div class="field"><label>Pesquisar por produto ou código</label><input id="prep216Busca" placeholder="Digite para pesquisar"></div>
   <div class="tablewrap" style="max-height:360px;overflow:auto;margin-top:12px"><table><thead><tr><th>Sel.</th><th>Produto</th><th>Disponível</th><th>Qtd.</th><th>Código</th></tr></thead><tbody id="prep216Tabela">${rows}</tbody></table></div>
@@ -6466,18 +6467,19 @@ async function prep192AdicionarMaterial(eventoId,origem){
    if(!selecionados.length){msg.textContent='Selecione pelo menos um produto.';return}
    const registros=[];
    for(const tr of selecionados){
-     const item=itens.find(x=>String(x.id)===tr.dataset.id);
+     const item=itens.find(x=>String(x.id)===tr.dataset.id&&x._czTipo===tr.dataset.tipo);
      if(!item)continue;
      const qtdTexto=tr.querySelector('.prep216Qtd').value.trim();
      const qtd=Number(qtdTexto);
      if(!qtdTexto||!Number.isInteger(qtd)||qtd<1){msg.textContent='Informe uma quantidade inteira maior que zero para '+item.nome+'.';return}
-     const disponivel=Number(ativo?item.quantidade:item.estoque_atual)||0;
-     const jaNoEvento=usados.get(String(item.id))||0;
-     if(ativo && !cz274Lote(item) && unidadesAtivo(item).length<qtd+jaNoEvento){msg.textContent=item.nome+': não há códigos de rastreio individuais suficientes para esta quantidade. Cadastre os rastreios no ativo antes de adicionar.';return}
+     const ehAtivo=item._czTipo==='ativo';
+     const disponivel=Number(ehAtivo?item.quantidade:item.estoque_atual)||0;
+     const jaNoEvento=usados.get(item._czTipo+':'+String(item.id))||0;
+     if(ehAtivo && !cz274Lote(item) && unidadesAtivo(item).length<qtd+jaNoEvento){msg.textContent=item.nome+': não há códigos de rastreio individuais suficientes para esta quantidade. Cadastre os rastreios no ativo antes de adicionar.';return}
      if(qtd+jaNoEvento>disponivel){
        msg.textContent=item.nome+': disponível '+disponivel+', já separado para este evento '+jaNoEvento+'. Quantidade adicional máxima: '+Math.max(0,disponivel-jaNoEvento)+'.';return;
      }
-     registros.push({evento_id:eventoId,tipo:ativo?'ativo':'produto',item_id:item.id,nome_item:item.nome,codigo:ativo?(unidadesAtivo(item).slice(jaNoEvento,jaNoEvento+qtd).join(' · ')||null):(item.codigo_barras||null),quantidade_necessaria:qtd,quantidade_bipada:0,origem});
+     registros.push({evento_id:eventoId,tipo:item._czTipo,item_id:item.id,nome_item:item.nome,codigo:ehAtivo?(cz274Lote(item)||unidadesAtivo(item).slice(jaNoEvento,jaNoEvento+qtd).join(' · ')||null):(item.codigo_barras||null),quantidade_necessaria:qtd,quantidade_bipada:0,origem});
    }
    if(!registros.length){msg.textContent='Nenhum item válido selecionado.';return}
    const btn=box.querySelector('#prep216Salvar');btn.disabled=true;msg.textContent='Salvando...';
@@ -8236,18 +8238,27 @@ function cz293CodigoLinha(x){
  const cs=cz293CodigosSaida(x);
  return ativo(x)?(cs.length?cs.join(' · '):'Rastreios da saída não encontrados no Supabase'):cod(x);
 }
+// V307: listas de retorno com contagem visível e conclusão em verde.
+function cz307Linha(nomeProduto,codigo,contratado,extraQtd,levou,voltou){
+ const completo=levou>0&&voltou>=levou;
+ return `<tr style="${completo?'background:#bbf7d0;color:#052e16;':''}">
+ <td><b>${E(nomeProduto)}</b><div class="cz245Muted" style="${completo?'color:#14532d;':''}">${E(codigo)}</div></td>
+ <td>${contratado}</td><td>${extraQtd}</td><td><b>${levou}</b></td><td><b>${voltou}</b></td>
+ <td><span style="display:inline-flex;align-items:center;justify-content:center;min-width:40px;height:34px;padding:0 8px;border-radius:7px;background:#60a5fa;color:#000;font-weight:900" title="${voltou} de ${levou} devolvidos">${voltou}</span></td></tr>`;
+}
+function cz307Linhas(){
+ const grupos=cz266Grupos().map(g=>({nome:g.nome,codigo:g.codigo,contratado:g.contratado,extra:g.extra,levou:g.total,voltou:g.voltou}));
+ const ativos=resumo().ativos.map(x=>({nome:nome(x),codigo:cz293CodigoLinha(x),contratado:extra(x)?0:Number(x.quantidade_necessaria||0),extra:extra(x)?Number(x.quantidade_necessaria||0):0,levou:qtd(x),voltou:dev(x)}));
+ return [...grupos,...ativos];
+}
 function cz291ListaPrincipal(){
- const grupos=cz266Grupos();
- const consumos=grupos.map(g=>`<tr><td><b>${E(g.nome)}</b><div class="cz245Muted">${E(g.codigo)}</div></td><td>${g.contratado}</td><td>${g.extra}</td><td><b>${g.total}</b></td><td><b>${g.voltou}</b></td></tr>`).join('');
- const ativos=resumo().ativos.map(x=>`<tr><td><b>${E(nome(x))}</b><div class="cz245Muted">${E(cz293CodigoLinha(x))}</div></td><td>${extra(x)?0:Number(x.quantidade_necessaria||0)}</td><td>${extra(x)?Number(x.quantidade_necessaria||0):0}</td><td><b>${qtd(x)}</b></td><td><b>${dev(x)}</b></td></tr>`).join('');
- return tabela(['Produto / Código','Contratado','Extra','Levou','Voltou'],consumos+ativos);
+ return tabela(['Produto / Código','Contratado','Extra','Levou','Voltou','Contagem'],cz307Linhas().map(x=>cz307Linha(x.nome,x.codigo,x.contratado,x.extra,x.levou,x.voltou)).join(''));
 }
 function cz291ListaBipados(){
- const grupos=cz266Grupos().map(g=>({nome:g.nome,codigo:g.codigo,levou:g.total,voltou:g.voltou}));
- const ativos=resumo().ativos.map(x=>({nome:nome(x),codigo:cz293CodigoLinha(x),levou:qtd(x),voltou:dev(x)}));
- const linhas=[...grupos,...ativos].filter(x=>x.voltou>0);
- return linhas.length?linhas.map(x=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 11px;margin:6px 0;border-radius:7px;background:${x.voltou>=x.levou?'#dcfce7':'#fff3c4'};color:#17212b"><span><b>${E(x.nome)}</b><small style="display:block">${E(x.codigo)}</small></span><b>${x.voltou}/${x.levou}</b></div>`).join(''):'<p class="cz245Muted">A lista será preenchida automaticamente conforme os códigos forem bipados.</p>';
+ const linhas=cz307Linhas().filter(x=>x.voltou>0);
+ return tabela(['Produto / Código','Contratado','Extra','Levou','Voltou','Contagem'],linhas.map(x=>cz307Linha(x.nome,x.codigo,x.contratado,x.extra,x.levou,x.voltou)).join(''));
 }
+function cz307TemFaltantes(){const {extras,ativos}=resumo();return extras.some(x=>restante(x)>0)||ativos.some(x=>dev(x)<qtd(x));}
 function cz291Pendencias(){
  const {extras,ativos}=resumo();
  const extraLinhas=extras.filter(x=>restante(x)>0).map(x=>`<div class="cz245Row" style="justify-content:space-between;margin:8px 0"><span><b>${E(nome(x))}</b> · ${restante(x)} faltando</span><span><button class="cz245Btn alt" onclick="cz245AbrirAcao('${E(chave(x))}','pdv')">PDV</button> <button class="cz245Btn alt" onclick="cz245AbrirAcao('${E(chave(x))}','sub')">Substituição</button></span></div>`).join('');
@@ -8267,7 +8278,7 @@ function render(){
  ${String(id)===CZ299_EVENTO&&mat.some(x=>ativo(x)&&qtd(x)>0&&!cz293CodigosSaida(x).length)?`<div class="cz245Card"><b>Evento antigo — regularizar identificação dos rastreios</b><p>Somente para este evento: escolha os códigos que realmente saíram. A regularização não altera o estoque.</p><button class="cz245Btn alt" onclick="cz299AbrirRegularizacao()">Identificar rastreios da saída</button><div id="cz299Area"></div></div>`:""}
  <div class="cz245Card"><h3>2. Lista de Bipagem de Retorno</h3><div id="cz291ListaBipados">${cz291ListaBipados()}</div></div>
  <div class="cz245Card"><h3>3. Lista principal — Materiais enviados</h3><div id="cz291ListaPrincipal">${cz291ListaPrincipal()}</div></div>
- ${concluido?cz291Pendencias():''}
+ ${concluido||cz307TemFaltantes()?cz291Pendencias():''}
  <div class="cz245Card"><div class="cz245Row"><button class="cz245Btn" onclick="cz245Finalizar()" ${evento.status==='finalizado'?'disabled':''}>✓ Concluir Retorno de Evento</button><button class="cz245Btn alt" onclick="cz245Imprimir()">▤ Imprimir Relatório</button></div></div>`;
  if(aberto)cz291AtivarLeitor();
  if(modal)desenharModal();
@@ -8347,6 +8358,12 @@ function desenharModal(){if(!modal)return;const x=mat.find(x=>chave(x)===modal.m
    });
    inp.focus();
   }
+ }else if(modal.tipo==='cz307faltantes'){
+  const pendExtras=extras.filter(x=>restante(x)>0);
+  const pendAtivos=ativos.filter(x=>dev(x)<qtd(x));
+  const extraHtml=pendExtras.map(x=>`<div style="padding:10px 0;border-bottom:1px solid #ddd"><b>${E(nome(x))}</b> · ${restante(x)} unidade(s) faltando <div class="cz245Row" style="margin-top:7px"><button class="cz245Btn alt" onclick="cz245AbrirAcao('${E(chave(x))}','pdv')">PDV</button><button class="cz245Btn alt" onclick="cz245AbrirAcao('${E(chave(x))}','sub')">Substituição CZ</button></div></div>`).join('');
+  const ativoHtml=pendAtivos.map(x=>`<div style="padding:10px 0;border-bottom:1px solid #ddd"><b>${E(nome(x))}</b> · ${qtd(x)-dev(x)} unidade(s) faltando <div class="cz245Muted">${E(cz293CodigoLinha(x))}</div><div class="cz245Row" style="margin-top:7px"><button class="cz245Btn alt" onclick="cz245Aguardar('${E(chave(x))}')">Procurar</button><button class="cz245Btn alt" onclick="cz245Perda('${E(chave(x))}')">Perda</button></div></div>`).join('');
+  popup(`<p>Confira os materiais não devolvidos. <b>O evento não será finalizado enquanto houver pendências sem confirmação.</b></p>${pendExtras.length?'<h4>Consumíveis extras — PDV ou substituição</h4>'+extraHtml:''}${pendAtivos.length?'<h4>Equipamentos ativos — procurar ou perda</h4>'+ativoHtml:''}<div class="cz245Row" style="margin-top:15px"><button class="cz245Btn alt" onclick="cz245Fechar()">Fechar e conferir</button></div>`);
  }else if(modal.tipo==='faltantes'){
   const falt=extras.filter(x=>restante(x)>0);popup(falt.length?`<p>Informe o destino das unidades extras não devolvidas.</p>${tabela(['Descrição','Faltante','PDV','Substituição','Ações'],falt.map(x=>`<tr><td>${E(nome(x))}</td><td>${restante(x)}</td><td>${decisao(x).pdv||0}</td><td>${decisao(x).sub||0}</td><td><button class="cz245Btn alt" onclick="cz245AbrirAcao('${E(chave(x))}','pdv')">PDV</button> <button class="cz245Btn alt" onclick="cz245AbrirAcao('${E(chave(x))}','sub')">Substituir</button></td></tr>`).join(''))}<button class="cz245Btn" onclick="cz245AbrirScan('extra')">Voltar à bipagem</button>`:`<p style="color:#8be9b1">✓ Nenhum extra faltante sem destino.</p><button class="cz245Btn" onclick="cz245Fechar()">Fechar</button>`);
  }else if(modal.tipo==='acao'){
@@ -8506,7 +8523,16 @@ window.cz245Finalizar=async()=>{
   if(classificados.length)avisos.push('EXTRAS CLASSIFICADOS, MAS SEM CONFIRMAÇÃO OFICIAL NO BANCO: '+classificados.map(x=>nome(x)+' ('+pendExtra(x)+' unidade(s); PDV '+(decisao(x).pdv||0)+'; substituição '+(decisao(x).sub||0)+')').join('; '));
  }
  if(!evento.saida_baixada_em)avisos.push('SAÍDA DO EVENTO AINDA NÃO CONFIRMADA NO SUPABASE.');
- if(avisos.length)return czAlert('Não foi possível concluir o retorno.\n\n'+avisos.join('\n\n')+'\n\nRegularize os itens indicados antes de finalizar. Nenhuma movimentação foi alterada.','Pendências do retorno');
+ if(avisos.length){
+  // A tela de pendências abre com as ações existentes, sem fazer baixa ou PDV automaticamente.
+  window.cz291BipagemAberta=false;window.cz291BipagemConcluida=true;
+  render();
+  if(ativosPendentes.length||extras.some(x=>restante(x)>0)){
+   modal={tipo:'cz307faltantes',titulo:'Materiais faltantes — decidir antes de concluir'};
+   desenharModal();
+  }else await czAlert('O retorno ainda tem pendências que exigem confirmação no banco.\n\n'+avisos.join('\n\n'),'Pendências do retorno');
+  return;
+ }
  if(!await czConfirm('Concluir o retorno e mover o evento para Eventos Concluídos?','Concluir retorno','Finalizar evento'))return;
  cz245Finalizando=true;
  const botao=document.querySelector('button[onclick="cz245Finalizar()"]');
