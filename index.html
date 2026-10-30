@@ -7514,7 +7514,51 @@ sair142Abrir=async function(id){
  czNovoOcultarSelecao(document.getElementById('sair222Tabela'));
  czNovoOcultarSelecao(document.getElementById('sair234TabelaExtras'));
  const inp=document.getElementById('sair142Cod');
- if(inp){let timer=null;inp.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key==='Tab'){ev.preventDefault();clearTimeout(timer);czNovoBiparSaida(id)}});inp.addEventListener('input',()=>{clearTimeout(timer);if(inp.value.trim())timer=setTimeout(()=>czNovoBiparSaida(id),650)});inp.focus()}
+ if(inp)cz320InstalarLeitorSaida(inp,id);
+}
+// V320 — mesma experiencia de leitura do Retorno: uma fila sequencial para a Saida.
+// Cada bipagem de lote e preservada, inclusive codigos repetidos intencionalmente.
+const cz320FilaSaida=[];
+let cz320ProcessandoSaida=false;
+function cz320InstalarLeitorSaida(inp,id){
+ if(!inp||inp.dataset.cz320Leitor==='1')return;
+ inp.dataset.cz320Leitor='1';
+ let timer=null;
+ function enfileirar(){
+  clearTimeout(timer);
+  const codigo=normalizarCodigoEvento(inp.value);
+  if(!codigo)return;
+  inp.value=''; // evita disparo duplo pelo Enter e pelo temporizador
+  cz320FilaSaida.push({id:String(id),codigo});
+  void cz320ExecutarFilaSaida();
+ }
+ inp.addEventListener('keydown',ev=>{
+  if(ev.key!=='Enter'&&ev.key!=='Tab')return;
+  ev.preventDefault();enfileirar();
+ });
+ inp.addEventListener('input',()=>{
+  clearTimeout(timer);
+  if(normalizarCodigoEvento(inp.value).length>=4)
+   timer=setTimeout(()=>{if(inp.isConnected)enfileirar()},650);
+ });
+ inp.focus();
+}
+async function cz320ExecutarFilaSaida(){
+ if(cz320ProcessandoSaida)return;
+ cz320ProcessandoSaida=true;
+ try{
+  while(cz320FilaSaida.length){
+   const {id,codigo}=cz320FilaSaida.shift();
+   const inp=document.getElementById('sair142Cod');
+   if(!inp){cz320FilaSaida.length=0;break;}
+   // O processador recebe o codigo explicitamente; nao le o campo que o operador esta usando.
+   const ok=await czNovoBiparSaida(id,codigo);
+   if(!ok){cz320FilaSaida.length=0;break;}
+  }
+ }finally{
+  cz320ProcessandoSaida=false;
+  const inp=document.getElementById('sair142Cod');if(inp)inp.focus();
+ }
 }
 // CZ V317 — sincronização da conferência com a fonte única (Supabase).
 // O cache em memória serve somente para a tela; nunca como confirmação de gravação.
@@ -7539,10 +7583,10 @@ async function cz317AguardarSaidaNoServidor(eventoId,materialId,minimoHistorico,
 }
 // Bipagem de saída V2: conta cada leitura de consumível, sem seleção ou modal.
 // A conferência é um rascunho local; a baixa oficial continua em sair142DarSaida.
-async function czNovoBiparSaida(id){
- if(czNovoScannerOcupado)return;
+async function czNovoBiparSaida(id,codigoRecebido){
+ if(czNovoScannerOcupado)return false;
  const inp=document.getElementById('sair142Cod');
- const codigo=normalizarCodigoEvento(inp?.value||'');
+ const codigo=normalizarCodigoEvento(codigoRecebido||inp?.value||'');
  if(!codigo)return;
  czNovoScannerOcupado=true;
  const aviso=document.getElementById('sair220Aviso');
@@ -7586,17 +7630,20 @@ async function czNovoBiparSaida(id){
    await sair142Abrir(id);
    const status=document.getElementById('sair220Aviso');
    if(status){status.style.color='#8de8a8';status.textContent='✓ '+sair222Nome(item)+' — '+contagens[item.id]+'/'+sair220Qtd(item)+' unidades conferidas e salvas no servidor';}
+   return true;
   }catch(erroTela){
    // A leitura JÁ está gravada: erro de atualização visual não é erro de código.
    const status=document.getElementById('sair220Aviso')||aviso;
    if(status){status.style.color='#fbbf24';status.textContent='✓ Leitura salva no servidor. Não bipe novamente. Falha apenas ao atualizar a tela: '+(erroTela.message||erroTela);}
+   return true;
   }
  }catch(e){
   const status=document.getElementById('sair220Aviso')||aviso;
   if(status){status.style.color='#ff9d9d';status.textContent=e.message||String(e);}
+  return false;
  }finally{
   czNovoScannerOcupado=false;
-  const novo=document.getElementById('sair142Cod');if(novo){novo.value='';novo.focus();}
+  const novo=document.getElementById('sair142Cod');if(novo)novo.focus();
  }
 }
 const czNovoRetornoAbrirOriginal=ret226Abrir;
