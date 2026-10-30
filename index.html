@@ -282,7 +282,7 @@ body .ret226Dialog button[aria-label="Fechar"]{color:#334155!important}
   },4000);
 })();
 </script>
-<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><span id="czBuildTag" style="margin-left:10px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:900">V313</span><div class="muted" style="font-size:12px">Sistema de gestão CZ · Atualização V282-A1</div></div><div><span id="czNuvemStatus" title="Sincronização de dados da empresa" style="font-size:12px;color:#86efac;margin-right:8px">☁ Aguardando login</span> <button id="czNuvemAtualizar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.atualizar()">Atualizar dados</button> <button id="czNuvemImportar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.importarLegado()">Importar dados antigos</button> <span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
+<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><span id="czBuildTag" style="margin-left:10px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:900">V314</span><div class="muted" style="font-size:12px">Sistema de gestão CZ · Atualização V282-A1</div></div><div><span id="czNuvemStatus" title="Sincronização de dados da empresa" style="font-size:12px;color:#86efac;margin-right:8px">☁ Aguardando login</span> <button id="czNuvemAtualizar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.atualizar()">Atualizar dados</button> <button id="czNuvemImportar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.importarLegado()">Importar dados antigos</button> <span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
 <div id="clientModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="modalTitle">Novo cliente</h2><button class="btn secondary" onclick="closeClient()">Fechar</button></div>
   <input id="clientId" type="hidden"><div class="muted" id="clientOpenedAt" style="font-size:13px">Data de abertura: será definida ao salvar</div>
   <div class="row"><div class="field"><label>Nome / Razão social *</label><input id="clientName" autocomplete="name"></div><div class="field"><label>Telefone *</label><input id="clientPhone" type="tel" inputmode="tel" autocomplete="tel"><div id="clientPhoneAviso" role="status" style="font-size:12px;margin-top:5px"></div></div></div>
@@ -4346,11 +4346,11 @@ async function biparRetornoEvento(eventoId,materialSelecionadoId=null){
   const ids=[...new Set(ativosDoEvento.map(m=>m.item_id))];
   let ativos=[];
   if(ids.length){
-   const r=await db.from('ativos').select('id,observacoes').in('id',ids);
+   const r=await db.from('ativos').select('id,observacoes,quantidade,codigo_interno').in('id',ids);
    if(r.error)throw r.error;
    ativos=r.data||[];
   }
-  const correspondentes=ativos.filter(a=>unidadesAtivo(a).some(c=>normalizarCodigoEvento(c)===codigo)||!!cz274Lote(a)&&normalizarCodigoEvento(cz274Lote(a))===codigo||ativosDoEvento.some(m=>String(m.item_id)===String(a.id)&&normalizarCodigoEvento(porId.get(String(m.id))?._codigoLote)===codigo));
+  const correspondentes=ativos.filter(a=>unidadesAtivo(a).some(c=>normalizarCodigoEvento(c)===codigo)||!!cz274Lote(a)&&normalizarCodigoEvento(cz274Lote(a))===codigo||ativosDoEvento.some(m=>String(m.item_id)===String(a.id)&&normalizarCodigoEvento(porId.get(String(m.id))?._codigoLote)===codigo)||window.cz299Regularizacao?.evento===String(eventoId)&&window.cz299Regularizacao?.materiais?.some(r=>String(r.cadastroId)===String(a.id)&&r.codigos?.map(normalizarCodigoEvento).includes(codigo)));
   if(correspondentes.length>1)throw new Error('Este código de rastreio está duplicado em mais de um cadastro de ativo.');
   const ativo=correspondentes[0]||null;
   const regLote=window.cz299Regularizacao?.evento===String(eventoId)&&window.cz299Regularizacao?.materiais?.some(r=>r.tipo==='lote'&&String(r.cadastroId)===String(ativo?.id)&&Array.isArray(r.codigos)&&r.codigos.map(normalizarCodigoEvento).includes(codigo));
@@ -5953,7 +5953,7 @@ async function sair221Materiais(eventoId){
   // Rastreios individuais têm precedência sobre o código geral do cadastro.
   const codigoLote=ativo?String(cz274Lote(cad)||'').trim():'';
   const codigos=ativo?(codigoLote?[codigoLote]:rastreios):(codProduto?[codProduto]:[]);
-  return {...x,_codigos:codigos,_codigoLote:codigoLote,_codigoExibicao:codigos.join(' · ')||(!ativo?String(x.codigo||'').trim():'Cadastre rastreios individuais')};
+  return {...x,_codigos:codigos,_codigoLote:codigoLote,_codigoCadastro:ativo?String(cad?.codigo_interno||'').trim():'',_codigoExibicao:codigos.join(' · ')||(!ativo?String(x.codigo||'').trim():'Cadastre rastreios individuais')};
  });
 }
 /* ===== V220 — SAIR PRO EVENTO: BIPAGEM AUTOMÁTICA E CONFERÊNCIA POR QUANTIDADE ===== */
@@ -8219,7 +8219,9 @@ function cz312LoteMaterial(x){
 // V313: cadastro legado pode ter uma etiqueta única sem a marca CZ274_LOTE.
 // Não converter automaticamente em lote: exigir confirmação expressa do operador.
 function cz313CandidatoLote(x){
- const cs=[...new Set((x?._codigos||[]).map(normalizarCodigoEvento).filter(Boolean))];
+ const base=(x?._codigos||[]).map(normalizarCodigoEvento).filter(Boolean);
+ const cs=[...new Set(base.length?base:[x?._codigoCadastro].map(normalizarCodigoEvento).filter(Boolean))];
+ // V314: permitir confirmar etiqueta única de cadastro legado, sem presumir automaticamente que é lote.
  return !cz312LoteMaterial(x)&&qtd(x)>1&&cs.length===1?cs[0]:'';
 }
 function cz313LoteConfirmado(x){
@@ -8253,7 +8255,7 @@ window.cz299SalvarRegularizacao=async()=>{
   const confirmadoLegado=!!cz313CandidatoLote(x)&&lote===cz313CandidatoLote(x)&&!!document.querySelector('.cz313ConfirmarLote[data-material="'+String(x.id)+'"]:checked');
   const codigos=lote?((loteSelecionado&&normalizarCodigoEvento(loteSelecionado.value)===lote)||confirmadoLegado?Array(qtd(x)).fill(lote):[]):[...document.querySelectorAll('.cz299Opcao')].filter(c=>c.dataset.material===String(x.id)&&c.checked).map(c=>normalizarCodigoEvento(c.value));
   if(codigos.length!==qtd(x)||(!lote&&new Set(codigos).size!==codigos.length)){msg.textContent=`Confirme exatamente ${qtd(x)} rastreio(s) para ${nome(x)}.`;return;}
-  const cadastro=(x._codigos||[]).map(normalizarCodigoEvento);
+  const cadastro=[...(x._codigos||[]),x._codigoCadastro].map(normalizarCodigoEvento).filter(Boolean);
   if(codigos.some(c=>!cadastro.includes(c)&&c!==lote)){msg.textContent='Código não pertence ao cadastro do ativo.';return;}
   materiais.push({materialId:String(x.id),cadastroId:String(x.item_id),codigos,quantidade:qtd(x),tipo:lote?'lote':'individual'});
   if(!lote)todos.push(...codigos);
@@ -8271,7 +8273,14 @@ window.cz299SalvarRegularizacao=async()=>{
   let todos;try{todos=JSON.parse(anterior.valor)}catch(_){throw Error('Histórico compartilhado inválido. Nenhuma alteração foi feita.');}
   if(!todos||typeof todos!=='object'||Array.isArray(todos))throw Error('Formato inválido do histórico de saída.');
   const existente=todos[String(id)];
-  if(existente?.regularizacao_rastreios_v300)throw Error('Já existe regularização para este evento. Atualize a tela.');
+  // V314: manter regularizações já confirmadas e acrescentar apenas as linhas faltantes.
+  const anteriorReg=existente?.regularizacao_rastreios_v300;
+  if(anteriorReg&&(anteriorReg.evento!==String(id)||!Array.isArray(anteriorReg.materiais)))throw Error('Regularização anterior inválida; nenhuma alteração feita.');
+  const preservados=anteriorReg?.materiais||[];
+  for(const novo of materiais){
+   if(preservados.some(a=>String(a.materialId)===String(novo.materialId)))throw Error('Uma linha já foi regularizada. Atualize o evento antes de continuar.');
+  }
+  registro.materiais=[...preservados,...materiais];
   // Nunca altera a quantidade ou o estado da saída: adiciona apenas metadados de rastreio.
   todos[String(id)]={...(existente||{}),regularizacao_rastreios_v300:registro};
   const {data:gravado,error}=await db.from('cz_estado_compartilhado')
