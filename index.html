@@ -282,7 +282,7 @@ body .ret226Dialog button[aria-label="Fechar"]{color:#334155!important}
   },4000);
 })();
 </script>
-<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><span id="czBuildTag" style="margin-left:10px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:900">V316</span><div class="muted" style="font-size:12px">Sistema de gestão CZ · Atualização V282-A1</div></div><div><span id="czNuvemStatus" title="Sincronização de dados da empresa" style="font-size:12px;color:#86efac;margin-right:8px">☁ Aguardando login</span> <button id="czNuvemAtualizar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.atualizar()">Atualizar dados</button> <button id="czNuvemImportar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.importarLegado()">Importar dados antigos</button> <span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
+<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><span id="czBuildTag" style="margin-left:10px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:900">V317</span><div class="muted" style="font-size:12px">Sistema de gestão CZ · Atualização V282-A1</div></div><div><span id="czNuvemStatus" title="Sincronização de dados da empresa" style="font-size:12px;color:#86efac;margin-right:8px">☁ Aguardando login</span> <button id="czNuvemAtualizar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.atualizar()">Atualizar dados</button> <button id="czNuvemImportar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.importarLegado()">Importar dados antigos</button> <span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
 <div id="clientModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="modalTitle">Novo cliente</h2><button class="btn secondary" onclick="closeClient()">Fechar</button></div>
   <input id="clientId" type="hidden"><div class="muted" id="clientOpenedAt" style="font-size:13px">Data de abertura: será definida ao salvar</div>
   <div class="row"><div class="field"><label>Nome / Razão social *</label><input id="clientName" autocomplete="name"></div><div class="field"><label>Telefone *</label><input id="clientPhone" type="tel" inputmode="tel" autocomplete="tel"><div id="clientPhoneAviso" role="status" style="font-size:12px;margin-top:5px"></div></div></div>
@@ -4461,14 +4461,17 @@ async function biparRetornoEvento(eventoId,materialSelecionadoId=null){
    }
   }
   if(campo)campo.value='';
-  if(materialSelecionadoId){
-   // Preserva a janela central e atualiza a contagem na própria tela.
-   const atual=await db.from('evento_materiais').select('*').eq('id',material.id).single();
-   if(!atual.error&&ret226Cache){
-    ret226Cache.mats=ret226Cache.mats.map(m=>String(m.id)===String(material.id)?{...m,...atual.data}:m);
-   }
-   ret226Pintar(eventoId);
-  }else await abrirRetornoEvento(eventoId);
+  // V317: depois de confirmar a devolução, qualquer falha de redesenho
+  // não pode transformar um sucesso no Supabase em "código não reconhecido".
+  try{
+   if(materialSelecionadoId){
+    const atual=await db.from('evento_materiais').select('*').eq('id',material.id).single();
+    if(!atual.error&&ret226Cache){
+     ret226Cache.mats=ret226Cache.mats.map(m=>String(m.id)===String(material.id)?{...m,...atual.data}:m);
+    }
+    ret226Pintar(eventoId);
+   }else await abrirRetornoEvento(eventoId);
+  }catch(erroVisual){console.warn('[CZ V317] Devolução registrada; atualização visual pendente:',erroVisual);}
   return true;
  }catch(err){
   if(msg){msg.style.color='#ffb0b0';msg.textContent='Não foi possível registrar o retorno: '+(err?.message||err)}
@@ -7513,6 +7516,27 @@ sair142Abrir=async function(id){
  const inp=document.getElementById('sair142Cod');
  if(inp){let timer=null;inp.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key==='Tab'){ev.preventDefault();clearTimeout(timer);czNovoBiparSaida(id)}});inp.addEventListener('input',()=>{clearTimeout(timer);if(inp.value.trim())timer=setTimeout(()=>czNovoBiparSaida(id),650)});inp.focus()}
 }
+// CZ V317 — sincronização da conferência com a fonte única (Supabase).
+// O cache em memória serve somente para a tela; nunca como confirmação de gravação.
+async function cz317AguardarSaidaNoServidor(eventoId,materialId,minimoHistorico,codigo){
+ const chave='cz_v142_saida_eventos';
+ for(let tentativa=0;tentativa<24;tentativa++){
+  // A fila do armazenamento compartilhado pode já estar enviando outra chave.
+  // Não aceitar o retorno antecipado de descarregar() como sucesso.
+  if(czSharedStorage.pendentes.has(chave))await czSharedStorage.descarregar();
+  const r=await db.from('cz_estado_compartilhado').select('valor').eq('chave',chave).maybeSingle();
+  if(r.error)throw new Error('Não foi possível verificar a leitura no servidor: '+r.error.message);
+  let todos={};try{todos=JSON.parse(r.data?.valor||'{}')}catch(_){throw new Error('Histórico da saída inválido no servidor. Não repita a leitura.');}
+  const st=todos[String(eventoId)]||{};
+  const h=Array.isArray(st.historico)?st.historico:[];
+  if(h.length>=minimoHistorico&&h.some(x=>String(x.material_id)===String(materialId)&&normalizarCodigoEvento(x.codigo)===codigo)){
+   window.cz294SaidaRemota=todos;
+   return;
+  }
+  await new Promise(resolve=>setTimeout(resolve,250));
+ }
+ throw new Error('A leitura está aguardando confirmação no Supabase. NÃO bipe novamente nem feche a tela. Verifique o indicador da nuvem e atualize os dados quando sincronizar.');
+}
 // Bipagem de saída V2: conta cada leitura de consumível, sem seleção ou modal.
 // A conferência é um rascunho local; a baixa oficial continua em sair142DarSaida.
 async function czNovoBiparSaida(id){
@@ -7551,10 +7575,22 @@ async function czNovoBiparSaida(id){
    rastreiosLidos:sair220Ativo(item)&&!cz274CodigoEmLote(codigo,item)?[...(st.rastreiosLidos||[]),codigo]:(st.rastreiosLidos||[]),
    historico
   });
-  // Recarrega as tabelas e o resumo, sem abrir a antiga janela de bipagem.
-  await sair142Abrir(id);
-  const status=document.getElementById('sair220Aviso');
-  if(status){status.style.color='#8de8a8';status.textContent='✓ '+sair222Nome(item)+' — '+contagens[item.id]+'/'+sair220Qtd(item)+' unidades conferidas';}
+  // V317: não recarregar da nuvem antes da gravação terminar. Isso fazia a
+  // tela consultar a versão anterior, rejeitar a leitura seguinte e só
+  // mostrar a contagem correta depois de F5.
+  const statusSalvando=document.getElementById('sair220Aviso');
+  if(statusSalvando){statusSalvando.style.color='#fbbf24';statusSalvando.textContent='Código '+codigo+' identificado. Confirmando no servidor...';}
+  await cz317AguardarSaidaNoServidor(id,item.id,historico.length,codigo);
+  // Atualizar a tela apenas depois da confirmação real no Supabase.
+  try{
+   await sair142Abrir(id);
+   const status=document.getElementById('sair220Aviso');
+   if(status){status.style.color='#8de8a8';status.textContent='✓ '+sair222Nome(item)+' — '+contagens[item.id]+'/'+sair220Qtd(item)+' unidades conferidas e salvas no servidor';}
+  }catch(erroTela){
+   // A leitura JÁ está gravada: erro de atualização visual não é erro de código.
+   const status=document.getElementById('sair220Aviso')||aviso;
+   if(status){status.style.color='#fbbf24';status.textContent='✓ Leitura salva no servidor. Não bipe novamente. Falha apenas ao atualizar a tela: '+(erroTela.message||erroTela);}
+  }
  }catch(e){
   const status=document.getElementById('sair220Aviso')||aviso;
   if(status){status.style.color='#ff9d9d';status.textContent=e.message||String(e);}
@@ -8594,7 +8630,7 @@ window.cz245Bipar=async()=>{
  const st=sair142State(id),historico=st.historico||[];
  const ativosCodigo=candidatos.filter(ativo);
  const alvo=ativosCodigo.length?(ativosCodigo.find(x=>historico.some(h=>String(h.material_id)===String(x.id)&&normalizarCodigoEvento(h.codigo)===codigo))||ativosCodigo[0]):candidatos.sort((a,b)=>Number(extra(b))-Number(extra(a)))[0];
- ocupado=true;try{const ok=await biparRetornoEvento(id,alvo.id);if(!ok)throw Error(document.getElementById('retMsg')?.textContent||'Falha na leitura.');const antes=tipo;await carregar();if(window.cz291BipagemAberta){modal=null;render();const m=document.getElementById('retMsg');if(m){m.style.color='#15803d';m.textContent='✓ '+nome(alvo)+' · Código '+codigo;setTimeout(()=>{if(m.isConnected)m.textContent=''},2000)}}else{modal={tipo:antes,titulo:antes==='todos'?'Bipagem única — Todo material devolvido':antes==='ativo'?'Bipagem Livre — Ativos':'Bipagem — Consumíveis devolvidos'};render();const m=document.getElementById('retMsg');if(m){m.style.color='#8be9b1';m.textContent='✓ Código reconhecido e devolução registrada.'}}}
+ ocupado=true;try{const ok=await biparRetornoEvento(id,alvo.id);if(!ok)throw Error(document.getElementById('retMsg')?.textContent||'Falha na leitura.');const antes=tipo;try{await carregar()}catch(erroAtualizacao){const aviso=document.getElementById('retMsg');if(aviso){aviso.style.color='#b45309';aviso.textContent='✓ Devolução salva no Supabase. Não bipe novamente. A tela não atualizou: '+(erroAtualizacao.message||erroAtualizacao)}return}if(window.cz291BipagemAberta){modal=null;render();const m=document.getElementById('retMsg');if(m){m.style.color='#15803d';m.textContent='✓ '+nome(alvo)+' · Código '+codigo;setTimeout(()=>{if(m.isConnected)m.textContent=''},2000)}}else{modal={tipo:antes,titulo:antes==='todos'?'Bipagem única — Todo material devolvido':antes==='ativo'?'Bipagem Livre — Ativos':'Bipagem — Consumíveis devolvidos'};render();const m=document.getElementById('retMsg');if(m){m.style.color='#8be9b1';m.textContent='✓ Código reconhecido e devolução registrada.'}}}
  catch(e){const aviso=document.getElementById('retMsg');if(aviso){aviso.style.color='#b42318';aviso.textContent=e.message}}finally{ocupado=false;const novo=document.getElementById('scanRetorno');if(novo){novo.value='';novo.focus()}}
 };
 window.cz245Perda=async mid=>{const x=mat.find(x=>chave(x)===mid);if(!x)return;await marcarPerdaRetorno(id,x.id,x.item_id||'');await carregar();window.cz245FaltantesAtivos()};
