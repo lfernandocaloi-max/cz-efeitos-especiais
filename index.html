@@ -282,7 +282,7 @@ body .ret226Dialog button[aria-label="Fechar"]{color:#334155!important}
   },4000);
 })();
 </script>
-<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><span id="czBuildTag" style="margin-left:10px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:900">V317</span><div class="muted" style="font-size:12px">Sistema de gestão CZ · Atualização V282-A1</div></div><div><span id="czNuvemStatus" title="Sincronização de dados da empresa" style="font-size:12px;color:#86efac;margin-right:8px">☁ Aguardando login</span> <button id="czNuvemAtualizar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.atualizar()">Atualizar dados</button> <button id="czNuvemImportar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.importarLegado()">Importar dados antigos</button> <span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
+<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><span id="czBuildTag" style="margin-left:10px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:900">V319</span><div class="muted" style="font-size:12px">Sistema de gestão CZ · Atualização V282-A1</div></div><div><span id="czNuvemStatus" title="Sincronização de dados da empresa" style="font-size:12px;color:#86efac;margin-right:8px">☁ Aguardando login</span> <button id="czNuvemAtualizar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.atualizar()">Atualizar dados</button> <button id="czNuvemImportar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.importarLegado()">Importar dados antigos</button> <span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
 <div id="clientModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="modalTitle">Novo cliente</h2><button class="btn secondary" onclick="closeClient()">Fechar</button></div>
   <input id="clientId" type="hidden"><div class="muted" id="clientOpenedAt" style="font-size:13px">Data de abertura: será definida ao salvar</div>
   <div class="row"><div class="field"><label>Nome / Razão social *</label><input id="clientName" autocomplete="name"></div><div class="field"><label>Telefone *</label><input id="clientPhone" type="tel" inputmode="tel" autocomplete="tel"><div id="clientPhoneAviso" role="status" style="font-size:12px;margin-top:5px"></div></div></div>
@@ -4407,9 +4407,9 @@ async function biparRetornoEvento(eventoId,materialSelecionadoId=null){
     }
     material=selecionado;
    }else{
-    material=produtos.find(m=>corresponde(m)&&(
+    material=produtos.filter(m=>corresponde(m)&&(
      (e.saida_baixada_em?Number(m.quantidade_devolvida||0):Number(retornoInfo(m.id).qtd||0))<qtdSaida(m)
-    ))||null;
+    )).sort((a,b)=>Number(['extra','extras'].includes(String(b.origem||'').toLowerCase()))-Number(['extra','extras'].includes(String(a.origem||'').toLowerCase())))[0]||null;
    }
    if(!material)throw new Error('Não há unidades pendentes para esse código neste evento. Confira a saída e a linha selecionada.');
   }
@@ -8462,13 +8462,55 @@ window.cz297Diagnostico=window.cz298Diagnostico;
 
 window.cz291IniciarBipagem=()=>{window.cz291BipagemAberta=true;window.cz291BipagemConcluida=false;render()};
 window.cz291ConcluirBipagem=()=>{window.cz291BipagemAberta=false;window.cz291BipagemConcluida=true;render()};
-function cz291AtivarLeitor(){
- const inp=document.getElementById('scanRetorno');if(!inp)return;
- let timer=null;
- inp.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key==='Tab'){ev.preventDefault();clearTimeout(timer);if(inp.value.trim())window.cz245Bipar()}});
- inp.addEventListener('input',()=>{clearTimeout(timer);if(normalizarCodigoEvento(inp.value).length>=4)timer=setTimeout(()=>{if(inp.isConnected&&!ocupado&&inp.value.trim())window.cz245Bipar()},450)});
+// V319: um unico controlador de leitor para as duas apresentacoes do Retorno.
+// Enter/Tab cancela o temporizador, e leituras durante gravacao ficam na fila.
+const cz319FilaRetorno=[];
+let cz319TimerLeitor=null,cz319Processando=false;
+function cz319InstalarLeitor(inp){
+ if(!inp||inp.dataset.cz319Leitor==='1')return;
+ inp.dataset.cz319Leitor='1';
+ inp.addEventListener('keydown',ev=>{
+  if(ev.key!=='Enter'&&ev.key!=='Tab')return;
+  ev.preventDefault();clearTimeout(cz319TimerLeitor);
+  cz319Enfileirar(inp);
+ });
+ inp.addEventListener('input',()=>{
+  clearTimeout(cz319TimerLeitor);
+  if(normalizarCodigoEvento(inp.value).length>=4){
+   cz319TimerLeitor=setTimeout(()=>{if(inp.isConnected)cz319Enfileirar(inp)},550);
+  }
+ });
  inp.focus();
 }
+function cz319Enfileirar(inp){
+ const codigo=normalizarCodigoEvento(inp?.value);
+ if(!codigo)return;
+ inp.value='';
+ // Nao duplicar a mesma leitura por Enter + timer.
+ const ultimo=cz319FilaRetorno[cz319FilaRetorno.length-1];
+ if(ultimo!==codigo)cz319FilaRetorno.push(codigo);
+ void cz319ExecutarFila();
+}
+async function cz319ExecutarFila(){
+ if(cz319Processando)return;
+ cz319Processando=true;
+ try{
+  while(cz319FilaRetorno.length){
+   const codigo=cz319FilaRetorno.shift();
+   const inp=document.getElementById('scanRetorno');
+   if(!inp||!id)break;
+   inp.value=codigo;
+   const ok=await window.cz245Bipar();
+   // Erro: interromper a fila, evitando repetir um lancamento de resultado incerto.
+   if(!ok){cz319FilaRetorno.length=0;break;}
+  }
+ }finally{
+  cz319Processando=false;
+  const inp=document.getElementById('scanRetorno');
+  if(inp){inp.value='';inp.focus()}
+ }
+}
+function cz291AtivarLeitor(){cz319InstalarLeitor(document.getElementById('scanRetorno'))}
 function popup(html){document.getElementById('cz245Overlay')?.remove();const ov=document.createElement('div');ov.id='cz245Overlay';ov.className='cz245Modal';ov.innerHTML=`<div class="cz245Box" role="dialog" aria-modal="true"><div class="cz245Head"><h3 style="margin:0">${modal.titulo}</h3><button class="cz245Btn alt" onclick="cz245Fechar()">✕</button></div>${html}</div>`;document.body.appendChild(ov);ov.addEventListener('click',ev=>{if(ev.target===ov)window.cz245Fechar()});}
 window.cz245Fechar=()=>{modal=null;document.getElementById('cz245Overlay')?.remove()};
 window.cz245AbrirCons=()=>czAlert('A baixa contratada agora é automática, calculada pela bipagem do retorno. Não há segunda confirmação.','Consumo automático');
@@ -8483,25 +8525,7 @@ function desenharModal(){if(!modal)return;const x=mat.find(x=>chave(x)===modal.m
  }else if(modal.tipo==='extra'||modal.tipo==='consumo'||modal.tipo==='ativo'||modal.tipo==='todos'){
   const lista=modal.tipo==='todos'?mat:modal.tipo==='ativo'?ativos:modal.tipo==='consumo'?[...cons,...extras]:extras;const total=lista.reduce((s,x)=>s+qtd(x),0),voltou=lista.reduce((s,x)=>s+dev(x),0);
   popup(`<div class="cz245Stats"><div>Total<b>${total}</b></div><div>Bipado<b>${voltou}</b></div><div>Falta<b>${total-voltou}</b></div></div><p class="cz245Muted">Bipe diretamente: a leitura será registrada automaticamente. Aceita leitores que enviam Enter ou Tab. Nos consumíveis, a devolução prioriza os extras.</p><input id="scanRetorno" class="cz245Input" autocomplete="off" placeholder="Bipe o código de barras..."><div id="retMsg" role="status" style="min-height:30px;color:#ffb4a3;margin:8px 0"></div> <button class="cz245Btn alt" onclick="cz245Faltantes()">Classificar extras</button> <button class="cz245Btn alt" onclick="cz245FaltantesAtivos()">Ativos faltantes</button><div style="margin-top:12px">${lista.map(x=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #35495b"><span>${E(nome(x))}</span><b>${dev(x)}/${qtd(x)}</b></div>`).join('')}</div>`);
-  const inp=document.getElementById('scanRetorno');
-  if(inp){
-   // Leitores USB podem finalizar com Enter, Tab ou apenas enviar o texto.
-   // Não exige botão de confirmação e mantém o foco para a próxima leitura.
-   let timer=null;
-   inp.addEventListener('keydown',ev=>{
-    if(ev.key==='Enter'||ev.key==='Tab'){
-     ev.preventDefault();if(timer)clearTimeout(timer);
-     if(inp.value.trim())window.cz245Bipar();
-    }
-   });
-   inp.addEventListener('input',()=>{
-    if(timer)clearTimeout(timer);
-    if(normalizarCodigoEvento(inp.value).length>=4){
-     timer=setTimeout(()=>{if(inp.isConnected&&!ocupado&&inp.value.trim())window.cz245Bipar()},450);
-    }
-   });
-   inp.focus();
-  }
+  cz319InstalarLeitor(document.getElementById('scanRetorno'));
  }else if(modal.tipo==='cz307faltantes'){
   const pendExtras=extras.filter(x=>restante(x)>0);
   const pendAtivos=ativos.filter(x=>dev(x)<qtd(x));
@@ -8614,24 +8638,42 @@ window.cz245ConfirmarBaixaCons=async()=>{
   const v=document.getElementById('cz245VoltarCons');if(v)v.disabled=false;
  }
 };
+// V319: a identificacao da linha e a confirmacao ocorrem na rotina oficial,
+// usando evento_materiais e codigos recuperados diretamente do Supabase.
+// Nao rejeitar a primeira leitura com base em mat/cache desatualizado.
 window.cz245Bipar=async()=>{
- if(ocupado)return;const inp=document.getElementById('scanRetorno'),msg=document.getElementById('retMsg'),codigo=normalizarCodigoEvento(inp?.value);if(!codigo)return;
- // V316: histórico da saída já foi consultado ao abrir e será recarregado após a confirmação no servidor.
- const tipo=window.cz291BipagemAberta?'todos':(modal?.tipo||'todos');
- const candidatos=mat.filter(x=>{
-  if(!(tipo==='todos'?true:tipo==='ativo'?ativo(x):tipo==='consumo'?!ativo(x):extra(x)&&!ativo(x))||dev(x)>=qtd(x))return false;
-  // Aceita o código mostrado na lista, o cadastro atual e o código salvo no evento.
-  // Alguns eventos antigos têm _codigos vazio ou código_barras não sincronizado.
-  const codigos=ativo(x)?cz293CodigosSaida(x):[...(x._codigos||[]),x.codigo_barras,x.codigo,x._codigoExibicao];
-  return codigos.some(c=>normalizarCodigoEvento(c)===codigo);
- });
- if(!candidatos.length){msg.textContent='Código '+codigo+' não encontrado entre os materiais com saída registrada neste evento. Verifique a quantidade Levou e o diagnóstico da saída. Nenhum estoque foi alterado.';inp.value='';inp.focus();return}
- // Ativos: conferir o rastreio exato; extras: devolver primeiro a linha extra.
- const st=sair142State(id),historico=st.historico||[];
- const ativosCodigo=candidatos.filter(ativo);
- const alvo=ativosCodigo.length?(ativosCodigo.find(x=>historico.some(h=>String(h.material_id)===String(x.id)&&normalizarCodigoEvento(h.codigo)===codigo))||ativosCodigo[0]):candidatos.sort((a,b)=>Number(extra(b))-Number(extra(a)))[0];
- ocupado=true;try{const ok=await biparRetornoEvento(id,alvo.id);if(!ok)throw Error(document.getElementById('retMsg')?.textContent||'Falha na leitura.');const antes=tipo;try{await carregar()}catch(erroAtualizacao){const aviso=document.getElementById('retMsg');if(aviso){aviso.style.color='#b45309';aviso.textContent='✓ Devolução salva no Supabase. Não bipe novamente. A tela não atualizou: '+(erroAtualizacao.message||erroAtualizacao)}return}if(window.cz291BipagemAberta){modal=null;render();const m=document.getElementById('retMsg');if(m){m.style.color='#15803d';m.textContent='✓ '+nome(alvo)+' · Código '+codigo;setTimeout(()=>{if(m.isConnected)m.textContent=''},2000)}}else{modal={tipo:antes,titulo:antes==='todos'?'Bipagem única — Todo material devolvido':antes==='ativo'?'Bipagem Livre — Ativos':'Bipagem — Consumíveis devolvidos'};render();const m=document.getElementById('retMsg');if(m){m.style.color='#8be9b1';m.textContent='✓ Código reconhecido e devolução registrada.'}}}
- catch(e){const aviso=document.getElementById('retMsg');if(aviso){aviso.style.color='#b42318';aviso.textContent=e.message}}finally{ocupado=false;const novo=document.getElementById('scanRetorno');if(novo){novo.value='';novo.focus()}}
+ if(ocupado)return false;
+ const inp=document.getElementById('scanRetorno');
+ const codigo=normalizarCodigoEvento(inp?.value);
+ if(!codigo)return false;
+ ocupado=true;
+ try{
+  const aviso=document.getElementById('retMsg');
+  if(aviso){aviso.style.color='#475569';aviso.textContent='Conferindo '+codigo+' no Supabase...'}
+  await cz294CarregarSaidaRemota(id);
+  const ok=await biparRetornoEvento(id,null);
+  if(!ok)throw new Error(document.getElementById('retMsg')?.textContent||'O servidor nao confirmou a bipagem.');
+  const tipo=window.cz291BipagemAberta?'todos':(modal?.tipo||'todos');
+  // Uma consulta de leitura apos o RPC garante contagem atualizada sem F5.
+  try{await carregar()}catch(e){
+   const msg=document.getElementById('retMsg');
+   if(msg){msg.style.color='#b45309';msg.textContent='Devolucao registrada. A atualizacao da tela falhou; NAO bipe novamente: '+e.message}
+   return true;
+  }
+  if(window.cz291BipagemAberta){modal=null;render()}
+  else{modal={tipo,titulo:tipo==='todos'?'Bipagem unica — Todo material devolvido':tipo==='ativo'?'Bipagem Livre — Ativos':'Bipagem — Consumiveis devolvidos'};render()}
+  const msg=document.getElementById('retMsg');
+  if(msg){msg.style.color='#15803d';msg.textContent='✓ Codigo '+codigo+' confirmado no Supabase. Contagem atualizada.'}
+  return true;
+ }catch(e){
+  const msg=document.getElementById('retMsg');
+  if(msg){msg.style.color='#b42318';msg.textContent=String(e?.message||e)}
+  return false;
+ }finally{
+  ocupado=false;
+  const inp=document.getElementById('scanRetorno');
+  if(inp){inp.value='';inp.focus()}
+ }
 };
 window.cz245Perda=async mid=>{const x=mat.find(x=>chave(x)===mid);if(!x)return;await marcarPerdaRetorno(id,x.id,x.item_id||'');await carregar();window.cz245FaltantesAtivos()};
 window.cz245Aguardar=async mid=>{const x=mat.find(x=>chave(x)===mid);if(!x)return;const d=ler();d.aguardar=d.aguardar||{};d.aguardar[mid]=true;salvar(d);await czAlert('Ativo mantido como pendente de devolução. O retorno do evento NÃO poderá ser finalizado até resolução oficial.','Aguardando');};
