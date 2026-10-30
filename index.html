@@ -8152,41 +8152,104 @@ function desenhar(){
  const n=grupos.filter(g=>estado(g).pronto).length;
  document.getElementById('pageTitle').textContent='Sair pro Evento';
  document.getElementById('content').innerHTML=estilos()+`<div class="sectionhead"><div><h2>🚚 Saída de Materiais — ${esc241(e.nome_evento||'Evento')}</h2><div class="muted">${esc241(e.cliente_nome||'')} • ${finDate(e.data_evento)} • ${esc241(e.cidade_evento||'')}</div></div><button class="btn secondary" onclick="czCentralAbrir()">← Central Operacional</button></div><div class="card"><div class="field" style="max-width:360px;margin-bottom:18px"><label>Responsável pela conferência *</label><input id="sair142Resp" value="${esc241(sair142State(eventoAtual).responsavel||'')}" placeholder="Nome do colaborador" onchange="sair142Set('${esc241(eventoAtual)}',{responsavel:this.value})"></div><h3>Lista geral de materiais</h3><p class="muted">Selecione o quadradinho para abrir a bipagem no centro da tela.</p><div class="tablewrap"><table class="cz241Lista"><thead><tr><th>Sel.</th><th>Descrição</th><th>Código do produto / rastreio</th><th>Contratado</th><th>Extra</th><th>Total</th></tr></thead><tbody>${listaHTML()}</tbody></table></div><p style="margin:16px 0">Itens concluídos: <strong>${n} de ${grupos.length}</strong></p></div><div class="card" style="margin-top:16px"><h3>Materiais Contratados</h3><div class="tablewrap"><table class="cz241Lista"><thead><tr><th style="width:150px">Quantidade</th><th>Descrição do produto</th></tr></thead><tbody>${contratadosHTML()}</tbody></table></div></div><div class="card" style="margin-top:16px"><button class="btn primary" onclick="cz241FinalizarSaida()">Confirmar saída do evento</button><p class="muted">A saída oficial só deve ser confirmada depois de conferir todos os materiais. A baixa de estoque permanece na rotina oficial.</p></div>${painelModal()}`;
- const inp=document.getElementById('cz241Codigo');if(inp){inp.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key==='Tab'){ev.preventDefault();clearTimeout(tempoLeitura);window.cz241Bipar()}});inp.focus()}
+ const inp=document.getElementById('cz241Codigo');
+ if(inp){
+  // V321: o leitor entrega cada codigo a uma fila, mesmo durante a gravacao.
+  let tempo=null;
+  const receber=()=>{
+   clearTimeout(tempo);
+   const codigo=norm(inp.value);
+   if(!codigo)return;
+   inp.value='';
+   filaLeituras.push({codigo,grupo:modalChave,evento:eventoAtual});
+   void processarFila();
+  };
+  inp.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key==='Tab'){ev.preventDefault();receber()}});
+  inp.addEventListener('input',()=>{clearTimeout(tempo);if(norm(inp.value).length>=4)tempo=setTimeout(()=>{if(inp.isConnected)receber()},500)});
+  inp.focus();
+ }
+
 }
-window.cz241Selecionar=function(i){const g=grupos[i];if(!g)return;modalChave=g.chave;desenhar()};
-window.cz241Fechar=function(){clearTimeout(tempoLeitura);modalChave=null;desenhar()};
-window.cz241Bipar=async function(){
- if(bloqueado)return;const g=grupos.find(g=>g.chave===modalChave),inp=document.getElementById('cz241Codigo');const cod=norm(inp?.value);if(!g||!cod)return;
- const resp=norm(document.getElementById('sair142Resp')?.value||sair142State(eventoAtual).responsavel);
- const aviso=document.getElementById('cz241Msg');bloqueado=true;
+window.cz241Selecionar=function(i){if(processandoFila||filaLeituras.length){mensagemLeitor('Aguarde a confirmacao das leituras antes de mudar de material.','#fbbf24');return}const g=grupos[i];if(!g)return;modalChave=g.chave;desenhar()};
+window.cz241Fechar=function(){if(processandoFila||filaLeituras.length){mensagemLeitor('Aguarde a confirmacao das leituras antes de fechar.','#fbbf24');return}clearTimeout(tempoLeitura);modalChave=null;desenhar()};
+// V321: fila sequencial real da interface de saida que esta ativa (cz241).
+// Nao redesenha o campo a cada leitura: o scanner permanece pronto para receber.
+const filaLeituras=[];
+let processandoFila=false;
+function mensagemLeitor(msg,cor){
+ const el=document.getElementById('cz241Msg');
+ if(el){el.textContent=msg;el.style.color=cor||'#8af1b8';}
+}
+function atualizarNumerosLeitor(g){
+ if(modalChave!==g.chave)return;
+ const s=estado(g),numeros=document.querySelectorAll('#cz241Overlay .cz241Numero');
+ if(numeros.length===3){
+  const bip=numeros[1].querySelector('strong'),falta=numeros[2].querySelector('strong');
+  if(bip)bip.textContent=String(s.bipado);
+  if(falta)falta.textContent=String(s.falta);
+  numeros[1].classList.toggle('cz305BipagemCompleta',s.total>0&&s.bipado>=s.total);
+ }
+}
+async function processarFila(){
+ if(processandoFila)return;
+ processandoFila=true;
  try{
-  if(!resp)throw Error('Informe o responsável pela conferência antes de bipar.');
-  const st=sair142State(eventoAtual),s=estado(g);if(s.bipado>=s.total)throw Error('Quantidade total já conferida. Clique em Concluir conferência.');
+  while(filaLeituras.length){
+   const leitura=filaLeituras.shift();
+   if(leitura.evento!==eventoAtual||leitura.grupo!==modalChave){
+    mensagemLeitor('A tela mudou. Leituras pendentes nao foram aplicadas.','#ffb8a8');
+    filaLeituras.length=0;break;
+   }
+   const ok=await registrarLeituraSaida(leitura.codigo,leitura.grupo);
+   if(!ok){
+    const restantes=filaLeituras.length;
+    filaLeituras.length=0;
+    if(restantes)mensagemLeitor('Falha na leitura. '+restantes+' leitura(s) seguintes nao foram registradas. Confira no servidor antes de repetir.','#ffb8a8');
+    break;
+   }
+  }
+ }finally{processandoFila=false;document.getElementById('cz241Codigo')?.focus()}
+}
+async function registrarLeituraSaida(cod,grupoChave){
+ const g=grupos.find(x=>x.chave===grupoChave);
+ if(!g)return false;
+ const resp=norm(document.getElementById('sair142Resp')?.value||sair142State(eventoAtual).responsavel);
+ try{
+  if(!resp)throw Error('Informe o responsavel pela conferencia antes de bipar.');
+  const st=sair142State(eventoAtual),s=estado(g);
+  if(s.bipado>=s.total)throw Error('Quantidade total ja conferida. Clique em Concluir conferencia.');
   const codigo=normalizarCodigoEvento(cod);
   const possiveis=g.linhas.filter(x=>(x._codigos||[]).some(v=>normalizarCodigoEvento(v)===codigo));
-  if(!possiveis.length)throw Error('Código não pertence ao material selecionado.');
-  if(g.tipo==='Ativo'&&!possiveis.some(x=>cz274CodigoEmLote(codigo,x))&&(st.rastreiosLidos||[]).includes(codigo))throw Error('Este código de rastreio já foi bipado.');
-  // A conferência por linha é preservada para a rotina oficial de saída.
+  if(!possiveis.length)throw Error('Codigo nao pertence ao material selecionado.');
+  if(g.tipo==='Ativo'&&!possiveis.some(x=>cz274CodigoEmLote(codigo,x))&&(st.rastreiosLidos||[]).some(v=>normalizarCodigoEvento(v)===codigo))throw Error('Este codigo de rastreio ja foi bipado.');
   const alvo=possiveis.sort((a,b)=>Number(ehExtra(a))-Number(ehExtra(b))).find(x=>Number(s.c[x.id]||0)<qtd(x));
-  if(!alvo)throw Error('Quantidade correspondente a este código já está completa.');
+  if(!alvo)throw Error('Quantidade correspondente a este codigo ja esta completa.');
   const contagens={...s.c,[alvo.id]:Number(s.c[alvo.id]||0)+1};
-  const bipados=[...new Set([...(st.bipados||[]),String(alvo.codigo_barras||alvo.codigo||alvo.id)])];
-  sair142Set(eventoAtual,{responsavel:resp,contagens,bipados,rastreiosLidos:g.tipo==='Ativo'&&!cz274CodigoEmLote(codigo,alvo)?[...(st.rastreiosLidos||[]),codigo]:(st.rastreiosLidos||[]),historico:[...(st.historico||[]),{acao:'Conferência',codigo:cod,material_id:alvo.id,data:new Date().toISOString(),responsavel:resp}]});
-  // V308: não anunciar sucesso enquanto a leitura não existir no Supabase.
-  await czSharedStorage.descarregar();
-  const {data:confirmado,error:erroConf}=await db.from('cz_estado_compartilhado').select('valor').eq('chave',SAIR142_KEY).maybeSingle();
-  if(erroConf)throw Error('A leitura não pôde ser verificada na nuvem: '+erroConf.message);
-  let estadoNuvem={};try{estadoNuvem=JSON.parse(confirmado?.valor||'{}')[String(eventoAtual)]||{}}catch(_){}
-  const numLidos=(estadoNuvem.historico||[]).filter(h=>h.acao==='Conferência'&&String(h.material_id)===String(alvo.id)&&normalizarCodigoEvento(h.codigo)===codigo).length;
-  const numLocal=(sair142State(eventoAtual).historico||[]).filter(h=>h.acao==='Conferência'&&String(h.material_id)===String(alvo.id)&&normalizarCodigoEvento(h.codigo)===codigo).length;
-  if(numLidos<numLocal)throw Error('A leitura ainda não foi confirmada no Supabase. Não continue a saída; confira a sincronização.');
-  desenhar();const novo=document.getElementById('cz241Msg');if(novo){novo.style.color='#8af1b8';novo.textContent='✓ Leitura registrada: '+estado(g).bipado+'/'+estado(g).total}
- }catch(err){if(aviso){aviso.textContent=err.message;aviso.style.color='#ffb8a8'}}
- finally{bloqueado=false;const novo=document.getElementById('cz241Codigo');if(novo){novo.value='';novo.focus()}}
+  const historico=[...(st.historico||[]),{acao:'Conferência',codigo:cod,material_id:alvo.id,data:new Date().toISOString(),responsavel:resp}];
+  sair142Set(eventoAtual,{
+   responsavel:resp,contagens,
+   bipados:[...new Set([...(st.bipados||[]),String(alvo.codigo_barras||alvo.codigo||alvo.id)])],
+   rastreiosLidos:g.tipo==='Ativo'&&!cz274CodigoEmLote(codigo,alvo)?[...(st.rastreiosLidos||[]),codigo]:(st.rastreiosLidos||[]),
+   historico
+  });
+  atualizarNumerosLeitor(g);
+  mensagemLeitor('Leitura '+codigo+' recebida ('+estado(g).bipado+'/'+estado(g).total+'). Confirmando no Supabase...','#fbbf24');
+  // Espera a confirmacao da leitura especifica no banco, sem redesenhar a pagina.
+  await cz317AguardarSaidaNoServidor(eventoAtual,alvo.id,historico.length,codigo);
+  atualizarNumerosLeitor(g);
+  mensagemLeitor('✓ Salvo no Supabase: '+estado(g).bipado+'/'+estado(g).total+(filaLeituras.length?' • '+filaLeituras.length+' na fila':''),'#8af1b8');
+  return true;
+ }catch(err){mensagemLeitor(err.message||String(err),'#ffb8a8');return false}
+}
+window.cz241Bipar=function(){
+ const inp=document.getElementById('cz241Codigo'),codigo=norm(inp?.value);
+ if(!codigo)return;
+ inp.value='';filaLeituras.push({codigo,grupo:modalChave,evento:eventoAtual});
+ void processarFila();
 };
-window.cz241Concluir=async function(){const g=grupos.find(g=>g.chave===modalChave);if(!g)return;const s=estado(g);if(s.falta>0){const msg=document.getElementById('cz241Msg');if(msg)msg.textContent='Ainda faltam '+s.falta+' unidade(s). Termine a bipagem antes de concluir.';return}const st=sair142State(eventoAtual);sair142Set(eventoAtual,{v241Concluidos:{...(st.v241Concluidos||{}),[g.chave]:true}});modalChave=null;desenhar()};
+window.cz241Concluir=async function(){if(processandoFila||filaLeituras.length)return czAlert('Aguarde a confirmacao das leituras pendentes no Supabase.','Bipagem em andamento');const g=grupos.find(g=>g.chave===modalChave);if(!g)return;const s=estado(g);if(s.falta>0){const msg=document.getElementById('cz241Msg');if(msg)msg.textContent='Ainda faltam '+s.falta+' unidade(s). Termine a bipagem antes de concluir.';return}const st=sair142State(eventoAtual);sair142Set(eventoAtual,{v241Concluidos:{...(st.v241Concluidos||{}),[g.chave]:true}});modalChave=null;desenhar()};
 window.cz241FinalizarSaida=async function(){
+ if(processandoFila||filaLeituras.length)return czAlert('Aguarde a confirmacao das leituras pendentes no Supabase.','Bipagem em andamento');
  const faltantes=grupos.filter(g=>!estado(g).pronto);
  if(faltantes.length)return czAlert('Conclua a conferência dos materiais antes da saída: '+faltantes.map(g=>g.nome).join(', '),'Saída');
  try{
