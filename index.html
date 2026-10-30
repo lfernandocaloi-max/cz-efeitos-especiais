@@ -282,7 +282,7 @@ body .ret226Dialog button[aria-label="Fechar"]{color:#334155!important}
   },4000);
 })();
 </script>
-<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><span id="czBuildTag" style="margin-left:10px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:900">V310</span><div class="muted" style="font-size:12px">Sistema de gestão CZ · Atualização V282-A1</div></div><div><span id="czNuvemStatus" title="Sincronização de dados da empresa" style="font-size:12px;color:#86efac;margin-right:8px">☁ Aguardando login</span> <button id="czNuvemAtualizar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.atualizar()">Atualizar dados</button> <button id="czNuvemImportar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.importarLegado()">Importar dados antigos</button> <span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
+<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><span id="czBuildTag" style="margin-left:10px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:900">V311</span><div class="muted" style="font-size:12px">Sistema de gestão CZ · Atualização V282-A1</div></div><div><span id="czNuvemStatus" title="Sincronização de dados da empresa" style="font-size:12px;color:#86efac;margin-right:8px">☁ Aguardando login</span> <button id="czNuvemAtualizar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.atualizar()">Atualizar dados</button> <button id="czNuvemImportar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.importarLegado()">Importar dados antigos</button> <span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
 <div id="clientModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="modalTitle">Novo cliente</h2><button class="btn secondary" onclick="closeClient()">Fechar</button></div>
   <input id="clientId" type="hidden"><div class="muted" id="clientOpenedAt" style="font-size:13px">Data de abertura: será definida ao salvar</div>
   <div class="row"><div class="field"><label>Nome / Razão social *</label><input id="clientName" autocomplete="name"></div><div class="field"><label>Telefone *</label><input id="clientPhone" type="tel" inputmode="tel" autocomplete="tel"><div id="clientPhoneAviso" role="status" style="font-size:12px;margin-top:5px"></div></div></div>
@@ -4078,7 +4078,7 @@ async function biparEvento(eventoId){
    let ativoEncontrado=null;
    if(ativosEvento.length){
     const ids=[...new Set(ativosEvento.map(m=>m.item_id))];
-    const r=await db.from('ativos').select('id,observacoes').in('id',ids);
+    const r=await db.from('ativos').select('id,observacoes,quantidade').in('id',ids);
     if(r.error)throw r.error;
     const encontrados=(r.data||[]).filter(x=>unidadesAtivo(x).some(c=>normalizarCodigoEvento(c)===codigoLido));
     if(encontrados.length>1)throw new Error('Código de rastreio duplicado em cadastros diferentes.');
@@ -4350,10 +4350,11 @@ async function biparRetornoEvento(eventoId,materialSelecionadoId=null){
    if(r.error)throw r.error;
    ativos=r.data||[];
   }
-  const correspondentes=ativos.filter(a=>unidadesAtivo(a).some(c=>normalizarCodigoEvento(c)===codigo)||!!cz274Lote(a)&&normalizarCodigoEvento(cz274Lote(a))===codigo);
+  const correspondentes=ativos.filter(a=>unidadesAtivo(a).some(c=>normalizarCodigoEvento(c)===codigo)||!!cz274Lote(a)&&normalizarCodigoEvento(cz274Lote(a))===codigo||ativosDoEvento.some(m=>String(m.item_id)===String(a.id)&&normalizarCodigoEvento(porId.get(String(m.id))?._codigoLote)===codigo));
   if(correspondentes.length>1)throw new Error('Este código de rastreio está duplicado em mais de um cadastro de ativo.');
   const ativo=correspondentes[0]||null;
-  const codigoPorLote=!!ativo&&!!cz274Lote(ativo)&&normalizarCodigoEvento(cz274Lote(ativo))===codigo;
+  const regLote=window.cz299Regularizacao?.evento===String(eventoId)&&window.cz299Regularizacao?.materiais?.some(r=>r.tipo==='lote'&&String(r.cadastroId)===String(ativo?.id)&&Array.isArray(r.codigos)&&r.codigos.map(normalizarCodigoEvento).includes(codigo));
+  const codigoPorLote=!!ativo&&(!!cz274Lote(ativo)&&normalizarCodigoEvento(cz274Lote(ativo))===codigo || ativosDoEvento.some(m=>String(m.item_id)===String(ativo.id)&&normalizarCodigoEvento(porId.get(String(m.id))?._codigoLote)===codigo)||regLote);
   let material=null,rastreio=false;
   if(ativo){
    // Lote: a mesma etiqueta identifica várias unidades. A quantidade
@@ -4367,7 +4368,8 @@ async function biparRetornoEvento(eventoId,materialSelecionadoId=null){
    }
    const historico=Array.isArray(stSaida.historico)?stSaida.historico:[];
    const leituraNaSaida=historico.some(h=>normalizarCodigoEvento(h.codigo)===codigo&&candidatos.some(m=>String(m.id)===String(h.material_id)));
-   const legado=cz185Lidos(eventoId,'saida').includes(codigo)|| (String(eventoId)==='a5e02ed6-e93f-46c8-854c-5f3bd7190cb8'&&window.cz299Regularizacao?.materiais?.some(r=>candidatos.some(m=>String(m.id)===String(r.materialId)&&String(m.item_id)===String(r.cadastroId))&&Array.isArray(r.codigos)&&r.codigos.map(normalizarCodigoEvento).includes(codigo)));
+   const regularizado=window.cz299Regularizacao?.evento===String(eventoId)&&window.cz299Regularizacao?.materiais?.some(r=>candidatos.some(m=>String(m.id)===String(r.materialId)&&String(m.item_id)===String(r.cadastroId))&&Array.isArray(r.codigos)&&r.codigos.map(normalizarCodigoEvento).includes(codigo));
+   const legado=cz185Lidos(eventoId,'saida').map(normalizarCodigoEvento).includes(codigo)||regularizado;
    // Rastreamento por unidade: não basta o código existir no cadastro.
    if(!leituraNaSaida&&!legado){
     throw new Error('Este rastreio está cadastrado, mas não há registro da sua bipagem na saída deste evento no histórico de saída do Supabase. Confira o registro da saída.');
@@ -5939,7 +5941,7 @@ async function sair221Materiais(eventoId){
  const aids=[...new Set(mats.filter(x=>sair220Ativo(x)&&x.item_id).map(x=>x.item_id))];
  const [pr,ar]=await Promise.all([
   pids.length?db.from('produtos').select('id,codigo_barras').in('id',pids):Promise.resolve({data:[],error:null}),
-  aids.length?db.from('ativos').select('id,codigo_interno,observacoes').in('id',aids):Promise.resolve({data:[],error:null})
+  aids.length?db.from('ativos').select('id,codigo_interno,observacoes,quantidade').in('id',aids):Promise.resolve({data:[],error:null})
  ]);
  if(pr.error)throw pr.error;if(ar.error)throw ar.error;
  const pm=new Map((pr.data||[]).map(x=>[String(x.id),x]));
@@ -8190,7 +8192,7 @@ const CZ299_CHAVE='cz_v142_saida_eventos'; // Chave existente permitida pela val
 window.cz299Regularizacao=null;
 async function cz299LerRegularizacao(){
  window.cz299Regularizacao=null;
- if(!evento?.saida_baixada_em)return;
+ if(!id)return;
  const {data,error}=await db.from('cz_estado_compartilhado').select('valor').eq('chave',CZ299_CHAVE).maybeSingle();
  if(error)throw new Error('Falha ao consultar regularização do evento: '+error.message);
  if(!data?.valor)return;
@@ -8205,18 +8207,40 @@ function cz299Codigos(x){
  const r=window.cz299Regularizacao?.materiais?.find(m=>String(m.materialId)===String(x.id)&&String(m.cadastroId)===String(x.item_id));
  return Array.isArray(r?.codigos)?r.codigos.map(normalizarCodigoEvento):[];
 }
+// V312: a linha do evento recebe o lote diretamente da tabela de ativos
+// em sair221Materiais(). Não depender do array global `assets`, que pode
+// não estar carregado na tela de retorno.
+function cz312LoteMaterial(x){
+ const direto=normalizarCodigoEvento(x?._codigoLote||'');
+ if(direto)return direto;
+ const cadastro=(assets||[]).find(a=>String(a.id)===String(x?.item_id));
+ return cadastro?normalizarCodigoEvento(cz274Lote(cadastro)):'';
+}
+// V313: cadastro legado pode ter uma etiqueta única sem a marca CZ274_LOTE.
+// Não converter automaticamente em lote: exigir confirmação expressa do operador.
+function cz313CandidatoLote(x){
+ const cs=[...new Set((x?._codigos||[]).map(normalizarCodigoEvento).filter(Boolean))];
+ return !cz312LoteMaterial(x)&&qtd(x)>1&&cs.length===1?cs[0]:'';
+}
+function cz313LoteConfirmado(x){
+ const declarado=cz312LoteMaterial(x);
+ if(declarado)return declarado;
+ const candidato=cz313CandidatoLote(x);
+ const marcado=[...document.querySelectorAll('.cz313ConfirmarLote')].find(c=>c.dataset.material===String(x.id)&&c.checked);
+ return marcado&&normalizarCodigoEvento(marcado.value)===candidato?candidato:'';
+}
 window.cz299AbrirRegularizacao=()=>{
  if(!evento?.saida_baixada_em)return;
  const pendentes=mat.filter(x=>ativo(x)&&qtd(x)>0&&!cz293CodigosSaida(x).length);
  if(!pendentes.length)return czAlert('Não há ativos sem rastreios neste evento.','Regularização');
  const html=pendentes.map(x=>{
   const codigos=[...new Set((x._codigos||[]).map(normalizarCodigoEvento).filter(Boolean))];
-  const cadastro=assets.find(a=>String(a.id)===String(x.item_id));
-  const lote=cadastro?normalizarCodigoEvento(cz274Lote(cadastro)):'';
-  return `<div style="padding:10px;border:1px solid #ddd;margin:10px 0;border-radius:8px"><b>${E(nome(x))}</b> · Levou ${qtd(x)}<div class="cz245Muted">${lote?'Código por lote: confirme a etiqueta usada nas '+qtd(x)+' unidades.':'Selecione exatamente '+qtd(x)+' códigos individuais que realmente saíram.'}</div>${lote?`<label><input type="checkbox" class="cz309Lote" data-material="${E(x.id)}" value="${E(lote)}"> Confirmo lote ${E(lote)} — ${qtd(x)} unidades</label>`:codigos.map(c=>`<label style="display:inline-flex;align-items:center;gap:5px;margin:7px 13px 4px 0"><input type="checkbox" class="cz299Opcao" data-material="${E(x.id)}" value="${E(c)}">${E(c)}</label>`).join('')}</div>`;
+  const lote=cz312LoteMaterial(x);
+  const candidato=cz313CandidatoLote(x);
+  return `<div style="padding:10px;border:1px solid #ddd;margin:10px 0;border-radius:8px"><b>${E(nome(x))}</b> · Levou ${qtd(x)}<div class="cz245Muted">${lote?'Código por lote: confirme a etiqueta usada nas '+qtd(x)+' unidades.':candidato?'Possível código por lote legado: confira o cadastro e confirme expressamente o modo por lote.':'Selecione exatamente '+qtd(x)+' códigos individuais que realmente saíram.'}</div>${lote?`<label><input type="checkbox" class="cz309Lote" data-material="${E(x.id)}" value="${E(lote)}"> Confirmo lote ${E(lote)} — ${qtd(x)} unidades</label>`:candidato?`<label style="display:block;margin:8px 0;font-weight:700"><input type="checkbox" class="cz313ConfirmarLote" data-material="${E(x.id)}" value="${E(candidato)}"> Confirmo que o código ${E(candidato)} é POR LOTE e identifica as ${qtd(x)} unidades desta linha</label><small>O cadastro não forneceu a marcação de lote ao retorno. Marque somente se conferiu o modo por lote no cadastro do ativo.</small>`:codigos.map(c=>`<label style="display:inline-flex;align-items:center;gap:5px;margin:7px 13px 4px 0"><input type="checkbox" class="cz299Opcao" data-material="${E(x.id)}" value="${E(c)}">${E(c)}</label>`).join('')}</div>`;
  }).join('');
  const el=document.getElementById('cz299Area');if(!el)return;
- el.innerHTML=`<div style="border:2px solid #d97706;border-radius:9px;padding:13px;background:#fff7ed;color:#17212b"><b>Regularização de rastreios não recuperados</b><p>O histórico dos códigos individuais não foi encontrado. Confirme somente os códigos que você sabe que foram levados. Isto registra a identificação para o retorno, sem alterar quantidades nem estoque.</p>${html}<label style="display:block;margin:12px 0"><input type="checkbox" id="cz299Confirma"> Confirmo que os códigos selecionados são os equipamentos efetivamente enviados neste evento.</label><button class="cz245Btn" onclick="cz299SalvarRegularizacao()">Registrar códigos confirmados</button><div id="cz299Msg" style="margin-top:8px"></div></div>`;
+ el.innerHTML=`<div style="border:2px solid #d97706;border-radius:9px;padding:13px;background:#fff7ed;color:#17212b"><b>Regularização de rastreios não recuperados</b><p>O histórico dos rastreios não foi encontrado. Para ativos por lote, confirme uma etiqueta por linha; para ativos individuais, selecione cada código efetivamente enviado. Isto registra a identificação para o retorno, sem alterar quantidades nem estoque.</p>${html}<label style="display:block;margin:12px 0"><input type="checkbox" id="cz299Confirma"> Confirmo que os códigos selecionados são os equipamentos efetivamente enviados neste evento.</label><button class="cz245Btn" onclick="cz299SalvarRegularizacao()">Registrar códigos confirmados</button><div id="cz299Msg" style="margin-top:8px"></div></div>`;
 };
 window.cz299SalvarRegularizacao=async()=>{
  const msg=document.getElementById('cz299Msg');if(!msg)return;
@@ -8224,10 +8248,10 @@ window.cz299SalvarRegularizacao=async()=>{
  const pendentes=mat.filter(x=>ativo(x)&&qtd(x)>0&&!cz293CodigosSaida(x).length);
  const materiais=[];const todos=[];
  for(const x of pendentes){
-  const cadastroAtivo=assets.find(a=>String(a.id)===String(x.item_id));
-  const lote=cadastroAtivo?normalizarCodigoEvento(cz274Lote(cadastroAtivo)):'';
+  const lote=cz312LoteMaterial(x)||cz313LoteConfirmado(x);
   const loteSelecionado=[...document.querySelectorAll('.cz309Lote')].find(c=>c.dataset.material===String(x.id)&&c.checked);
-  const codigos=lote?(loteSelecionado&&normalizarCodigoEvento(loteSelecionado.value)===lote?Array(qtd(x)).fill(lote):[]):[...document.querySelectorAll('.cz299Opcao')].filter(c=>c.dataset.material===String(x.id)&&c.checked).map(c=>normalizarCodigoEvento(c.value));
+  const confirmadoLegado=!!cz313CandidatoLote(x)&&lote===cz313CandidatoLote(x)&&!!document.querySelector('.cz313ConfirmarLote[data-material="'+String(x.id)+'"]:checked');
+  const codigos=lote?((loteSelecionado&&normalizarCodigoEvento(loteSelecionado.value)===lote)||confirmadoLegado?Array(qtd(x)).fill(lote):[]):[...document.querySelectorAll('.cz299Opcao')].filter(c=>c.dataset.material===String(x.id)&&c.checked).map(c=>normalizarCodigoEvento(c.value));
   if(codigos.length!==qtd(x)||(!lote&&new Set(codigos).size!==codigos.length)){msg.textContent=`Confirme exatamente ${qtd(x)} rastreio(s) para ${nome(x)}.`;return;}
   const cadastro=(x._codigos||[]).map(normalizarCodigoEvento);
   if(codigos.some(c=>!cadastro.includes(c)&&c!==lote)){msg.textContent='Código não pertence ao cadastro do ativo.';return;}
@@ -8273,9 +8297,7 @@ function cz293CodigosSaida(x){
  const antigos=cz185Lidos(id,'saida');
  const cadastro=(x._codigos||[]).map(v=>normalizarCodigoEvento(v));
  const relacionados=antigos.filter(c=>cadastro.includes(normalizarCodigoEvento(c)));
- const lote=assets.find(a=>String(a.id)===String(x.item_id));
- const codLote=lote?cz274Lote(lote):'';
- return [...new Set([...diretos,...relacionados,...cz299Codigos(x),...(codLote&&qtd(x)>0?[codLote]:[])])];
+ return [...new Set([...diretos,...relacionados,...cz299Codigos(x)])];
 }
 function cz293CodigoLinha(x){
  const cs=cz293CodigosSaida(x);
@@ -8536,10 +8558,10 @@ window.cz245Perda=async mid=>{const x=mat.find(x=>chave(x)===mid);if(!x)return;a
 window.cz245Aguardar=async mid=>{const x=mat.find(x=>chave(x)===mid);if(!x)return;const d=ler();d.aguardar=d.aguardar||{};d.aguardar[mid]=true;salvar(d);await czAlert('Ativo mantido como pendente de devolução. O retorno do evento NÃO poderá ser finalizado até resolução oficial.','Aguardando');};
 async function carregar(){
  await cz294CarregarSaidaRemota(id);
- await cz299LerRegularizacao();
  const [er,ms]=await Promise.all([db.from('eventos_operacionais').select('*').eq('id',id).single(),sair221Materiais(id)]);
  if(er.error)throw er.error;
  evento=er.data;
+ await cz299LerRegularizacao();
  // V297: não descartar linhas contratadas só porque o registro de saída está zerado.
  // Quantidade contratada e quantidade efetivamente saída são informações distintas.
  mat=ms.filter(x=>Number(x.quantidade_necessaria||0)>0||ret226Esperado(x,evento)>0);
