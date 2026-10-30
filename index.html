@@ -282,7 +282,7 @@ body .ret226Dialog button[aria-label="Fechar"]{color:#334155!important}
   },4000);
 })();
 </script>
-<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><span id="czBuildTag" style="margin-left:10px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:900">V315</span><div class="muted" style="font-size:12px">Sistema de gestão CZ · Atualização V282-A1</div></div><div><span id="czNuvemStatus" title="Sincronização de dados da empresa" style="font-size:12px;color:#86efac;margin-right:8px">☁ Aguardando login</span> <button id="czNuvemAtualizar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.atualizar()">Atualizar dados</button> <button id="czNuvemImportar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.importarLegado()">Importar dados antigos</button> <span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
+<div id="app" class="app hidden"><aside class="side"><div class="brand">CZ<small>EFEITOS ESPECIAIS</small></div><nav class="nav" id="nav"></nav></aside><main class="main"><header class="top"><div><button id="menuBtn" class="btn secondary" type="button" aria-label="Abrir menu" style="display:none;margin-right:8px">☰</button><b id="pageTitle">Dashboard</b><span id="czBuildTag" style="margin-left:10px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:900">V316</span><div class="muted" style="font-size:12px">Sistema de gestão CZ · Atualização V282-A1</div></div><div><span id="czNuvemStatus" title="Sincronização de dados da empresa" style="font-size:12px;color:#86efac;margin-right:8px">☁ Aguardando login</span> <button id="czNuvemAtualizar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.atualizar()">Atualizar dados</button> <button id="czNuvemImportar" type="button" class="btn secondary" style="padding:7px 9px;font-size:12px;margin-right:7px" onclick="czSharedStorage.importarLegado()">Importar dados antigos</button> <span id="userName" class="muted"></span> <button id="logoutBtn" class="btn secondary">Sair</button></div></header><div id="content" class="content"></div></main></div>
 <div id="clientModal" class="modal hidden"><div class="modalbox"><div class="sectionhead"><h2 id="modalTitle">Novo cliente</h2><button class="btn secondary" onclick="closeClient()">Fechar</button></div>
   <input id="clientId" type="hidden"><div class="muted" id="clientOpenedAt" style="font-size:13px">Data de abertura: será definida ao salvar</div>
   <div class="row"><div class="field"><label>Nome / Razão social *</label><input id="clientName" autocomplete="name"></div><div class="field"><label>Telefone *</label><input id="clientPhone" type="tel" inputmode="tel" autocomplete="tel"><div id="clientPhoneAviso" role="status" style="font-size:12px;margin-top:5px"></div></div></div>
@@ -6336,28 +6336,55 @@ async function prep141Abrir(eventoId){
    extra:mats.filter(x=>String(x.origem||'').toLowerCase()==='extra'),
    montagem:mats.filter(x=>String(x.origem||'').toLowerCase()==='montagem'||(String(x.origem||'').toLowerCase()==='orcamento'&&x.tipo==='ativo'))
   };
-  const linha=(x,extra=false)=>`<tr><td>${coEsc(x.nome_item||x.descricao||'Material')}</td><td>${coEsc(x.quantidade_necessaria||1)}</td><td>${coEsc(x.codigo||'')}</td><td>${extra?`<button class="btn secondary" onclick="prep145RemoverExtra('${x.id}','${eventoId}')">Remover</button>`:'—'}</td></tr>`;
+  // V316: agrupar as quantidades por cadastro sem alterar as linhas oficiais no Supabase.
+  const agrupados=(linhas,ehMontagem)=>{
+   const mapa=new Map();
+   for(const x of linhas){
+    const origem=String(x.origem||'').toLowerCase();
+    const isExtra=origem==='extra'||(ehMontagem&&origem==='montagem');
+    const k=String(x.tipo||'')+':'+String(x.item_id||x.nome_item||x.id);
+    if(!mapa.has(k))mapa.set(k,{nome:x.nome_item||x.descricao||'Material',contratado:0,extra:0,contratados:[],extras:[],codigos:[]});
+    const g=mapa.get(k);const qtd=Number(x.quantidade_necessaria||0);
+    if(isExtra){g.extra+=qtd;g.extras.push(x)}else{g.contratado+=qtd;g.contratados.push(x)}
+    if(x.tipo!=='ativo'&&x.codigo)g.codigos.push(x.codigo);
+    if(x.tipo==='ativo'&&x.codigo&&cz274CodigoEmLote?.(x.codigo,x))g.codigos.push(x.codigo);
+   }
+   return [...mapa.values()];
+  };
+  const linhasTabela=(linhas,ehMontagem)=>agrupados(linhas,ehMontagem).map(g=>{
+   const excluir=g.extras.map(x=>`<button type="button" class="btn danger" style="padding:5px 9px;font-size:12px;margin:2px" onclick="prep192RemoverMaterial('${coEsc(x.id)}','${coEsc(eventoId)}','${coEsc(x.origem)}')">Excluir extra (${Number(x.quantidade_necessaria||0)})</button>`).join('');
+   return `<tr><td>${coEsc(g.nome)}</td><td>${g.contratado}</td><td>${g.extra}</td><td><b>${g.contratado+g.extra}</b></td><td>${coEsc([...new Set(g.codigos)].join(' · ')||'A identificar na saída')}</td><td>${excluir||'—'}</td></tr>`;
+  }).join('');
+  const tabelaMateriais=(linhas,ehMontagem)=>`<div class="tablewrap"><table><thead><tr><th>Descrição</th><th>Qtd.</th><th>Extra</th><th>Total</th><th>Cód.</th><th>Ação</th></tr></thead><tbody>${linhasTabela(linhas,ehMontagem)||'<tr><td colspan="6">Nenhum material registrado.</td></tr>'}</tbody></table></div>`;
+  const contratados=[...grupos.contratado.filter(x=>x.tipo!=='ativo'),...grupos.extra.filter(x=>x.tipo!=='ativo')];
+  const montagem=[...grupos.contratado.filter(x=>x.tipo==='ativo'),...grupos.montagem.filter(x=>String(x.origem).toLowerCase()==='montagem'),...grupos.extra.filter(x=>x.tipo==='ativo')];
   $('#content').innerHTML=`<div class="sectionhead"><div><h2>${coEsc(e.nome_evento||'Evento')}</h2><div class="muted">${coEsc(e.cliente_nome||'')} • ${finDate(e.data_evento)} • ${coEsc(e.cidade_evento||'')}</div></div><button class="btn secondary" onclick="renderEventos()">Voltar</button></div>
   <div class="card"><h3 style="margin-top:0">1. Informações do evento</h3><div class="row"><div class="field"><label>Cliente</label><input value="${coEsc(e.cliente_nome||'')}" disabled></div><div class="field"><label>Telefone</label><input value="${coEsc(e.cliente_telefone||'')}" disabled></div></div><div class="row"><div class="field"><label>Data</label><input value="${finDate(e.data_evento)}" disabled></div><div class="field"><label>Horário</label><input value="${coEsc(e.horario_evento||'')}" disabled></div></div><div class="row"><div class="field"><label>Local</label><input value="${coEsc(e.local_evento||'')}" disabled></div><div class="field"><label>Cidade</label><input value="${coEsc(e.cidade_evento||'')}" disabled></div></div></div>
-
-  <div class="card"><div class="sectionhead"><div><h3 style="margin:0">2. Produtos Contratados</h3><div class="muted">Puxados automaticamente do orçamento/contrato. Não precisa digitar novamente.</div></div></div>
-   ${grupos.contratado.length?`<div class="tablewrap"><table><thead><tr><th>Descrição</th><th>Qtd.</th><th>Código</th><th>Ação</th></tr></thead><tbody>${grupos.contratado.map(x=>linha(x)).join('')}</tbody></table></div>`:'<div class="empty">Nenhum produto contratado foi vinculado a este evento.</div>'}
-  </div>
-
-  <div class="card"><div class="sectionhead"><div><h3 style="margin:0">3. Produto Extra</h3><div class="muted">Selecione produtos e informe a quantidade.</div></div><button class="btn secondary" onclick="prep192AdicionarMaterial('${eventoId}','extra')">+ Adicionar produto extra</button></div>
-   ${grupos.extra.length?`<div class="tablewrap"><table><thead><tr><th>Produto</th><th>Quantidade</th><th>Código</th><th>Ação</th></tr></thead><tbody>${grupos.extra.map(x=>`<tr><td>${coEsc(x.nome_item)}</td><td>${Number(x.quantidade_necessaria||0)}</td><td>${coEsc(x.codigo||"—")}</td><td><button class="btn secondary" onclick="prep192RemoverMaterial('${x.id}','${eventoId}','extra')">Remover</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Nenhum produto extra adicionado.</div>'}
-  </div>
-
-  <div class="card"><div class="sectionhead"><div><h3 style="margin:0">4. Materiais de Montagem</h3><div class="muted">Ativos do orçamento aparecem automaticamente. Adicione outros ativos, se necessário.</div></div><button class="btn secondary" onclick="prep192AdicionarMaterial('${eventoId}','montagem')">+ Adicionar material de montagem</button></div>
-   ${grupos.montagem.length?`<div class="tablewrap"><table><thead><tr><th>Produto</th><th>Quantidade</th><th>Código</th><th>Ação</th></tr></thead><tbody>${grupos.montagem.map(x=>`<tr><td>${coEsc(x.nome_item)}</td><td>${Number(x.quantidade_necessaria||0)}</td><td>${coEsc(x.codigo||"—")}</td><td>${x.origem==='orcamento'?'<span class="muted">Do orçamento</span>':`<button class="btn secondary" onclick="prep192RemoverMaterial('${x.id}','${eventoId}','montagem')">Remover</button>`}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Nenhum ativo de montagem selecionado.</div>'}
-  </div>
+  <div class="card"><div class="sectionhead"><div><h3 style="margin:0">2. Produtos Contratados</h3><div class="muted">Quantidade do orçamento e extras no mesmo bloco.</div></div><button class="btn secondary" onclick="prep192AdicionarMaterial('${eventoId}','extra')">+ Material Extra</button></div>${tabelaMateriais(contratados,false)}</div>
+  <div class="card"><div class="sectionhead"><div><h3 style="margin:0">4. Materiais de Montagem</h3><div class="muted">O rastreio individual é identificado somente na saída.</div></div><button class="btn secondary" onclick="prep192AdicionarMaterial('${eventoId}','montagem')">+ Material Extra</button></div>${tabelaMateriais(montagem,true)}</div>
 
   <div class="card"><div class="sectionhead"><div><h3 style="margin:0">5. Projeto de execução</h3><div class="muted">O desenho fica oculto até abrir o projeto. O desenho salvo será preservado.</div></div><button type="button" class="btn primary" onclick="editarProjetoEvento('${eventoId}')">✎ Abrir Projeto</button></div></div>
 
   <div class="card"><h3 style="margin-top:0">6. Anotação técnica</h3><textarea id="prep145Anotacao" style="display:block;width:100%;box-sizing:border-box;min-height:180px;resize:vertical" rows="6" placeholder="Orientações para montagem e operação">${coEsc(e.anotacao_tecnica||'')}</textarea></div>
 
-  <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">7. Documentação</h3><div class="tablewrap"><table><thead><tr><th>Documento</th><th>Status</th></tr></thead><tbody><tr><td>Alvará de Queima de Fogos</td><td><span style="color:${String(docs217.alvara||'').toLowerCase()==='concluído'?'#38b86b':'#ef5350'};font-weight:800">${coEsc(docs217.alvara||'Pendente')}</span></td></tr><tr><td>Croqui Polícia Civil</td><td><span style="color:${String(docs217.croqui||'').toLowerCase()==='concluído'?'#38b86b':'#ef5350'};font-weight:800">${coEsc(docs217.croqui||'Pendente')}</span></td></tr></tbody></table></div><p class="muted">A situação da documentação é mantida pelo módulo de documentação do evento.</p></div><div class="card" style="display:none;margin-bottom:16px"><h3 style="margin-top:0">8. Ocorrências de campo</h3><textarea id="prep217Ocorrencias" rows="4" placeholder="Registre ocorrências, observações e acontecimentos durante o evento">${coEsc(info217.ocorrencias||'')}</textarea></div><div class="actions"><button class="btn primary" onclick="prep145Salvar('${eventoId}')">Salvar preparação</button><button class="btn secondary" onclick="prep217Imprimir('${eventoId}')">🖨 Imprimir projeto de execução</button><button class="btn secondary" onclick="abrirMapaReservasV140()">Ver reservas</button></div><div id="prep145Msg" class="msg"></div>`;
+  <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">7. Documentação</h3><div class="tablewrap"><table><thead><tr><th>Documento</th><th>Status</th></tr></thead><tbody><tr><td>Alvará de Queima de Fogos</td><td><span style="color:${String(docs217.alvara||'').toLowerCase()==='concluído'?'#38b86b':'#ef5350'};font-weight:800">${coEsc(docs217.alvara||'Pendente')}</span></td></tr><tr><td>Croqui Polícia Civil</td><td><span style="color:${String(docs217.croqui||'').toLowerCase()==='concluído'?'#38b86b':'#ef5350'};font-weight:800">${coEsc(docs217.croqui||'Pendente')}</span></td></tr></tbody></table></div><button type="button" class="btn primary" style="background:#15803d;margin-top:10px" onclick="cz316ConcluirDocs('${eventoId}')">✓ Concluído</button><p class="muted">Status salvo no Supabase e compartilhado com todos os computadores.</p></div><div class="card" style="display:none;margin-bottom:16px"><h3 style="margin-top:0">8. Ocorrências de campo</h3><textarea id="prep217Ocorrencias" rows="4" placeholder="Registre ocorrências, observações e acontecimentos durante o evento">${coEsc(info217.ocorrencias||'')}</textarea></div><div class="actions"><button class="btn primary" onclick="prep145Salvar('${eventoId}')">Salvar preparação</button><button class="btn secondary" onclick="prep217Imprimir('${eventoId}')">🖨 Imprimir projeto de execução</button><button class="btn secondary" onclick="abrirMapaReservasV140()">Ver reservas</button></div><div id="prep145Msg" class="msg"></div>`;
  }catch(err){$('#content').innerHTML=`<div class="msg">Erro: ${coEsc(err.message)}</div>`}
+}
+async function cz316ConcluirDocs(eventoId){
+ try{
+  const atual=cz135Load();atual.eventos=atual.eventos||{};
+  const anterior=atual.eventos[eventoId]||{};
+  atual.eventos[eventoId]={...anterior,docs:{...(anterior.docs||{}),alvara:'Concluído',croqui:'Concluído'}};
+  cz135Save(atual);
+  await czSharedStorage.descarregar();
+  if(czSharedStorage.pendentes.size)throw Error('Sincronização pendente. Não foi possível confirmar a gravação.');
+  const r=await db.from('cz_estado_compartilhado').select('valor').eq('chave',CZ135_KEY).maybeSingle();
+  if(r.error)throw r.error;
+  const remoto=JSON.parse(r.data?.valor||'{}');
+  const docs=remoto.eventos?.[eventoId]?.docs;
+  if(docs?.alvara!=='Concluído'||docs?.croqui!=='Concluído')throw Error('O servidor ainda não confirmou os documentos.');
+  await prep141Abrir(eventoId);
+ }catch(e){await czAlert('Documentação não confirmada: '+e.message,'Supabase')}
 }
 async function prep145Salvar(id){
  const msg=$('#prep145Msg');if(msg)msg.textContent='Salvando...';
@@ -6449,7 +6476,7 @@ async function prep192AdicionarMaterial(eventoId,origem){
  const box=document.createElement('div');
  box.style.cssText='background:#17202b;color:white;border:1px solid #44556a;border-radius:14px;padding:20px;width:min(960px,100%);max-height:90vh;overflow:auto';
  const rows=itens.map(x=>{
-   const codigo=x._czTipo==='ativo'?(cz274Lote(x)||unidadesAtivo(x).join(' · ')||'SEM RASTREIO'):(x.codigo_barras||'');
+   const codigo=x._czTipo==='ativo'?(cz274Lote(x)||'Identificar na saída'):(x.codigo_barras||'');
    const disponivel=Math.max(0,Number(x._czTipo==='ativo'?x.quantidade:x.estoque_atual)||0);
    const busca=(String(x.nome||'')+' '+String(codigo)).toLowerCase();
    return `<tr data-busca="${esc(busca)}" data-id="${esc(String(x.id))}" data-tipo="${esc(x._czTipo)}">
@@ -6493,7 +6520,7 @@ async function prep192AdicionarMaterial(eventoId,origem){
      if(qtd+jaNoEvento>disponivel){
        msg.textContent=item.nome+': disponível '+disponivel+', já separado para este evento '+jaNoEvento+'. Quantidade adicional máxima: '+Math.max(0,disponivel-jaNoEvento)+'.';return;
      }
-     registros.push({evento_id:eventoId,tipo:item._czTipo,item_id:item.id,nome_item:item.nome,codigo:ehAtivo?(cz274Lote(item)||unidadesAtivo(item).slice(jaNoEvento,jaNoEvento+qtd).join(' · ')||null):(item.codigo_barras||null),quantidade_necessaria:qtd,quantidade_bipada:0,origem});
+     registros.push({evento_id:eventoId,tipo:item._czTipo,item_id:item.id,nome_item:item.nome,codigo:ehAtivo?(cz274Lote(item)||null):(item.codigo_barras||null),quantidade_necessaria:qtd,quantidade_bipada:0,origem});
    }
    if(!registros.length){msg.textContent='Nenhum item válido selecionado.';return}
    const btn=box.querySelector('#prep216Salvar');btn.disabled=true;msg.textContent='Salvando...';
@@ -8321,7 +8348,7 @@ function cz293CodigoLinha(x){
 }
 // V307: listas de retorno com contagem visível e conclusão em verde.
 function cz307Linha(nomeProduto,codigo,contratado,extraQtd,levou,voltou){
- const completo=levou>0&&voltou>=levou;
+ const completo=levou>0&&(voltou>=levou||(extraQtd>0&&voltou>=extraQtd));
  return `<tr style="${completo?'background:#bbf7d0;color:#052e16;':''}">
  <td><b>${E(nomeProduto)}</b><div class="cz245Muted" style="${completo?'color:#14532d;':''}">${E(codigo)}</div></td>
  <td>${contratado}</td><td>${extraQtd}</td><td><b>${levou}</b></td><td><b>${voltou}</b></td>
@@ -8359,7 +8386,7 @@ function render(){
  ${evento?.saida_baixada_em&&mat.some(x=>ativo(x)&&qtd(x)>0&&!cz293CodigosSaida(x).length)?`<div class="cz245Card"><b>Regularizar identificação dos rastreios</b><p>Selecione somente os códigos que realmente saíram. A regularização não altera o estoque.</p><button class="cz245Btn alt" onclick="cz299AbrirRegularizacao()">Identificar rastreios da saída</button><div id="cz299Area"></div></div>`:""}
  <div class="cz245Card"><h3>2. Lista de Bipagem de Retorno</h3><div id="cz291ListaBipados">${cz291ListaBipados()}</div></div>
  <div class="cz245Card"><h3>3. Lista principal — Materiais enviados</h3><div id="cz291ListaPrincipal">${cz291ListaPrincipal()}</div></div>
- ${concluido||cz307TemFaltantes()?cz291Pendencias():''}
+ ${window.cz316MostrarPendencias&&concluido?cz291Pendencias():''}
  <div class="cz245Card"><div class="cz245Row"><button class="cz245Btn" onclick="cz245Finalizar()" ${evento.status==='finalizado'?'disabled':''}>✓ Concluir Retorno de Evento</button><button class="cz245Btn alt" onclick="cz245Imprimir()">▤ Imprimir Relatório</button></div></div>`;
  if(aberto)cz291AtivarLeitor();
  if(modal)desenharModal();
@@ -8553,7 +8580,7 @@ window.cz245ConfirmarBaixaCons=async()=>{
 };
 window.cz245Bipar=async()=>{
  if(ocupado)return;const inp=document.getElementById('scanRetorno'),msg=document.getElementById('retMsg'),codigo=normalizarCodigoEvento(inp?.value);if(!codigo)return;
- try{await cz294CarregarSaidaRemota(id)}catch(e){msg.textContent=e.message;return}
+ // V316: histórico da saída já foi consultado ao abrir e será recarregado após a confirmação no servidor.
  const tipo=window.cz291BipagemAberta?'todos':(modal?.tipo||'todos');
  const candidatos=mat.filter(x=>{
   if(!(tipo==='todos'?true:tipo==='ativo'?ativo(x):tipo==='consumo'?!ativo(x):extra(x)&&!ativo(x))||dev(x)>=qtd(x))return false;
@@ -8583,7 +8610,7 @@ async function carregar(){
  mat=ms.filter(x=>Number(x.quantidade_necessaria||0)>0||ret226Esperado(x,evento)>0);
  ret226Cache={e:evento,mats:mat};
 }
-window.cz245Abrir=async eventoId=>{window.cz245Fechar();id=String(eventoId);modal=null;window.cz291BipagemAberta=false;window.cz291BipagemConcluida=false;document.getElementById('content').innerHTML='<div class="card">Carregando retorno...</div>';try{await carregar();render()}catch(e){document.getElementById('content').innerHTML='<div class="msg">Erro ao carregar retorno: '+E(e.message)+'</div>'}};
+window.cz245Abrir=async eventoId=>{window.cz245Fechar();id=String(eventoId);modal=null;window.cz291BipagemAberta=false;window.cz291BipagemConcluida=false;window.cz316MostrarPendencias=false;document.getElementById('content').innerHTML='<div class="card">Carregando retorno...</div>';try{await carregar();render()}catch(e){document.getElementById('content').innerHTML='<div class="msg">Erro ao carregar retorno: '+E(e.message)+'</div>'}};
 let cz245Finalizando=false;
 window.cz245Finalizar=async()=>{
  if(cz245Finalizando)return;
@@ -8606,7 +8633,7 @@ window.cz245Finalizar=async()=>{
  if(!evento.saida_baixada_em)avisos.push('SAÍDA DO EVENTO AINDA NÃO CONFIRMADA NO SUPABASE.');
  if(avisos.length){
   // A tela de pendências abre com as ações existentes, sem fazer baixa ou PDV automaticamente.
-  window.cz291BipagemAberta=false;window.cz291BipagemConcluida=true;
+  window.cz291BipagemAberta=false;window.cz291BipagemConcluida=true;window.cz316MostrarPendencias=true;
   render();
   if(ativosPendentes.length||extras.some(x=>restante(x)>0)){
    modal={tipo:'cz307faltantes',titulo:'Materiais faltantes — decidir antes de concluir'};
@@ -8614,7 +8641,14 @@ window.cz245Finalizar=async()=>{
   }else await czAlert('O retorno ainda tem pendências que exigem confirmação no banco.\n\n'+avisos.join('\n\n'),'Pendências do retorno');
   return;
  }
- if(!await czConfirm('Concluir o retorno e mover o evento para Eventos Concluídos?','Concluir retorno','Finalizar evento'))return;
+ // V316: revisão final de consumo contratado, sem baixa manual ou duplicada.
+ // O servidor continua sendo o único responsável pela baixa oficial do estoque.
+ const conferenciaConsumo=cz266Grupos().filter(g=>g.contratado>0).map(g=>
+  g.nome+': contratado '+g.contratado+' | devolvido (prioridade extra) '+Math.max(0,g.voltou-g.extra)+' | consumo contratado '+g.contratadoUsado
+ ).join('\n');
+ const pergunta='REVISÃO DO CONSUMO CONTRATADO\n\n'+(conferenciaConsumo||'Nenhum consumível contratado.')+
+  '\n\nAs quantidades são calculadas a partir das leituras confirmadas no Supabase. A baixa será executada somente pela conclusão oficial do evento.\n\nConfirmar e concluir retorno?';
+ if(!await czConfirm(pergunta,'Conferência final — consumo contratado','Confirmar conclusão'))return;
  cz245Finalizando=true;
  const botao=document.querySelector('button[onclick="cz245Finalizar()"]');
  if(botao){botao.disabled=true;botao.textContent='Concluindo retorno...'}
@@ -8645,9 +8679,7 @@ window.cz245Imprimir=()=>{
 // Tela oficial de retorno da Central e atalhos legados.
 ret226Abrir=window.cz245Abrir;
 abrirRetornoEvento=window.cz245Abrir;
-// Ajusta a preparação existente sem perder botões e campos já implementados.
-const prepAntiga=prep141Abrir;
-prep141Abrir=async function(eventoId){await prepAntiga(eventoId);const area=document.getElementById('content');if(!area)return;const hs=[...area.querySelectorAll('h3')];const hc=hs.find(x=>/Produtos Contratados/i.test(x.textContent)),he=hs.find(x=>/Produto Extra/i.test(x.textContent));if(!hc||!he)return;const c1=hc.closest('.card'),c2=he.closest('.card');if(!c1||!c2||c1===c2)return;const bloco1=[c1],bloco2=[c2];if(c1.nextElementSibling?.classList.contains('tablewrap')||c1.nextElementSibling?.classList.contains('empty'))bloco1.push(c1.nextElementSibling);if(c2.nextElementSibling?.classList.contains('tablewrap')||c2.nextElementSibling?.classList.contains('empty'))bloco2.push(c2.nextElementSibling);const grid=document.createElement('div');grid.className='cz245Split';const box1=document.createElement('div'),box2=document.createElement('div');box1.className='cz245Card';box2.className='cz245Card';c1.before(grid);grid.append(box1,box2);bloco1.forEach(el=>box1.appendChild(el));bloco2.forEach(el=>box2.appendChild(el));hc.textContent='Materiais Contratados';he.textContent='Materiais Extras';};
+// V316: apresentação unificada já renderizada diretamente por prep141Abrir.
 })();
 
 
