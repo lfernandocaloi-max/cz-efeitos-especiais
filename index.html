@@ -6334,10 +6334,15 @@ async function prep141Abrir(eventoId){
   if(error)throw error;if(em)throw em;
   const mats=m||[];const info217=prep217Local(eventoId);const docs217=cz135Evento(eventoId).docs||{};
   // Usa a estrutura REAL já existente no sistema: origem = orcamento / extra / montagem.
+  // V325: itens do orçamento (consumo e ativos) devem aparecer em Contratados.
+  // A origem, e não o tipo de material, determina o bloco.
+  const origemPrep=x=>String(x.origem||'').trim().toLowerCase();
+  const ehExtraPrep=x=>['extra','extras'].includes(origemPrep(x));
+  const ehMontagemPrep=x=>['montagem','material_montagem'].includes(origemPrep(x));
   const grupos={
-   contratado:mats.filter(x=>String(x.origem||'').toLowerCase()==='orcamento'),
-   extra:mats.filter(x=>String(x.origem||'').toLowerCase()==='extra'),
-   montagem:mats.filter(x=>String(x.origem||'').toLowerCase()==='montagem'||(String(x.origem||'').toLowerCase()==='orcamento'&&x.tipo==='ativo'))
+   contratado:mats.filter(x=>!ehExtraPrep(x)&&!ehMontagemPrep(x)),
+   extra:mats.filter(ehExtraPrep),
+   montagem:mats.filter(ehMontagemPrep)
   };
   // V316: agrupar as quantidades por cadastro sem alterar as linhas oficiais no Supabase.
   const agrupados=(linhas,ehMontagem)=>{
@@ -6359,11 +6364,13 @@ async function prep141Abrir(eventoId){
    return `<tr><td>${coEsc(g.nome)}</td><td>${g.contratado}</td><td>${g.extra}</td><td><b>${g.contratado+g.extra}</b></td><td>${coEsc([...new Set(g.codigos)].join(' · ')||'A identificar na saída')}</td><td>${excluir||'—'}</td></tr>`;
   }).join('');
   const tabelaMateriais=(linhas,ehMontagem)=>`<div class="tablewrap"><table><thead><tr><th>Descrição</th><th>Qtd.</th><th>Extra</th><th>Total</th><th>Cód.</th><th>Ação</th></tr></thead><tbody>${linhasTabela(linhas,ehMontagem)||'<tr><td colspan="6">Nenhum material registrado.</td></tr>'}</tbody></table></div>`;
-  const contratados=[...grupos.contratado.filter(x=>x.tipo!=='ativo'),...grupos.extra.filter(x=>x.tipo!=='ativo')];
-  const montagem=[...grupos.contratado.filter(x=>x.tipo==='ativo'),...grupos.montagem.filter(x=>String(x.origem).toLowerCase()==='montagem'),...grupos.extra.filter(x=>x.tipo==='ativo')];
+  const contratados=grupos.contratado;
+  const extras=grupos.extra;
+  const montagem=grupos.montagem;
   $('#content').innerHTML=`<div class="sectionhead"><div><h2>${coEsc(e.nome_evento||'Evento')}</h2><div class="muted">${coEsc(e.cliente_nome||'')} • ${finDate(e.data_evento)} • ${coEsc(e.cidade_evento||'')}</div></div><button class="btn secondary" onclick="renderEventos()">Voltar</button></div>
   <div class="card"><h3 style="margin-top:0">1. Informações do evento</h3><div class="row"><div class="field"><label>Cliente</label><input value="${coEsc(e.cliente_nome||'')}" disabled></div><div class="field"><label>Telefone</label><input value="${coEsc(e.cliente_telefone||'')}" disabled></div></div><div class="row"><div class="field"><label>Data</label><input value="${finDate(e.data_evento)}" disabled></div><div class="field"><label>Horário</label><input value="${coEsc(e.horario_evento||'')}" disabled></div></div><div class="row"><div class="field"><label>Local</label><input value="${coEsc(e.local_evento||'')}" disabled></div><div class="field"><label>Cidade</label><input value="${coEsc(e.cidade_evento||'')}" disabled></div></div></div>
-  <div class="card"><div class="sectionhead"><div><h3 style="margin:0">2. Produtos Contratados</h3><div class="muted">Quantidade do orçamento e extras no mesmo bloco.</div></div><button class="btn secondary" onclick="prep192AdicionarMaterial('${eventoId}','extra')">+ Material Extra</button></div>${tabelaMateriais(contratados,false)}</div>
+  <div class="card"><div class="sectionhead"><div><h3 style="margin:0">2. Produtos Contratados</h3><div class="muted">Todos os itens do orçamento: produtos de uso e consumo e ativos/equipamentos contratados.</div></div></div>${tabelaMateriais(contratados,false)}</div>
+  <div class="card"><div class="sectionhead"><div><h3 style="margin:0">3. Produtos Extras</h3><div class="muted">Materiais adicionais separados dos contratados.</div></div><button class="btn secondary" onclick="prep192AdicionarMaterial('${eventoId}','extra')">+ Material Extra</button></div>${tabelaMateriais(extras,false)}</div>
   <div class="card"><div class="sectionhead"><div><h3 style="margin:0">4. Materiais de Montagem</h3><div class="muted">O rastreio individual é identificado somente na saída.</div></div><button class="btn secondary" onclick="prep192AdicionarMaterial('${eventoId}','montagem')">+ Material Extra</button></div>${tabelaMateriais(montagem,true)}</div>
 
   <div class="card"><div class="sectionhead"><div><h3 style="margin:0">5. Projeto de execução</h3><div class="muted">O desenho fica oculto até abrir o projeto. O desenho salvo será preservado.</div></div><button type="button" class="btn primary" onclick="editarProjetoEvento('${eventoId}')">✎ Abrir Projeto</button></div></div>
