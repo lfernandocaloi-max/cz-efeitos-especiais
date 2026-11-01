@@ -169,6 +169,14 @@ body .ret226Dialog button[aria-label="Fechar"]{color:#334155!important}
 @media(max-width:1150px){#content:has(#orcClienteSelect) .orc-team-row{grid-template-columns:repeat(3,minmax(0,1fr))!important}}
 @media(max-width:600px){#content:has(#orcClienteSelect) .orc-team-row{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
 
+/* CZ V331 — deslocamento com vários veículos, sem alterar a equipe. */
+#content:has(#orcClienteSelect) .cz331-vehicle-row{padding:10px 0;border-bottom:1px solid rgba(150,165,180,.22)}
+#content:has(#orcClienteSelect) .cz331-vehicle-row:first-child{padding-top:0}
+#content:has(#orcClienteSelect) .cz331-vehicle-row .orc-travel-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+#content:has(#orcClienteSelect) .cz331-vehicle-row .orc-travel-grid .field:first-child{grid-column:1/-1}
+#content:has(#orcClienteSelect) .cz331-vehicle-row .field{min-width:0}
+#content:has(#orcClienteSelect) .cz331-vehicle-row input,#content:has(#orcClienteSelect) .cz331-vehicle-row select{width:100%;min-width:0}
+#content:has(#orcClienteSelect) .cz331-vehicle-row .cz331-remove{margin-top:8px}
 /* V267-E1: Deslocamento e Equipe lado a lado, em quadros independentes. */
 #content:has(#orcClienteSelect) .cz267-logistica-lado-a-lado{display:grid;grid-template-columns:minmax(300px,36%) minmax(0,64%);gap:14px;align-items:stretch;margin-bottom:18px}
 #content:has(#orcClienteSelect) .cz267-logistica-lado-a-lado>.card{margin-bottom:0!important;min-width:0;overflow:hidden}
@@ -526,7 +534,18 @@ function czAlert(mensagem,titulo='Aviso'){return czDialog({titulo,mensagem,tipo:
 function czConfirm(mensagem,titulo='Confirmação',confirmar='Confirmar'){return czDialog({titulo,mensagem,tipo:'confirmar',confirmar,cancelar:'Cancelar'})}
 function czPrompt(mensagem,valor='',titulo='Preenchimento'){return czDialog({titulo,mensagem,tipo:'prompt',valor,confirmar:'Continuar',cancelar:'Cancelar'})}
 window.alert=(m)=>{czAlert(m)};
-const modules=['Dashboard','Clientes','Orçamentos','Contratos','Eventos','Retorno de evento','Estoque','Ativos / Equipamentos','Colaboradores','Manutenção','Financeiro / DRE','Agenda','Relatórios','Configurações','Lista de compra','Veículos','Caixa','PDV','Sair pro Evento','Oficina','Inventário / Contagem','Monitoramento de Eventos','Eventos Concluídos','Capas dos Orçamentos'];
+// CZ V331: propostas antigas mantêm um veículo; novas guardam lista em dados.deslocamento.veiculos.
+function cz331ListaDeslocamento(des){
+  const d=des||{};
+  return Array.isArray(d.veiculos)&&d.veiculos.length?d.veiculos:[d];
+}
+function cz331TotalDeslocamento(des){
+  return cz331ListaDeslocamento(des).reduce((s,v)=>s+Number(v.km||0)*Number(v.valor_km||0)+Number(v.pedagio||0),0);
+}
+function cz331NomesVeiculos(des){
+  return cz331ListaDeslocamento(des).map(v=>v.veiculo||'').filter(Boolean).join(', ');
+}
+const modules=['Dashboard' ,'Clientes','Orçamentos','Contratos','Eventos','Retorno de evento','Estoque','Ativos / Equipamentos','Colaboradores','Manutenção','Financeiro / DRE','Agenda','Relatórios','Configurações','Lista de compra','Veículos','Caixa','PDV','Sair pro Evento','Oficina','Inventário / Contagem','Monitoramento de Eventos','Eventos Concluídos','Capas dos Orçamentos'];
 // V212 — grupos recolhíveis sem alterar os índices dos módulos.
 const cz212Menu=[
  {i:2},{i:3},{i:21,label:'Monitoramento de Eventos'},{i:0,label:'Central Operacional'},{i:11},{i:22,label:'Eventos Concluídos'},{i:1},
@@ -1363,7 +1382,7 @@ async function abrirFechamentoEvento(id){
  let o=null;if(e.origem_orcamento_id){const r=await db.from('orcamentos').select('*').eq('id',e.origem_orcamento_id).maybeSingle();o=r.data||null}
  const d=o?.dados||{}, total=Number(o?.valor_total??d.total??0), recebido=o?finPagoOrc(o.id):0, falta=Math.max(0,total-recebido), maoCZ=Number(d.mao_obra_cz||0);
  const equipe=(d.equipe||[]).reduce((s,x)=>s+(Number(x.valor_diaria||0)*Number(x.diarias||0))+(Number(x.alimentacao||0)*Number(x.diarias||0))+(Number(x.estadia||0)*Number(x.qtd_estadia??x.diarias??0)),0);
- const desloc=(Number(d.deslocamento?.km||0)*Number(d.deslocamento?.valor_km||0))+Number(d.deslocamento?.pedagio||0);
+ const desloc=cz331TotalDeslocamento(d.deslocamento);
  const ids=(d.produtos||[]).map(x=>x.id).filter(Boolean);let custos={};if(ids.length){const pr=await db.from('produtos').select('id,nome,valor_custo').in('id',ids);(pr.data||[]).forEach(x=>custos[String(x.id)]=x)}
  const mats=(d.produtos||[]).map(x=>({nome:x.nome||custos[String(x.id)]?.nome||'Produto',q:Number(x.quantidade||0),unit:Number(custos[String(x.id)]?.valor_custo||0)}));
  const material=mats.reduce((s,x)=>s+x.q*x.unit,0);
@@ -2051,13 +2070,14 @@ async function renderOrcamentos(novo=false, dadosDuplicacao=null){
     <div class="cz267-logistica-lado-a-lado">
     <div class="card cz267-deslocamento-card" style="margin-bottom:18px">
       <h3 style="margin:0 0 10px">Deslocamento</h3>
-      <div class="orc-travel-grid">
+      <div id="cz331VeiculosLista"><div class="cz331-vehicle-row"><div class="orc-travel-grid">
         <div class="field"><label for="orcVeiculo">Veículo</label><select id="orcVeiculo"><option value="">Carregando veículos...</option></select></div>
         <div class="field"><label>Km rodado</label><input id="orcKm" type="number" min="0" value="0"></div>
         <div class="field"><label>Valor do km</label><input id="orcValorKm" type="number" min="0" step="0.01" value="0" readonly></div>
         <div class="field"><label>Total dos km</label><input id="orcTotalKm" value="R$ 0,00" readonly></div>
         <div class="field"><label>Pedágio</label><input id="orcPedagio" type="number" min="0" step="0.01" value="0"></div>
-      </div>
+      </div></div></div>
+      <button type="button" id="cz331AdicionarVeiculo" class="btn secondary" style="margin:10px 0">+ Adicionar veículo</button>
       <div class="orc-team-total"><strong>Total do Deslocamento: <span id="orcTotalDeslocamento">R$ 0,00</span></strong></div>
     </div>
 
@@ -2151,6 +2171,35 @@ async function renderOrcamentos(novo=false, dadosDuplicacao=null){
     <div id="orcMsg" class="msg" role="status"></div>
   `;
 
+ // CZ V331: cada linha de deslocamento possui seus próprios quilômetros, pedágio e custo/km.
+ function cz331Linhas(){return [...document.querySelectorAll('#cz331VeiculosLista .cz331-vehicle-row')]}
+ function cz331LerVeiculos(){return cz331Linhas().map(l=>{
+   const select=l.querySelector('.cz331Veiculo')||l.querySelector('#orcVeiculo');
+   const id=select?.value||null;
+   const v=veiculosOrc.find(x=>String(x.id)===String(id));
+   return {veiculo_id:id,veiculo:v?.nome||'',km:Number((l.querySelector('.cz331Km')||l.querySelector('#orcKm'))?.value||0),valor_km:Number((l.querySelector('.cz331ValorKm')||l.querySelector('#orcValorKm'))?.value||0),pedagio:Number((l.querySelector('.cz331Pedagio')||l.querySelector('#orcPedagio'))?.value||0)};
+ })}
+ function cz331AdicionarLinha(d={}){
+   const linha=document.createElement('div');linha.className='cz331-vehicle-row';
+   linha.innerHTML=`<div class="orc-travel-grid">
+     <div class="field"><label>Veículo</label><select class="cz331Veiculo"><option value="">Selecione um veículo</option>${veiculosOrc.map(v=>`<option value="${esc(v.id)}">${esc(v.nome)}${v.placa?' — '+esc(v.placa):''}</option>`).join('')}</select></div>
+     <div class="field"><label>Km rodado</label><input class="cz331Km" type="number" min="0" step="0.01" value="0"></div>
+     <div class="field"><label>Valor do km</label><input class="cz331ValorKm" type="number" min="0" step="0.01" value="0" readonly></div>
+     <div class="field"><label>Total dos km</label><input class="cz331TotalKm" value="R$ 0,00" readonly></div>
+     <div class="field"><label>Pedágio</label><input class="cz331Pedagio" type="number" min="0" step="0.01" value="0"></div>
+   </div><button type="button" class="btn secondary cz331-remove">Remover veículo</button>`;
+   $('#cz331VeiculosLista').appendChild(linha);
+   const sel=linha.querySelector('.cz331Veiculo');sel.value=String(d.veiculo_id||'');
+   linha.querySelector('.cz331Km').value=Number(d.km||0);
+   linha.querySelector('.cz331Pedagio').value=Number(d.pedagio||0);
+   const encontrado=veiculosOrc.find(v=>String(v.id)===sel.value);
+   linha.querySelector('.cz331ValorKm').value=Number(encontrado?.valor_km??d.valor_km??0).toFixed(2);
+   sel.addEventListener('change',()=>{const v=veiculosOrc.find(x=>String(x.id)===sel.value);linha.querySelector('.cz331ValorKm').value=Number(v?.valor_km||0).toFixed(2);atualizarEquipe()});
+   linha.querySelectorAll('input').forEach(el=>el.addEventListener('input',atualizarEquipe));
+   linha.querySelector('.cz331-remove').onclick=()=>{linha.remove();atualizarEquipe()};
+   atualizarEquipe();return linha;
+ }
+ $('#cz331AdicionarVeiculo').onclick=()=>cz331AdicionarLinha();
  let parcelasRestanteBase=-1,parcelasRestanteQtd=0;
  // CZ V330: o último campo de desconto editado governa o cálculo.
  // Valores monetários permanecem em reais e percentuais são derivados do subtotal.
@@ -2184,7 +2233,8 @@ if (campoTotalEquipe) {
   });
 }
   const totalKm=Number($('#orcKm').value||0)*Number($('#orcValorKm').value||0);
-  const deslocamento=totalKm+Number($('#orcPedagio').value||0);
+  const deslocamento=cz331LerVeiculos().reduce((s,v)=>s+v.km*v.valor_km+v.pedagio,0);
+  cz331Linhas().forEach(l=>{const km=Number((l.querySelector('.cz331Km')||l.querySelector('#orcKm'))?.value||0),valor=Number((l.querySelector('.cz331ValorKm')||l.querySelector('#orcValorKm'))?.value||0);(l.querySelector('.cz331TotalKm')||l.querySelector('#orcTotalKm')).value=money(km*valor)});
   $('#orcTotalKm').value=money(totalKm);
   $('#orcTotalDeslocamento').textContent=money(deslocamento);
   const itens = [...itensProduto,...itensAtivo].reduce((s,item)=>s+item.quantidade*item.preco,0);
@@ -2432,12 +2482,17 @@ atualizarEquipe();
     const opcaoCliente=clientePorId||clientePorNome;
     if(opcaoCliente){clienteSelect.value=opcaoCliente.value;clienteSelect.dispatchEvent(new Event('change'))}
     else{$('#orcMsg').textContent='Confira o cliente: o cadastro original não foi localizado. Selecione um cliente antes de gerar a proposta.'}
+    if(Array.isArray(des.veiculos)&&des.veiculos.length){
+      const primeiro=des.veiculos[0];
+      Object.assign(des,{veiculo_id:primeiro.veiculo_id,veiculo:primeiro.veiculo,km:primeiro.km,valor_km:primeiro.valor_km,pedagio:primeiro.pedagio});
+    }
     if(des.veiculo_id && [...$('#orcVeiculo').options].some(o=>o.value===String(des.veiculo_id))){
       set('orcVeiculo',des.veiculo_id);$('#orcVeiculo').dispatchEvent(new Event('change'));
     }
     set('orcKm',des.km);set('orcPedagio',des.pedagio);
     // Mantém o custo/km original caso o veículo não exista mais no cadastro.
     if(!$('#orcVeiculo').value && des.valor_km!=null)set('orcValorKm',des.valor_km);
+    if(Array.isArray(des.veiculos))des.veiculos.slice(1).forEach(v=>cz331AdicionarLinha(v));
     const equipe=Array.isArray(d.equipe)?d.equipe:[];
     equipe.forEach((e,i)=>{
       if(i>0)$('#btnAdicionarColaborador').click();
@@ -2488,7 +2543,8 @@ atualizarEquipe();
       qtd_estadia:l.querySelector('.equipeQtdEstadia')?.value===''?Number(l.querySelector('.equipeDiarias')?.value||0):Number(l.querySelector('.equipeQtdEstadia')?.value||0)
     })).filter(x=>x.nome||x.diarias||x.valor_diaria||x.alimentacao||x.estadia);
     const totalEquipe=equipe.reduce((s,x)=>s+(x.valor_diaria*x.diarias)+(x.alimentacao*x.diarias)+(x.estadia*(x.qtd_estadia??x.diarias)),0);
-    const deslocamento=(Number($('#orcKm').value||0)*Number($('#orcValorKm').value||0))+Number($('#orcPedagio').value||0);
+    const veiculosDeslocamento=cz331LerVeiculos();
+    const deslocamento=veiculosDeslocamento.reduce((s,v)=>s+v.km*v.valor_km+v.pedagio,0);
     const totalItens=[...itensProduto,...itensAtivo].reduce((s,x)=>s+(x.quantidade*x.preco),0);
       const maoObraCZ=cz267LerMoeda($('#orcMaoObraCZ')?.value);
     const subtotal=Number((totalEquipe+deslocamento+totalItens+maoObraCZ).toFixed(2));
@@ -2511,7 +2567,7 @@ atualizarEquipe();
       introducao_proposta:$('#orcIntroducaoProposta')?.value.trim()||'',
       observacoes:$('#orcObservacoes')?.value.trim()||'',
       produtos:itensProduto.map(x=>({...x})), equipamentos:itensAtivo.map(x=>({...x})), equipe,
-      deslocamento:{veiculo_id:$('#orcVeiculo').value||null,veiculo:veiculosOrc.find(v=>String(v.id)===$('#orcVeiculo').value)?.nome||'',km:Number($('#orcKm').value||0),valor_km:Number($('#orcValorKm').value||0),pedagio:Number($('#orcPedagio').value||0)},
+      deslocamento:{...veiculosDeslocamento[0],veiculos:veiculosDeslocamento},
       pagamento:{modo,forma:modo==='cartao'?'Cartão — '+($('#cz231Modalidade').selectedOptions[0]?.textContent||''):modo==='avista'?$('#orcFormaPagamento').value:null,modalidade_cartao:modo==='cartao'?$('#cz231Modalidade').value:null,parcelas:modo==='cartao'&&$('#cz231Modalidade').value==='credito_parcelado'?Math.max(1,Math.min(60,Number($('#cz231Qtd').value)||1)):modo==='avista'&&$('#orcFormaPagamento').value==='Cartão de crédito'?Number($('#orcParcelasCartao').value):1,entrada_percentual:entradaPercentual,entrada_valor:entradaValor,data_entrada:modo==='contratual'?$('#orcDataEntrada').value:null,forma_entrada:modo==='contratual'?$('#orcFormaEntrada').value:null,restante:Number((total-entradaValor).toFixed(2)),parcelas_detalhes:parcelasDetalhes,vencimento_saldo:parcelasDetalhes.at(-1)?.data||null,tipo_datas:modo==='contratual'?($('#orcTipoDatasParcelas')?.value||'manual'):'manual',intervalo_dias:Number($('#orcIntervaloDias')?.value||30),dia_mensal:Number($('#orcDiaMensal')?.value||10)},
       mao_obra_cz:maoObraCZ,subtotal,desconto_percentual:descontoPercentual,desconto_valor:descontoValor,total
     };
@@ -2542,7 +2598,7 @@ atualizarEquipe();
     const itens=[...(Array.isArray(d.produtos)?d.produtos:[]).map(x=>({...x,tipo:'Produto'})),...(Array.isArray(d.equipamentos)?d.equipamentos:[]).map(x=>({...x,tipo:'Equipamento'}))];
     const campo=(nome,valor)=>`<div class="field"><label>${esc(nome)}</label><div style="overflow-wrap:anywhere">${esc(valor===null||valor===undefined||valor===''?'—':String(valor))}</div></div>`;
     const totalEquipe=equipe.reduce((s,x)=>s+Number(x.diarias||0)*(Number(x.valor_diaria||0)+Number(x.alimentacao||0))+Number(x.estadia||0)*Number(x.qtd_estadia??x.diarias??0),0);
-    const deslocamento=Number(des.km||0)*Number(des.valor_km||0)+Number(des.pedagio||0);
+    const deslocamento=cz331TotalDeslocamento(des);
     const totalItens=itens.reduce((s,x)=>s+Number(x.quantidade||0)*Number(x.preco||0),0);
     const total=Number(d.total??p.valor_total??0);
     let pagamento='';
@@ -2558,7 +2614,7 @@ atualizarEquipe();
     $('#pageTitle').textContent='Orçamentos';
     $('#content').innerHTML=`<div class="sectionhead"><div><h2>Orçamento ${esc(p.numero||'')}</h2><div class="muted">${esc(p.cliente_nome||d.cliente||'')} • ${esc(p.status||'')}</div></div><button type="button" class="btn secondary" id="voltarPropostaVisualizada">Voltar às propostas</button></div>
     <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">📋 1. Orçamento</h3><div class="row">${campo('Cliente',d.cliente||p.cliente_nome)}${campo('Telefone',d.telefone||p.cliente_telefone)}${campo('Projeto / Evento',d.evento||p.evento_nome)}${campo('Data do evento',finDate(d.data_evento||p.data_evento))}${campo('Validade do orçamento',finDate(d.validade_orcamento))}${campo('Local do evento',d.local_evento||p.local_evento)}${campo('Cidade do evento',d.cidade_evento)}${campo('Horário',d.horario)}${campo('Responsável pelo evento',d.responsavel_evento)}${campo('Telefone do responsável',d.telefone_responsavel)}</div></div>
-    <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">🚗 Deslocamento</h3><div class="row">${campo('Veículo',des.veiculo)}${campo('Quilômetros',des.km??0)}${campo('Valor do km',money(des.valor_km))}${campo('Total dos km',money(Number(des.km||0)*Number(des.valor_km||0)))}${campo('Pedágio',money(des.pedagio))}${campo('Total deslocamento',money(deslocamento))}</div></div>
+    <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">🚗 Deslocamento</h3>${cz331ListaDeslocamento(des).map((v,i)=>`<div class="row" style="margin-bottom:10px">${campo('Veículo '+(i+1),v.veiculo)}${campo('Quilômetros',v.km??0)}${campo('Valor do km',money(v.valor_km))}${campo('Total dos km',money(Number(v.km||0)*Number(v.valor_km||0)))}${campo('Pedágio',money(v.pedagio))}</div>`).join('')}<div style="text-align:right;font-weight:800">Total deslocamento: ${money(deslocamento)}</div></div>
     <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">Equipe</h3>${equipe.length?`<div class="tablewrap"><table><thead><tr><th>Colaborador</th><th>Diárias</th><th>Valor diária</th><th>Alimentação</th><th>Estadia</th><th>Total</th></tr></thead><tbody>${equipe.map(x=>`<tr><td>${esc(x.nome||'')}</td><td>${esc(x.diarias??0)}</td><td>${money(x.valor_diaria)}</td><td>${money(x.alimentacao)}</td><td>${money(x.estadia)}</td><td>${money(Number(x.diarias||0)*(Number(x.valor_diaria||0)+Number(x.alimentacao||0))+Number(x.estadia||0)*Number(x.qtd_estadia??x.diarias??0))}</td></tr>`).join('')}</tbody></table></div>`:'<div class="muted">Nenhum colaborador neste orçamento.</div>'}<div style="text-align:right;margin-top:14px;color:#55d884;font-weight:800">Total da Equipe: ${money(totalEquipe)}</div></div>
     <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">📦 2. Orçamento — itens</h3>${itens.length?`<div class="tablewrap"><table><thead><tr><th>Produto / Equipamento</th><th>Quantidade</th><th>Valor unitário</th><th>Tabela de preço</th><th>Total</th></tr></thead><tbody>${itens.map(x=>`<tr><td>${esc(x.nome||'')}</td><td>${esc(x.quantidade??0)}</td><td>${money(x.preco)}</td><td>${esc(x.tabela||'—')}</td><td>${money(Number(x.quantidade||0)*Number(x.preco||0))}</td></tr>`).join('')}</tbody></table></div>`:'<div class="muted">Nenhum item neste orçamento.</div>'}<div style="text-align:right;margin-top:14px;color:#55d884;font-weight:800">Total dos itens: ${money(totalItens)}</div></div>
     <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">Total de investimento</h3><div class="row">${campo('Subtotal',money(d.subtotal??total))}${campo('Desconto %',Number(d.desconto_percentual||0)+'%')}${campo('Desconto em R$',money(d.desconto_valor))}</div><div style="font-size:24px;font-weight:800;color:#55d884;text-align:right;margin-top:14px">Investimento do cliente: ${money(total)}</div></div>
@@ -2964,7 +3020,7 @@ async function cz267ResumoPrevistoOrcamento(o){
  const material=mats.reduce((a,x)=>a+x.q*x.unit,0);
  const equipeItens=Array.isArray(d.equipe)?d.equipe:[];
  const equipe=equipeItens.reduce((a,x)=>a+(Number(x.valor_diaria||0)*Number(x.diarias||0))+(Number(x.alimentacao||0)*Number(x.diarias||0))+(Number(x.estadia||0)*Number(x.qtd_estadia??x.diarias??0)),0);
- const desloc=(Number(d.deslocamento?.km||0)*Number(d.deslocamento?.valor_km||0))+Number(d.deslocamento?.pedagio||0);
+ const desloc=cz331TotalDeslocamento(d.deslocamento);
  const custosTotais=material+equipe+desloc;
  const lucro=total-custosTotais;
  const margem=total>0?100*lucro/total:0;
@@ -3846,7 +3902,7 @@ async function mostrarTecnicaEvento(p,info,existente=null,materiaisExistentes=[]
   const shapes=Array.isArray(existente?.projeto_execucao)?structuredClone(existente.projeto_execucao):[];
   $('#content').innerHTML=`<div class="sectionhead"><div><h2>🛠️ Técnica do evento</h2><div class="muted">Proposta ${esc(p.numero||'')} • sem valores financeiros</div></div><button type="button" class="btn secondary" id="tecVoltar">Voltar</button></div>
     <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">Cabeçalho do evento</h3><div class="tecnica-grid">
-      ${[['Cliente',info.cliente_nome],['Telefone do cliente',info.cliente_telefone],['Projeto / Evento',info.nome_evento],['Data do evento',finDate(info.data_evento)],['Local do evento',info.local_evento],['Cidade do evento',dados.cidade_evento],['Horário inicial',info.horario_evento],['Responsável pelo evento',info.responsavel_evento],['Telefone do responsável',info.telefone_responsavel],['Veículo',dados.deslocamento?.veiculo],['Colaboradores',(dados.equipe||[]).map(c=>c.nome).filter(Boolean).join(', ')]].map(([nome,valor])=>`<div class="field"><label>${nome}</label><div>${esc(valor||'—')}</div></div>`).join('')}
+      ${[['Cliente',info.cliente_nome],['Telefone do cliente',info.cliente_telefone],['Projeto / Evento',info.nome_evento],['Data do evento',finDate(info.data_evento)],['Local do evento',info.local_evento],['Cidade do evento',dados.cidade_evento],['Horário inicial',info.horario_evento],['Responsável pelo evento',info.responsavel_evento],['Telefone do responsável',info.telefone_responsavel],['Veículos',cz331NomesVeiculos(dados.deslocamento)],['Colaboradores',(dados.equipe||[]).map(c=>c.nome).filter(Boolean).join(', ')]].map(([nome,valor])=>`<div class="field"><label>${nome}</label><div>${esc(valor||'—')}</div></div>`).join('')}
     </div><div class="row"><div class="field"><label for="tecInicioMontagem">Início da montagem</label><input id="tecInicioMontagem" type="date" value="${esc(info.data_inicio_montagem||'')}"></div><div class="field"><label for="tecTerminoMontagem">Término da montagem</label><input id="tecTerminoMontagem" type="date" value="${esc(info.data_termino_montagem||'')}"></div></div><div class="field"><label for="tecHorarioMontagem">Horário de montagem</label><input id="tecHorarioMontagem" type="time" value="${esc((info.horario_montagem||'').slice(0,5))}"></div></div>
     <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">Itens do orçamento</h3><div class="tablewrap"><table><thead><tr><th>Item</th><th>Tipo</th><th>Quantidade</th><th>Cód. de barras</th></tr></thead><tbody>${orcamento.map(x=>`<tr><td>${esc(x.nome)}</td><td>${x.tipo==='produto'?'Produto':'Equipamento'}</td><td>${x.quantidade}</td><td>${esc(x.codigo||'Sem código cadastrado')}</td></tr>`).join('')||'<tr><td colspan="4">Nenhum item no orçamento.</td></tr>'}</tbody></table></div></div>
     <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">Projeto de execução</h3><div class="muted">Escolha uma forma e arraste na área. Em Texto, clique no local e escreva a identificação. Selecione um desenho para apagar.</div>
@@ -3872,7 +3928,7 @@ async function mostrarTecnicaEvento(p,info,existente=null,materiaisExistentes=[]
       let clienteId=info.cliente_id;
       if(clienteId){const {error}=await db.from('clientes').update({nome:info.cliente_nome,telefone:info.cliente_telefone,endereco:info.endereco||null,atualizado_em:new Date().toISOString()}).eq('id',clienteId);if(error)throw error}
       else{const {data,error}=await db.from('clientes').insert({nome:info.cliente_nome,telefone:info.cliente_telefone,endereco:info.endereco||null,origem:'proposta',atualizado_em:new Date().toISOString()}).select('id').single();if(error)throw error;clienteId=data.id;info.cliente_id=clienteId}
-      const payload={cliente_id:clienteId,cliente_nome:info.cliente_nome,cliente_telefone:info.cliente_telefone,nome_evento:info.nome_evento,data_evento:info.data_evento,local_evento:info.local_evento||null,cidade_evento:dados.cidade_evento||null,horario_evento:info.horario_evento||null,data_inicio_montagem:info.data_inicio_montagem||null,data_termino_montagem:info.data_termino_montagem||null,horario_montagem:info.horario_montagem||null,tecnico_responsavel:info.tecnico_responsavel||null,responsavel_evento:info.responsavel_evento||null,telefone_responsavel:info.telefone_responsavel||null,veiculo:dados.deslocamento?.veiculo||null,colaboradores:(dados.equipe||[]).map(c=>c.nome).filter(Boolean),projeto_execucao:shapes,anotacao_tecnica:$('#tecAnotacao').value.trim()||null,origem_orcamento_id:p.id,status:'pendente',atualizado_em:new Date().toISOString()};
+      const payload={cliente_id:clienteId,cliente_nome:info.cliente_nome,cliente_telefone:info.cliente_telefone,nome_evento:info.nome_evento,data_evento:info.data_evento,local_evento:info.local_evento||null,cidade_evento:dados.cidade_evento||null,horario_evento:info.horario_evento||null,data_inicio_montagem:info.data_inicio_montagem||null,data_termino_montagem:info.data_termino_montagem||null,horario_montagem:info.horario_montagem||null,tecnico_responsavel:info.tecnico_responsavel||null,responsavel_evento:info.responsavel_evento||null,telefone_responsavel:info.telefone_responsavel||null,veiculo:cz331NomesVeiculos(dados.deslocamento)||null,colaboradores:(dados.equipe||[]).map(c=>c.nome).filter(Boolean),projeto_execucao:shapes,anotacao_tecnica:$('#tecAnotacao').value.trim()||null,origem_orcamento_id:p.id,status:'pendente',atualizado_em:new Date().toISOString()};
       if(eventoId){const {error}=await db.from('eventos_operacionais').update(payload).eq('id',eventoId);if(error)throw error}
       else{const {data,error}=await db.from('eventos_operacionais').insert(payload).select('id').single();if(error)throw error;eventoId=data.id;novo=true}
       const rows=[...orcamento.map(x=>({evento_id:eventoId,tipo:x.tipo,item_id:x.id,nome_item:x.nome,codigo:x.codigo||null,quantidade_necessaria:x.quantidade,quantidade_bipada:0,origem:'orcamento'})),...montagem.map(x=>({evento_id:eventoId,tipo:'ativo',item_id:x.id,nome_item:x.nome,codigo:x.codigo,quantidade_necessaria:x.quantidade,quantidade_bipada:0,origem:'montagem'}))];
