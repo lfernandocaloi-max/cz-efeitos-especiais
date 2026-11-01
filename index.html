@@ -2092,7 +2092,7 @@ async function renderOrcamentos(novo=false, dadosDuplicacao=null){
       <div class="muted" style="margin:12px 0">Composição interna do orçamento</div>
       <div class="orc-discount-grid" style="margin-top:12px">
         <div class="field"><label>Desconto %</label><input id="orcDescontoPercentual" type="number" min="0" max="100" step="0.01" value="0" inputmode="decimal"></div>
-        <div class="field"><label>Desconto em R$</label><input id="orcDescontoValor" readonly value="R$ 0,00"></div>
+        <div class="field"><label>Desconto em R$</label><input id="orcDescontoValor" type="text" inputmode="decimal" value="R$ 0,00" placeholder="R$ 0,00" aria-label="Desconto em reais"></div>
       </div>
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:20px;flex-wrap:wrap"><b>INVESTIMENTO DO CLIENTE R$</b><div id="orcInvestimento" style="font-size:27px;font-weight:900;background:#f36b16;color:#fff;padding:9px 15px;border-radius:9px">R$ 0,00</div></div>
     </div>
@@ -2120,7 +2120,7 @@ async function renderOrcamentos(novo=false, dadosDuplicacao=null){
         <div class="payment-grid">
           <div class="field"><label>Entrada %</label><input id="orcEntradaPercentual" type="number" min="0" max="100" step="0.01" value="40" inputmode="decimal"></div>
           <div class="field"><label>Valor da entrada</label><input id="orcEntradaValor" readonly value="R$ 0,00"></div>
-          <div class="field"><label for="orcDataEntrada">Data da entrada (data do orçamento)</label><input id="orcDataEntrada" type="date" value="${finISODate()}" readonly></div>
+          <div class="field"><label for="orcDataEntrada">Data prevista de pagamento da entrada</label><input id="orcDataEntrada" type="date" value="${finISODate()}"></div>
           <div class="field"><label>Forma de pagamento da entrada</label><select id="orcFormaEntrada"><option>PIX</option><option>Dinheiro</option><option>Cartão de débito</option><option>Cartão de crédito</option><option>Transferência</option></select></div>
           <div class="field"><label>Restante a pagar</label><input id="orcRestante" readonly value="R$ 0,00"></div>
           <div class="field"><label>Parcelas do restante</label><select id="orcParcelasContrato">${Array.from({length:10},(_,i)=>`<option value="${i+1}">${i+1}x</option>`).join('')}</select></div>
@@ -2152,6 +2152,9 @@ async function renderOrcamentos(novo=false, dadosDuplicacao=null){
   `;
 
  let parcelasRestanteBase=-1,parcelasRestanteQtd=0;
+ // CZ V330: o último campo de desconto editado governa o cálculo.
+ // Valores monetários permanecem em reais e percentuais são derivados do subtotal.
+ let cz330DescontoOrigem='percentual';
  const atualizarEquipe = () => {
   let totalEquipe = 0;
 
@@ -2187,10 +2190,19 @@ if (campoTotalEquipe) {
   const itens = [...itensProduto,...itensAtivo].reduce((s,item)=>s+item.quantidade*item.preco,0);
   const maoObraCZ=cz267LerMoeda($('#orcMaoObraCZ')?.value);
   const subtotal=Number((totalEquipe+deslocamento+itens+maoObraCZ).toFixed(2));
-  const percentual=Number($('#orcDescontoPercentual').value||0);
-  const desconto=Number((subtotal*Math.min(100,Math.max(0,Number.isFinite(percentual)?percentual:0))/100).toFixed(2));
+  const percentualCampo=$('#orcDescontoPercentual');
+  const reaisCampo=$('#orcDescontoValor');
+  let desconto;
+  if(cz330DescontoOrigem==='reais'){
+    const valor=cz267LerMoeda(reaisCampo.value);
+    desconto=Number(Math.min(subtotal,Math.max(0,Number.isFinite(valor)?valor:0)).toFixed(2));
+    percentualCampo.value=subtotal>0?String(Number((desconto/subtotal*100).toFixed(4))):'0';
+  }else{
+    const percentual=Number(percentualCampo.value||0);
+    desconto=Number((subtotal*Math.min(100,Math.max(0,Number.isFinite(percentual)?percentual:0))/100).toFixed(2));
+  }
   const totalGeral=Number((subtotal-desconto).toFixed(2));
-  $('#orcDescontoValor').value=money(desconto);
+  if(document.activeElement!==reaisCampo)reaisCampo.value=money(desconto);
   $('#orcInvestimento').textContent=money(totalGeral);
   $('#orcInvestimento').dataset.valor=String(totalGeral);
   atualizarPagamento();
@@ -2199,7 +2211,7 @@ if (campoTotalEquipe) {
 document.querySelectorAll('.orc-equipe-linha input, .linhaEquipe input').forEach(input => {
   input.addEventListener('input', atualizarEquipe);
 });
-['orcKm','orcValorKm','orcPedagio','orcMaoObraCZ','orcDescontoPercentual'].forEach(id=>$('#'+id).addEventListener('input',atualizarEquipe));
+['orcKm','orcValorKm','orcPedagio','orcMaoObraCZ'].forEach(id=>$('#'+id).addEventListener('input',atualizarEquipe));
  $('#orcMaoObraCZ').addEventListener('focus',e=>{e.target.value=cz267LerMoeda(e.target.value).toFixed(2).replace('.',',');e.target.select()});
  $('#orcMaoObraCZ').addEventListener('blur',e=>{e.target.value=money(cz267LerMoeda(e.target.value));atualizarEquipe()});
  $('#orcCancelarEdicao').onclick=async()=>{if(await czConfirm('Descartar as alterações deste orçamento e voltar à lista? Nenhuma proposta será excluída.','Cancelar edição','Descartar e voltar'))renderOrcamentos(false)};
@@ -2218,7 +2230,11 @@ async function prepararVeiculosOrcamento(){
   campo.innerHTML='<option value="">Selecione um veículo</option>'+veiculosOrc.map(v=>`<option value="${esc(v.id)}">${esc(v.nome)}${v.placa?' — '+esc(v.placa):''}</option>`).join('');
   if(!veiculosOrc.length)$('#orcMsg').textContent='Cadastre um veículo na página Veículos para preencher o custo por km.';
 }
-$('#orcDescontoPercentual').addEventListener('input',atualizarEquipe);
+$('#orcDescontoPercentual').addEventListener('input',()=>{cz330DescontoOrigem='percentual';atualizarEquipe()});
+$('#orcDescontoValor').addEventListener('input',()=>{cz330DescontoOrigem='reais';atualizarEquipe()});
+$('#orcDescontoValor').addEventListener('focus',e=>{e.target.value=cz267LerMoeda(e.target.value).toFixed(2).replace('.',',');e.target.select()});
+$('#orcDescontoValor').addEventListener('blur',e=>{e.target.value=money(cz267LerMoeda(e.target.value));atualizarEquipe()});
+$('#orcDataEntrada').addEventListener('change',()=>atualizarSomaParcelas());
 document.querySelectorAll('input[name="orcCondicaoPagamento"]').forEach(r=>r.addEventListener('change',()=>atualizarPagamento()));
 $('#orcFormaPagamento').onchange=()=>atualizarPagamento();
 $('#orcParcelasCartao').onchange=()=>atualizarPagamento();
@@ -2409,7 +2425,7 @@ atualizarEquipe();
     set('orcLocalEvento',d.local_evento);set('orcCidadeEvento',d.cidade_evento);set('orcHorario',d.horario);
     set('orcResponsavelEvento',d.responsavel_evento);set('orcTelefoneResponsavel',d.telefone_responsavel);
     set('orcIntroducaoProposta',d.introducao_proposta);set('orcObservacoes',d.observacoes||d.observacao);
-    set('orcMaoObraCZ',money(Number(d.mao_obra_cz||0)));set('orcDescontoPercentual',d.desconto_percentual);
+    set('orcMaoObraCZ',money(Number(d.mao_obra_cz||0)));cz330DescontoOrigem='percentual';set('orcDescontoPercentual',d.desconto_percentual);
     const clienteId=String(d.cliente_id||'');
     const clientePorId=[...clienteSelect.options].find(o=>o.value===clienteId&&clienteId);
     const clientePorNome=[...clienteSelect.options].find(o=>o.value&&o.textContent.split(' — ')[0].trim().toLowerCase()===String(d.cliente||'').trim().toLowerCase());
@@ -2476,8 +2492,10 @@ atualizarEquipe();
     const totalItens=[...itensProduto,...itensAtivo].reduce((s,x)=>s+(x.quantidade*x.preco),0);
       const maoObraCZ=cz267LerMoeda($('#orcMaoObraCZ')?.value);
     const subtotal=Number((totalEquipe+deslocamento+totalItens+maoObraCZ).toFixed(2));
-    const descontoPercentual=Number($('#orcDescontoPercentual').value||0);
-    const descontoValor=Number((subtotal*Math.min(100,Math.max(0,descontoPercentual))/100).toFixed(2));
+    const descontoValor=cz330DescontoOrigem==='reais'
+      ? Number(Math.min(subtotal,Math.max(0,cz267LerMoeda($('#orcDescontoValor').value))).toFixed(2))
+      : Number((subtotal*Math.min(100,Math.max(0,Number($('#orcDescontoPercentual').value||0)))/100).toFixed(2));
+    const descontoPercentual=subtotal>0?Number((descontoValor/subtotal*100).toFixed(4)):0;
     const total=Number((subtotal-descontoValor).toFixed(2));
     const modo=document.querySelector('input[name="orcCondicaoPagamento"]:checked')?.value||'avista';
     const entradaPercentual=modo==='contratual'?Number($('#orcEntradaPercentual').value||0):0;
@@ -6940,14 +6958,14 @@ function cz182ParcelasFechamento(p,fechamento){
  const entrada=Math.round(Number(pg.entrada_valor||0)*100);
  const parcelas=Array.isArray(pg.parcelas_detalhes)?pg.parcelas_detalhes:[];
  const lista=[];
- if(entrada>0)lista.push({rotulo:'Entrada',cent:entrada,data:fechamento,forma:pg.forma_entrada||'A definir'});
+ if(entrada>0)lista.push({rotulo:'Entrada',cent:entrada,data:pg.data_entrada||fechamento,forma:pg.forma_entrada||'A definir'});
  const qtd=parcelas.length||1;
  const resto=total-entrada;
  let soma=0;
  for(let i=0;i<qtd;i++){
   const cent=parcelas.length?Math.round(Number(parcelas[i].valor||0)*100):i===qtd-1?resto-soma:Math.floor(resto/qtd);
   soma+=cent;
-  const data=pg.tipo_datas==='intervalo'?finAddDays(fechamento,(i+1)*Math.max(1,Number(pg.intervalo_dias)||30)):cz182AddMonths(fechamento,i+1);
+  const data=parcelas[i]?.data||(pg.tipo_datas==='intervalo'?finAddDays(pg.data_entrada||fechamento,(i+1)*Math.max(1,Number(pg.intervalo_dias)||30)):cz182AddMonths(pg.data_entrada||fechamento,i+1));
   lista.push({rotulo:'Parcela '+(i+1)+'/'+qtd,cent,data,forma:parcelas[i]?.forma||'A definir'});
  }
  return lista.filter(x=>x.cent>0);
